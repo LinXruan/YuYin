@@ -170,13 +170,15 @@ class _HomePageState extends State<HomePage> {
     return [picked];
   }
 
-  /// 一键复制当前网页地址和日志面板内容，便于发送给开发者排查
+  /// 一键复制链接来源和日志面板内容，便于发送给开发者排查
   Future<void> _copyLogs() async {
     if (_logs.isEmpty) {
       _addLog('暂无可复制的日志');
       return;
     }
 
+    final sourceUrl = _sniffer.sourceUrl ?? '';
+    final awemePageUrl = _sniffer.awemePageUrl ?? '';
     var currentUrl = '';
     try {
       currentUrl = await _sniffer.controller.currentUrl() ?? '';
@@ -185,8 +187,13 @@ class _HomePageState extends State<HomePage> {
     }
 
     final buffer = StringBuffer();
-    if (currentUrl.isNotEmpty) {
-      buffer.writeln('当前网页: $currentUrl');
+    if (sourceUrl.isNotEmpty) buffer.writeln('原始链接: $sourceUrl');
+    if (awemePageUrl.isNotEmpty) buffer.writeln('嗅探页面: $awemePageUrl');
+    if (currentUrl.isNotEmpty) buffer.writeln('当前网页: $currentUrl');
+    if (sourceUrl.isNotEmpty ||
+        awemePageUrl.isNotEmpty ||
+        currentUrl.isNotEmpty) {
+      buffer.writeln();
     }
     buffer.write(_logs.join('\n'));
 
@@ -199,7 +206,11 @@ class _HomePageState extends State<HomePage> {
 
   /// 把异常转换成简短的中文提示
   String _friendlyError(Object error) {
-    if (error is TimeoutException) return '嗅探超时，请检查链接是否有效后重试';
+    if (error is TimeoutException) {
+      final message = error.message;
+      if (message != null && message.isNotEmpty) return message;
+      return '嗅探超时，请检查链接是否有效后重试';
+    }
     if (error is DioException && error.response?.statusCode == 403) {
       return '视频服务器拒绝了请求（403），请稍后重试';
     }

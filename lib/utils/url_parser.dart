@@ -1,3 +1,6 @@
+/// 抖音作品页面类型（只用于选择兜底策略，不代表作品内容）
+enum DouyinWorkPage { note, video, unknown }
+
 /// 抖音分享口令解析工具
 class UrlParser {
   UrlParser._(); // 工具类禁止实例化
@@ -42,6 +45,38 @@ class UrlParser {
         RegExp('/(?:video|note|slides)/($idPattern)').firstMatch(url);
     if (rawPath != null) return rawPath.group(1);
     return RegExp('[?&]modal_id=($idPattern)').firstMatch(url)?.group(1);
+  }
+
+  /// 是否允许 WebView 导航到该 URL（只允许网页协议）
+  static bool isAllowedNavigationUrl(String url) {
+    final lower = url.trim().toLowerCase();
+    return lower.startsWith('http://') ||
+        lower.startsWith('https://') ||
+        lower.startsWith('about:');
+  }
+
+  /// 判断抖音作品页面类型：
+  /// - douyin.com / iesdouyin.com 主机的 /note/、/slides/ → note
+  /// - /video/ → video
+  /// - 短链、modal_id、其他主机 → unknown
+  static DouyinWorkPage classifyWorkPage(String? url) {
+    if (url == null || url.isEmpty) return DouyinWorkPage.unknown;
+    final uri = Uri.tryParse(url);
+    if (uri == null) return DouyinWorkPage.unknown;
+
+    final host = uri.host.toLowerCase();
+    final isDouyinHost = host == 'douyin.com' ||
+        host.endsWith('.douyin.com') ||
+        host == 'iesdouyin.com' ||
+        host.endsWith('.iesdouyin.com');
+    if (!isDouyinHost) return DouyinWorkPage.unknown;
+
+    final path = uri.path;
+    if (path.contains('/note/') || path.contains('/slides/')) {
+      return DouyinWorkPage.note;
+    }
+    if (path.contains('/video/')) return DouyinWorkPage.video;
+    return DouyinWorkPage.unknown;
   }
 
   /// 判断链接域名是否为抖音（douyin.com 及其子域名）
