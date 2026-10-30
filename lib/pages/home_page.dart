@@ -8,10 +8,12 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../services/douyin_sniffer.dart';
 import '../services/video_downloader.dart';
 import '../utils/url_parser.dart';
+import '../widgets/image_preview_sheet.dart';
 import '../widgets/log_panel.dart';
+import '../widgets/video_quality_sheet.dart';
 import 'login_webview_page.dart';
 
-/// 主界面：输入分享口令，嗅探无水印地址并保存到相册
+/// 主界面：解析作品 -> 选择画质或勾选图片/实况 -> 下载到相册
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -85,8 +87,8 @@ class _HomePageState extends State<HomePage> {
     if (done == true) _addLog('登录完成，Cookie 已保存，可重新解析获取高清画质');
   }
 
-  /// 主流程：提取短链 -> WebView 嗅探 -> 下载保存
-  Future<void> _startDownload() async {
+  /// 主流程：提取短链 -> 嗅探 -> 选择资源 -> 下载选中项
+  Future<void> _startParse() async {
     if (_busy) return;
     FocusScope.of(context).unfocus();
 
@@ -105,18 +107,33 @@ class _HomePageState extends State<HomePage> {
     }
 
     try {
-      _addLog('正在后台加载网页嗅探...');
+      _addLog('正在解析作品...');
       final result = await _sniffer.sniffVideoUrl(url);
-      final total = result.items.length;
-      _addLog(
-        '解析成功（共 $total 个资源：${result.imageCount} 张图片、'
-        '${result.videoCount} 个视频），开始下载...',
-      );
-      await _downloader.downloadMediaList(
-        result,
+      if (!mounted) return;
+      if (result.items.isEmpty) {
+        _addLog('未解析到可下载资源，请检查链接或稍后重试');
+        return;
+      }
+
+      // 普通视频选画质；图文/实况图集勾选资源
+      final selected = await _chooseItems(result);
+      if (!mounted) return;
+      if (selected == null || selected.isEmpty) {
+        _addLog('已取消下载');
+        return;
+      }
+
+      _addLog('开始下载 ${selected.length} 个选中资源...');
+      await _downloader.downloadItems(
+        selected,
+        cookie: result.cookie,
         onProgress: _updateBatchProgress,
       );
-      _addLog('全部 $total 个资源已无水印保存至系统相册！');
+      _addLog(
+        selected.length == 1
+            ? '已保存到相册！'
+            : '全部 ${selected.length} 个资源已无水印保存至系统相册！',
+      );
     } catch (error) {
       _addLog('操作失败：${_friendlyError(error)}');
     } finally {
@@ -127,6 +144,30 @@ class _HomePageState extends State<HomePage> {
         });
       }
     }
+  }
+
+  /// 根据作品类型弹出对应选择面板，返回用户选中的资源
+  Future<List<MediaItem>?> _chooseItems(SniffResult result) async {
+    if (result.isImagePost) {
+      // 图文/实况图集：网格预览并勾选
+      return ImagePreviewSheet.show(
+        context,
+        items: result.items,
+        headers: const {
+          'User-Agent': DouyinSniffer.desktopUserAgent,
+          'Referer': 'https://www.douyin.com/',
+        },
+      );
+    }
+
+    // 普通视频：从全部清晰度档位中选择一个
+    final picked = await VideoQualitySheet.show(context, result.items);
+    if (picked == null) return null;
+    final quality = picked.resolutionLabel.isNotEmpty
+        ? picked.resolutionLabel
+        : (picked.resolution ?? picked.gearName ?? '默认画质');
+    _addLog('已选择 $quality（${picked.formattedSize}）');
+    return [picked];
   }
 
   /// 把异常转换成简短的中文提示
@@ -180,9 +221,9 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
               FilledButton.icon(
-                onPressed: _busy ? null : _startDownload,
+                onPressed: _busy ? null : _startParse,
                 icon: const Icon(Icons.download),
-                label: Text(_busy ? '处理中...' : '解析并无水印下载'),
+                label: Text(_busy ? '处理中...' : '解析作品'),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),

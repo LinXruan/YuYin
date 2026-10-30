@@ -102,13 +102,15 @@ class DouyinSniffer {
         final item = MediaItem.fromJson(Map<String, dynamic>.from(raw));
         if (item.url.isNotEmpty) items.add(item);
       }
-      if (items.isNotEmpty) _finishWithItems(items);
+      if (items.isNotEmpty) {
+        _finishWithItems(items, data['isImagePost'] == true);
+      }
     } catch (e) {
       debugPrint('解析 Channel 消息失败: $e');
     }
   }
   /// 读取 Cookie 后完成当前任务
-  Future<void> _finishWithItems(List<MediaItem> items) async {
+  Future<void> _finishWithItems(List<MediaItem> items, bool isImagePost) async {
     final completer = _completer;
     if (completer == null || completer.isCompleted) return;
     var cookie = '';
@@ -121,9 +123,14 @@ class DouyinSniffer {
     }
     if (completer.isCompleted) return;
     _stopTimers();
-    final result = SniffResult(items: items, cookie: cookie);
-    final summary = '解析成功：共发现 ${result.imageCount} 张图片、'
-        '${result.videoCount} 个视频';
+    final result = SniffResult(
+      items: items,
+      cookie: cookie,
+      isImagePost: isImagePost,
+    );
+    final summary = isImagePost
+        ? '解析成功：共发现 ${result.imageCount} 张图片、${result.videoCount} 个视频'
+        : '解析成功：共发现 ${result.items.length} 个清晰度档位';
     debugPrint('[JS-Sniffer] $summary');
     onLog?.call(summary);
     completer.complete(result);

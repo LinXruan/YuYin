@@ -45,14 +45,27 @@ class VideoDownloader {
     }
   }
 
-  /// 批量下载图文/视频/实况图，并逐个保存进系统相册。
-  /// [onProgress] 参数依次为：当前序号（从 1 开始）、总数、当前文件进度（0.0 ~ 1.0）。
+  /// 批量下载嗅探结果中的全部资源（保留给旧调用方）。
   Future<void> downloadMediaList(
     SniffResult result, {
     required void Function(int current, int total, double itemProgress)
         onProgress,
+  }) {
+    return downloadItems(
+      result.items,
+      cookie: result.cookie,
+      onProgress: onProgress,
+    );
+  }
+
+  /// 下载用户选中的资源列表（单个画质档位或勾选的图片/实况）。
+  /// [onProgress] 参数依次为：当前序号（从 1 开始）、总数、当前文件进度（0.0 ~ 1.0）。
+  Future<void> downloadItems(
+    List<MediaItem> items, {
+    String? cookie,
+    required void Function(int current, int total, double itemProgress)
+        onProgress,
   }) async {
-    final items = result.items;
     final total = items.length;
     if (total == 0) {
       throw Exception('没有可下载的资源');
@@ -71,7 +84,7 @@ class VideoDownloader {
         await _downloadFile(
           item.url,
           tempPath,
-          cookie: result.cookie,
+          cookie: cookie,
           onProgress: (progress) => onProgress(i + 1, total, progress),
         );
         await _putToGallery(tempPath, item.type);
