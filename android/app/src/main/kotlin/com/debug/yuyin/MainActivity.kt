@@ -1,4 +1,4 @@
-package com.down.yuyin
+package com.debug.yuyin
 
 import io.flutter.embedding.android.FlutterActivity
 
