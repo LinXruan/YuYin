@@ -4,12 +4,12 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../models/sniff_result.dart';
+import '../models/media_item.dart';
 import 'js_script_builder.dart';
 
-export '../models/sniff_result.dart';
+export '../models/media_item.dart';
 
-/// 隐藏式 WebView 嗅探服务：加载抖音分享链接并抓取无水印视频直链
+/// 隐藏式 WebView 嗅探服务：抓取无水印视频/图文/实况图直链
 class DouyinSniffer {
   /// 抖音 PC 网页版使用的桌面 Chrome UA
   static const String desktopUserAgent =
@@ -19,6 +19,7 @@ class DouyinSniffer {
   late final WebViewController _controller;
   Completer<SniffResult>? _completer;
   Timer? _timeoutTimer;
+  Timer? _injectTimer;
   bool _acceptMessages = false;
   bool _disposed = false;
 
@@ -29,42 +30,42 @@ class DouyinSniffer {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setUserAgent(desktopUserAgent)
-      ..addJavaScriptChannel(
-        'DouyinChannel',
-        onMessageReceived: _onJavaScriptMessage,
-      )
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (_) {
-            // 新页面开始加载后才接受回传，避免旧页面的延迟消息
-            _acceptMessages = true;
-            _injectScript();
-          },
-          onPageFinished: (url) {
-            _injectScript();
-            _checkCaptcha(url);
-          },
-        ),
-      );
+      ..addJavaScriptChannel('DouyinChannel', onMessageReceived: _onJavaScriptMessage)
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageStarted: (_) {
+          // 新页面开始加载后才接受回传，避免旧页面的延迟消息
+          _acceptMessages = true;
+          _injectScript();
+        },
+        onPageFinished: (url) {
+          _injectScript();
+          _checkCaptcha(url);
+        },
+      ));
   }
-
   /// 供主界面挂载隐藏 WebViewWidget 使用
   WebViewController get controller => _controller;
-
-  /// 加载分享链接并等待 JS 回传，最长等待 20 秒
+  /// 加载分享链接并等待 JS 回传，最长等待 30 秒
   Future<SniffResult> sniffVideoUrl(String shareUrl) async {
     // 上一次未完成的任务直接失败，避免 Completer 泄漏
     _finishWithError(StateError('已有新的解析任务开始，旧任务已取消'));
-
     final completer = Completer<SniffResult>();
     _completer = completer;
     _acceptMessages = false;
 
     _timeoutTimer?.cancel();
-    _timeoutTimer = Timer(const Duration(seconds: 20), () {
-      _finishWithError(
-        TimeoutException('20 秒内未捕获到视频地址，请检查链接是否有效或稍后重试'),
-      );
+    _timeoutTimer = Timer(const Duration(seconds: 30), () {
+      _finishWithError(TimeoutException('30 秒内未捕获到无水印资源，请检查链接是否有效或稍后重试'));
+    });
+
+    // 多图页会因加载 10+ 张大图导致 onPageFinished 延迟，主动轮询注入兜底
+    _injectTimer?.cancel();
+    _injectTimer = Timer.periodic(const Duration(milliseconds: 1200), (_) {
+      if (_completer?.isCompleted ?? true) {
+        _stopTimers();
+      } else {
+        _injectScript();
+      }
     });
 
     // 重置上一个页面内的嗅探状态，再加载新链接
@@ -75,19 +76,15 @@ class DouyinSniffer {
     } catch (e) {
       debugPrint('重置嗅探状态失败: $e');
     }
-
     await _controller.loadRequest(Uri.parse(shareUrl));
     return completer.future;
   }
-
   /// 接收 JS 通过 DouyinChannel 回传的 JSON 消息
   void _onJavaScriptMessage(JavaScriptMessage message) {
     if (!_acceptMessages) return;
     try {
       final data = jsonDecode(message.message);
       if (data is! Map) return;
-
-      // JS 调试日志：打印到控制台并转发给界面日志框
       if (data['type'] == 'log') {
         final msg = data['msg']?.toString() ?? '';
         if (msg.isNotEmpty) {
@@ -96,28 +93,24 @@ class DouyinSniffer {
         }
         return;
       }
-
-      final url = data['videoUrl'] as String?;
-      if (url == null || url.isEmpty) return;
-      _finishWithUrl(
-        url,
-        width: _toInt(data['width']),
-        height: _toInt(data['height']),
-      );
+      if (data['type'] != 'result') return;
+      final rawItems = data['items'];
+      if (rawItems is! List) return;
+      final items = <MediaItem>[];
+      for (final raw in rawItems) {
+        if (raw is! Map) continue;
+        final item = MediaItem.fromJson(Map<String, dynamic>.from(raw));
+        if (item.url.isNotEmpty) items.add(item);
+      }
+      if (items.isNotEmpty) _finishWithItems(items);
     } catch (e) {
       debugPrint('解析 Channel 消息失败: $e');
     }
   }
-
   /// 读取 Cookie 后完成当前任务
-  Future<void> _finishWithUrl(
-    String url, {
-    int width = 0,
-    int height = 0,
-  }) async {
+  Future<void> _finishWithItems(List<MediaItem> items) async {
     final completer = _completer;
     if (completer == null || completer.isCompleted) return;
-
     var cookie = '';
     try {
       cookie = _jsResultToString(
@@ -126,21 +119,20 @@ class DouyinSniffer {
     } catch (e) {
       debugPrint('读取 Cookie 失败: $e');
     }
-
-    // 读取 Cookie 期间可能已超时或被新任务取消
     if (completer.isCompleted) return;
-    _timeoutTimer?.cancel();
-    _timeoutTimer = null;
-    completer.complete(
-      SniffResult(videoUrl: url, cookie: cookie, width: width, height: height),
-    );
+    _stopTimers();
+    final result = SniffResult(items: items, cookie: cookie);
+    final summary = '解析成功：共发现 ${result.imageCount} 张图片、'
+        '${result.videoCount} 个视频';
+    debugPrint('[JS-Sniffer] $summary');
+    onLog?.call(summary);
+    completer.complete(result);
   }
 
   /// 检测验证码中间页，命中后提前结束等待
   Future<void> _checkCaptcha(String url) async {
     if (_disposed || _completer == null || _completer!.isCompleted) return;
-    var hit =
-        RegExp(r'captcha|verify|security', caseSensitive: false).hasMatch(url);
+    var hit = RegExp(r'captcha|verify|security', caseSensitive: false).hasMatch(url);
     if (!hit) {
       try {
         final result = await _controller.runJavaScriptReturningResult(
@@ -156,9 +148,7 @@ class DouyinSniffer {
       }
     }
     if (hit) {
-      _finishWithError(
-        StateError('触发抖音滑块验证，请点击右上角【账号登录】手动滑块解锁'),
-      );
+      _finishWithError(StateError('触发抖音滑块验证，请点击右上角【账号登录】手动滑块解锁'));
     }
   }
 
@@ -176,23 +166,22 @@ class DouyinSniffer {
     return text == 'null' ? '' : text;
   }
 
-  int _toInt(Object? value) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String) return int.tryParse(value) ?? 0;
-    return 0;
+  /// 取消超时与轮询注入定时器
+  void _stopTimers() {
+    _timeoutTimer?.cancel();
+    _timeoutTimer = null;
+    _injectTimer?.cancel();
+    _injectTimer = null;
   }
 
   /// 超时、取消或异常时结束当前任务
   void _finishWithError(Object error) {
-    _timeoutTimer?.cancel();
-    _timeoutTimer = null;
+    _stopTimers();
     final completer = _completer;
     if (completer == null || completer.isCompleted) return;
     completer.completeError(error);
   }
 
-  /// 页面开始加载和加载完成时各注入一次嗅探脚本
   Future<void> _injectScript() async {
     if (_disposed) return;
     try {
@@ -202,7 +191,6 @@ class DouyinSniffer {
     }
   }
 
-  /// 释放服务：让等待中的任务立即失败
   void dispose() {
     _disposed = true;
     _acceptMessages = false;

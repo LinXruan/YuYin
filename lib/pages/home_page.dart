@@ -28,12 +28,7 @@ class _HomePageState extends State<HomePage> {
   bool _busy = false;
   bool _showDebugWebView = false;
   double? _progress;
-  int _lastPercent = -1;
-  String _resolutionLabel = '';
-
-  /// 日志中展示的分辨率后缀（未知时为空）
-  String get _resolutionTag =>
-      _resolutionLabel.isEmpty ? '' : '（$_resolutionLabel）';
+  String _lastProgressKey = '';
 
   @override
   void initState() {
@@ -56,15 +51,19 @@ class _HomePageState extends State<HomePage> {
     if (mounted) setState(() => _logs.add(text));
   }
 
-  /// 刷新下载进度（同一行内更新百分比，避免刷屏）
-  void _updateProgress(double progress) {
-    final percent = (progress * 100).round();
-    if (!mounted || percent == _lastPercent) return;
-    _lastPercent = percent;
+  /// 刷新批量下载进度（同一行内更新，避免刷屏）
+  void _updateBatchProgress(int current, int total, double itemProgress) {
+    final percent = (itemProgress * 100).round();
+    final key = '$current/$total/$percent';
+    if (!mounted || key == _lastProgressKey) return;
+    _lastProgressKey = key;
+
+    // 总进度 = 已完成项 + 当前项进度
+    final overall = total == 0 ? 0.0 : ((current - 1) + itemProgress) / total;
     setState(() {
-      _progress = progress;
-      final line = '已捕获无水印地址$_resolutionTag，正在下载 $percent%...';
-      if (_logs.isNotEmpty && _logs.last.startsWith('已捕获无水印地址')) {
+      _progress = overall.clamp(0.0, 1.0).toDouble();
+      final line = '正在下载第 $current/$total 个资源（$percent%）...';
+      if (_logs.isNotEmpty && _logs.last.startsWith('正在下载第')) {
         _logs[_logs.length - 1] = line;
       } else {
         _logs.add(line);
@@ -94,8 +93,7 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _busy = true;
       _progress = null;
-      _lastPercent = -1;
-      _resolutionLabel = '';
+      _lastProgressKey = '';
       _logs..clear()..add('正在提取短链...');
     });
 
@@ -109,14 +107,16 @@ class _HomePageState extends State<HomePage> {
     try {
       _addLog('正在后台加载网页嗅探...');
       final result = await _sniffer.sniffVideoUrl(url);
-      _resolutionLabel = result.resolutionLabel;
-      _addLog('已捕获无水印地址$_resolutionTag，正在下载 0%...');
-      await _downloader.downloadToGallery(
-        result.videoUrl,
-        cookie: result.cookie,
-        onProgress: _updateProgress,
+      final total = result.items.length;
+      _addLog(
+        '解析成功（共 $total 个资源：${result.imageCount} 张图片、'
+        '${result.videoCount} 个视频），开始下载...',
       );
-      _addLog('已保存到相册！');
+      await _downloader.downloadMediaList(
+        result,
+        onProgress: _updateBatchProgress,
+      );
+      _addLog('全部 $total 个资源已无水印保存至系统相册！');
     } catch (error) {
       _addLog('操作失败：${_friendlyError(error)}');
     } finally {

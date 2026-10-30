@@ -1,32 +1,13 @@
-/// 注入到抖音网页中的嗅探脚本。
-///
-/// 改造要点：
-/// 1. 移除全部 GM_* API、jQuery/SweetAlert 和页面下载按钮；
-/// 2. fetch / XHR 非破坏性劫持，记录候选地址后继续调用原方法；
-/// 3. 每 800ms 轮询页面数据与 <video>/<source> 兜底；
-/// 4. 优先从 bit_rate 数组挑选最高码率/分辨率档位，并回传 width/height；
-/// 5. 地址清洗（补协议、HTML 实体、playwm→play），通过 DouyinChannel 只回传一次。
+/// 注入式嗅探脚本：支持重复注入，跨注入共享状态，兼容图文/实况图/普通视频。
 const String kDouyinSniffJs = r'''
 (function () {
-  // 同一页面重复注入时跳过，避免叠加定时器
-  if (window.__douyinSnifferInstalled) return;
-  window.__douyinSnifferInstalled = true;
-  var sent = false, lastUrl = '';
-  var logCache = {};
-
-  // 向 Flutter 发送去重后的调试日志
+  // Dart 每 1.2 秒重复注入一次，结果与日志状态必须挂到 window 上共享
+  var S = window.__dyState || (window.__dyState = { sent: false, lastUrl: '', logs: {} });
   function log(msg) {
-    if (logCache[msg]) return;
-    logCache[msg] = true;
-    try {
-      if (window.DouyinChannel && typeof window.DouyinChannel.postMessage === 'function') {
-        window.DouyinChannel.postMessage(JSON.stringify({ type: 'log', msg: msg }));
-      }
-    } catch (e) {}
+    if (S.logs[msg]) return; S.logs[msg] = true;
+    try { window.DouyinChannel && window.DouyinChannel.postMessage(JSON.stringify({ type: 'log', msg: msg })); } catch (e) {}
   }
-
-  log('脚本已注入: ' + location.href);
-
+  if (!S.injected) { S.injected = true; log('脚本已注入: ' + location.href); }
   // 清洗地址：实体解码、补全协议、去水印
   function clean(raw) {
     if (!raw || typeof raw !== 'string') return '';
@@ -34,23 +15,16 @@ const String kDouyinSniffJs = r'''
     if (!url || url.indexOf('blob:') === 0 || url.indexOf('data:') === 0) return '';
     try { url = decodeURI(url); } catch (e) {}
     if (url.indexOf('//') === 0) url = 'https:' + url;
-    if (!/^https?:\/\//i.test(url)) return '';
-    return url.replace(/playwm/g, 'play');
+    return /^https?:\/\//i.test(url) ? url.replace(/playwm/g, 'play') : '';
   }
-
-  // 判断媒体直链，用于过滤网络请求
   function isMediaUrl(raw) {
-    if (!raw || typeof raw !== 'string') return false;
-    var url = raw.toLowerCase();
+    if (!raw || typeof raw !== 'string') return false; var url = raw.toLowerCase();
     try { url = decodeURIComponent(url); } catch (e) {}
-    if (url.indexOf('blob:') === 0 || url.indexOf('data:') === 0) return false;
-    return url.indexOf('.mp4') !== -1 || url.indexOf('.m3u8') !== -1 ||
-      url.indexOf('douyinvod') !== -1 || url.indexOf('video/tos') !== -1 ||
-      url.indexOf('/aweme/v1/play') !== -1 ||
-      (url.indexOf('amemv.com') !== -1 && url.indexOf('play') !== -1);
+    return url.indexOf('blob:') !== 0 && url.indexOf('data:') !== 0 &&
+      (url.indexOf('.mp4') !== -1 || url.indexOf('.m3u8') !== -1 || url.indexOf('douyinvod') !== -1 ||
+       url.indexOf('video/tos') !== -1 || url.indexOf('/aweme/v1/play') !== -1 ||
+       (url.indexOf('amemv.com') !== -1 && url.indexOf('play') !== -1));
   }
-
-  // 从 url_list 中优先选择含 video_id 的官方播放直链
   function pickUrl(list) {
     if (!list || !list.length) return '';
     for (var i = 0; i < list.length; i++) {
@@ -59,8 +33,7 @@ const String kDouyinSniffJs = r'''
     }
     return list[0] || '';
   }
-
-  // 按 bit_rate（缺省时按分辨率）挑选最高画质档位
+  // 按 bit_rate（缺省时按分辨率）挑选最高画质
   function pickBest(video) {
     if (!video) return null;
     var list = video.bit_rate && video.bit_rate.length ? video.bit_rate.slice() : [];
@@ -69,152 +42,156 @@ const String kDouyinSniffJs = r'''
     for (var i = 0; i < list.length; i++) {
       var addr = (list[i] || {}).play_addr || {}, url = pickUrl(addr.url_list);
       if (!url) continue;
-      var s = Number((list[i] || {}).bit_rate) ||
-        (Number(addr.width) || 0) * (Number(addr.height) || 0);
-      if (s > score) {
-        score = s;
-        best = {
-          url: url,
-          width: addr.width || video.width,
-          height: addr.height || video.height,
-          rate: s
-        };
-      }
+      var s = Number((list[i] || {}).bit_rate) || (Number(addr.width) || 0) * (Number(addr.height) || 0);
+      if (s > score) { score = s; best = { url: url, width: addr.width || video.width, height: addr.height || video.height }; }
     }
-    // 兼容 #RENDER_DATA 中的旧字段 playAddr
-    if (!best && video.playAddr && video.playAddr.length) {
-      var old = video.playAddr[0] || {};
-      if (old.src) best = { url: old.src, width: old.width, height: old.height };
+    if (!best && video.playAddr && video.playAddr.length && video.playAddr[0].src) {
+      best = { url: video.playAddr[0].src, width: video.playAddr[0].width, height: video.playAddr[0].height };
     }
     return best;
   }
-
-  // 回传 Flutter；trusted=true 表示来自播放器 DOM 或页面数据
-  function report(raw, trusted, width, height) {
-    if (sent) return;
-    var url = clean(raw);
-    if (!url || url === lastUrl || (!trusted && !isMediaUrl(url))) return;
-    if (!window.DouyinChannel || typeof window.DouyinChannel.postMessage !== 'function') return;
-    var data = { videoUrl: url, width: width || 0, height: height || 0 };
-    try {
-      log('回传无水印地址: ' + url);
-      window.DouyinChannel.postMessage(JSON.stringify(data));
-      sent = true;
-      lastUrl = url;
-    } catch (e) {}
+  function resText(w, h) {
+    w = Number(w) || 0; h = Number(h) || 0;
+    return w > 0 && h > 0 ? w + 'x' + h : '';
   }
-
-  // 非破坏性劫持 fetch：记录候选地址后照常发起原请求
-  try {
-    var rawFetch = window.fetch;
-    if (rawFetch && !rawFetch.__douyinHooked) {
-      var hookedFetch = function () {
+  // 静态图：优先 jpeg/jpg 原图，否则取 url_list 最后一项
+  function pickImage(img) {
+    if (!img || !img.url_list || !img.url_list.length) return '';
+    for (var i = 0; i < img.url_list.length; i++) {
+      var u = String(img.url_list[i] || '').toLowerCase();
+      if (u.indexOf('.jpeg') !== -1 || u.indexOf('.jpg') !== -1) return img.url_list[i];
+    }
+    return img.url_list[img.url_list.length - 1];
+  }
+  // 图集：每张图输出静态原图，实况图额外输出视频
+  function collectImages(images) {
+    var items = [];
+    for (var i = 0; i < images.length; i++) {
+      var img = images[i] || {}, imageUrl = clean(pickImage(img));
+      if (imageUrl) items.push({ url: imageUrl, mediaType: 'image', resolution: resText(img.width, img.height) });
+      if (img.video) {
+        var best = pickBest(img.video);
+        if (best) items.push({ url: best.url, mediaType: 'video', resolution: resText(best.width, best.height) });
+      }
+    }
+    if (items.length) log('图集解析: ' + images.length + ' 项, 产出 ' + items.length + ' 个资源');
+    return items;
+  }
+  // 按 url 去重后一次性回传
+  function sendItems(items) {
+    if (S.sent || !items || !items.length) return false;
+    var unique = [], seen = {};
+    for (var i = 0; i < items.length; i++) {
+      var url = clean(items[i].url); if (!url || seen[url]) continue;
+      seen[url] = true;
+      unique.push({ url: url, mediaType: items[i].mediaType, resolution: items[i].resolution || '' });
+    }
+    if (!unique.length || !window.DouyinChannel) return false;
+    try {
+      window.DouyinChannel.postMessage(JSON.stringify({ type: 'result', items: unique }));
+      S.sent = true;
+      log('解析完成: 共 ' + unique.length + ' 个资源');
+      return true;
+    } catch (e) { return false; }
+  }
+  // 单地址兜底：图文页不启用，避免误抓实况视频或背景音乐
+  function reportSingle(raw, trusted, w, h) {
+    if (S.sent || location.href.indexOf('/note/') !== -1) return;
+    var url = clean(raw);
+    if (!url || url === S.lastUrl || (!trusted && !isMediaUrl(url))) return;
+    if (sendItems([{ url: url, mediaType: 'video', resolution: resText(w, h) }])) S.lastUrl = url;
+  }
+  // 网络钩子只挂载一次；每次重复注入只执行提取
+  function hookNetwork() {
+    if (window.__dyHooked) return;
+    window.__dyHooked = true;
+    try {
+      var rawFetch = window.fetch;
+      if (rawFetch) window.fetch = function () {
         try {
-          var input = arguments[0];
-          var url = typeof input === 'string' ? input : (input && input.url) || '';
-          if (isMediaUrl(url)) {
-            log('捕获 fetch 媒体请求: ' + url);
-            report(url, false);
-          }
+          var input = arguments[0], url = typeof input === 'string' ? input : (input && input.url) || '';
+          if (isMediaUrl(url)) { log('捕获 fetch 媒体请求'); reportSingle(url, false); }
         } catch (e) {}
         return rawFetch.apply(this, arguments);
       };
-      hookedFetch.__douyinHooked = true;
-      window.fetch = hookedFetch;
-    }
-  } catch (e) {}
-
-  // 非破坏性劫持 XMLHttpRequest.open，并解析 JSON 响应中的 aweme_detail
-  try {
-    var rawOpen = XMLHttpRequest.prototype.open;
-    if (!rawOpen.__douyinHooked) {
-      var hookedOpen = function (method, url) {
+    } catch (e) {}
+    try {
+      var rawOpen = XMLHttpRequest.prototype.open;
+      XMLHttpRequest.prototype.open = function (method, url) {
         try {
-          if (isMediaUrl(url)) {
-            log('捕获 XHR 媒体请求: ' + url);
-            report(url, false);
-          }
-          var xhr = this;
-          xhr.addEventListener('load', function () {
+          if (isMediaUrl(url)) { log('捕获 XHR 媒体请求'); reportSingle(url, false); }
+          var xhr = this; xhr.addEventListener('load', function () {
             try { scanTree(JSON.parse(xhr.responseText)); } catch (e) {}
           });
         } catch (e) {}
         return rawOpen.apply(this, arguments);
       };
-      hookedOpen.__douyinHooked = true;
-      XMLHttpRequest.prototype.open = hookedOpen;
-    }
-  } catch (e) {}
-
-  // 读取当前播放器 DOM 中的 <video> / <source> 地址
+    } catch (e) {}
+  }
   function scanPlayer() {
+    if (location.href.indexOf('/note/') !== -1) return;
     var videos = document.getElementsByTagName('video');
-    for (var i = 0; i < videos.length; i++) {
-      var v = videos[i];
-      if (v.currentSrc || v.src) log('读取到播放器地址: ' + (v.currentSrc || v.src));
-      report(v.currentSrc || v.src, true, v.videoWidth, v.videoHeight);
-      if (sent) return;
+    for (var i = 0; i < videos.length && !S.sent; i++) {
+      var v = videos[i]; reportSingle(v.currentSrc || v.src, true, v.videoWidth, v.videoHeight);
       var sources = v.getElementsByTagName('source');
-      for (var j = 0; j < sources.length; j++) {
-        report(sources[j].src, true);
-        if (sent) return;
-      }
+      for (var j = 0; j < sources.length && !S.sent; j++) reportSingle(sources[j].src, true);
     }
   }
-
-  // 广度遍历 JSON，兼容 videoDetail/aweme_detail/_ROUTER_DATA 等结构
+  // 广度遍历：最多 3 万节点，Set 防止循环引用导致死循环
   function scanTree(root) {
     if (!root) return;
-    var queue = [root], guard = 0;
-    while (queue.length && guard++ < 3000) {
-      var node = queue.shift();
-      if (!node || typeof node !== 'object') continue;
-      var video = node.video ||
-        ((node.play_addr || node.playAddr || node.bit_rate) ? node : null);
-      var best = pickBest(video);
-      if (best) {
-        log('解析到最高画质: ' + (best.width || '?') + 'x' + (best.height || '?') +
-          ' 码率=' + (best.rate || '未知'));
-        report(best.url, true, best.width, best.height);
-        if (sent) return;
+    var queue = [root], qi = 0, seen = new Set(), guard = 0;
+    while (qi < queue.length && guard++ < 30000 && !S.sent) {
+      var node = queue[qi++];
+      if (!node || typeof node !== 'object' || seen.has(node)) continue; seen.add(node);
+      var hasImages = Array.isArray(node.images) && node.images.length > 0;
+      if (hasImages) {
+        var items = collectImages(node.images);
+        if (items.length && sendItems(items)) return;
+      } else {
+        var best = pickBest(node.video || ((node.play_addr || node.playAddr || node.bit_rate) ? node : null));
+        if (best && best.url && sendItems([{ url: best.url, mediaType: 'video', resolution: resText(best.width, best.height) }])) return;
       }
       for (var key in node) {
+        if (hasImages && key === 'video') continue;
         if (node[key] && typeof node[key] === 'object') queue.push(node[key]);
       }
     }
   }
-
-  // 解析 #RENDER_DATA 与 window._ROUTER_DATA 中的页面数据
-  function scanJson() {
-    var node = document.getElementById('RENDER_DATA');
-    if (node && node.textContent) {
-      log('读取到 #RENDER_DATA');
-      try { scanTree(JSON.parse(decodeURIComponent(node.textContent))); } catch (e) {}
+  // #RENDER_DATA 缺失或解析失败时静默跳过，继续扫描其它数据源
+  function scanRenderData() {
+    var el = document.getElementById('RENDER_DATA'); if (!el || !el.textContent) return;
+    try { scanTree(JSON.parse(decodeURIComponent(el.textContent))); }
+    catch (e) { log('#RENDER_DATA 解析失败，继续扫描其它数据源'); }
+  }
+  // Next.js 流式脚本：self.__pace_f.push([1, "..."])
+  function scanPace() {
+    var re = /self\.__pace_f\.push\(\[1\s*,\s*"((?:[^"\\]|\\.)*)"\s*\]\)/g;
+    var scripts = document.getElementsByTagName('script');
+    for (var i = 0; i < scripts.length && !S.sent; i++) {
+      var text = scripts[i].textContent || ''; if (text.indexOf('__pace_f') === -1) continue;
+      re.lastIndex = 0;
+      var m;
+      while ((m = re.exec(text)) && !S.sent) {
+        try {
+          var payload = JSON.parse('"' + m[1] + '"');
+          try { scanTree(JSON.parse(payload)); } catch (e) { log('__pace_f 片段非 JSON，已跳过'); }
+        } catch (e) {}
+      }
     }
-    if (window._ROUTER_DATA) log('读取到 _ROUTER_DATA');
+  }
+  function tryExtractNow() {
+    if (S.sent) return;
+    scanRenderData(); if (S.sent) return;
     try { scanTree(window._ROUTER_DATA); } catch (e) {}
-  }
-
-  function scan() {
-    if (sent) return;
-    // 先读页面数据，优先拿到 bit_rate 中的最高画质
-    scanJson();
-    if (sent) return;
+    if (S.sent) return;
+    try { scanTree(window.__INIT_PROPS__); } catch (e) {}
+    if (S.sent) return;
+    scanPace(); if (S.sent) return;
     scanPlayer();
-    if (sent) return;
-    if (!document.getElementsByTagName('video').length) {
-      log('页面暂未发现 video 标签，等待加载...');
-    }
   }
-
-  scan();
-  setInterval(scan, 800);
-
-  // 供 Flutter 开始新任务前重置（同页复用 WebView 时可调用）
-  window.__douyinSnifferReset = function () {
-    sent = false;
-    lastUrl = '';
-    logCache = {};
-  };
+  hookNetwork();
+  tryExtractNow();
+  window.__douyinSnifferReset = function () { S.sent = false; S.lastUrl = ''; S.logs = {}; };
 })();
 ''';
