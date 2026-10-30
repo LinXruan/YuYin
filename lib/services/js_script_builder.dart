@@ -3,6 +3,11 @@ const String kDouyinSniffJs = r'''
 (function () {
   // Dart 每 1.2 秒重复注入一次，结果与日志状态必须挂到 window 上共享
   var S = window.__dyState || (window.__dyState = { sent: false, lastUrl: '', logs: {} });
+  // 记录本次嗅探的起始时间；页面地址变化时重新计时
+  if (!window.__dyStartTime || window.__dyStartHref !== location.href) {
+    window.__dyStartTime = Date.now();
+    window.__dyStartHref = location.href;
+  }
   function log(msg) {
     if (S.logs[msg]) return; S.logs[msg] = true;
     try { window.DouyinChannel && window.DouyinChannel.postMessage(JSON.stringify({ type: 'log', msg: msg })); } catch (e) {}
@@ -54,22 +59,49 @@ const String kDouyinSniffJs = r'''
     w = Number(w) || 0; h = Number(h) || 0;
     return w > 0 && h > 0 ? w + 'x' + h : '';
   }
-  // 普通视频：遍历 bit_rate 提取全部清晰度档位，按码率从高到低排序
+  // 兼容 bitRateList 的 playAddr 数组结构：取第一个可用 src
+  function firstPlayAddrSrc(addrs) {
+    if (!Array.isArray(addrs)) return '';
+    for (var i = 0; i < addrs.length; i++) {
+      if (addrs[i] && addrs[i].src) return addrs[i].src;
+    }
+    return '';
+  }
+  // 兼容 bitRateList 的 playAddr 数组结构：取文件大小
+  function firstPlayAddrSize(addrs) {
+    if (!Array.isArray(addrs)) return 0;
+    for (var i = 0; i < addrs.length; i++) {
+      var a = addrs[i] || {};
+      if (a.dataSize || a.data_size) return a.dataSize || a.data_size;
+    }
+    return 0;
+  }
+  // 普通视频：同时兼容 bit_rate（下划线）与 bitRateList（驼峰），提取全部档位
   function collectVideos(video) {
     if (!video) return [];
-    var list = Array.isArray(video.bit_rate) ? video.bit_rate.slice() : [];
+    var list = [];
+    if (Array.isArray(video.bit_rate)) list = list.concat(video.bit_rate);
+    if (Array.isArray(video.bitRateList)) list = list.concat(video.bitRateList);
     var items = [];
     for (var i = 0; i < list.length; i++) {
-      var b = list[i] || {}, addr = b.play_addr || {};
-      var url = pickUrl(addr.url_list);
+      var b = list[i] || {};
+      if (b.format === 'dash') continue; // DASH 流不能直接保存为 mp4
+      var addr = Array.isArray(b.play_addr) ? {} : (b.play_addr || {});
+      var url = pickUrl(addr.url_list) || b.playApi ||
+        firstPlayAddrSrc(b.play_addr) || firstPlayAddrSrc(b.playAddr);
       if (!url) continue;
       items.push({
         url: url,
         mediaType: 'video',
-        resolution: resText(addr.width || video.width, addr.height || video.height),
-        bitRate: Number(b.bit_rate) || 0,
-        dataSize: Number(addr.data_size) || 0,
-        gearName: b.gear_name || b.gearName || ''
+        resolution: resText(
+          addr.width || b.width || video.width,
+          addr.height || b.height || video.height
+        ),
+        bitRate: Number(b.bit_rate || b.bitRate) || 0,
+        dataSize: Number(
+          addr.data_size || b.dataSize || b.data_size || firstPlayAddrSize(b.playAddr)
+        ) || 0,
+        gearName: b.gear_name || b.gearName || b.qualityType || ''
       });
     }
     // 码率高的档位排在前面，方便界面把第一项标为“最高画质”
@@ -82,20 +114,20 @@ const String kDouyinSniffJs = r'''
       keys[key] = true;
       unique.push(it);
     }
-    // bit_rate 为空或全部无效时，回退到顶层 play_addr 作为唯一档位
+    // 没有档位数据时，回退到顶层 play_addr / playApi 作为唯一档位
     if (!unique.length) {
-      var addr2 = video.play_addr || {};
-      var url2 = pickUrl(addr2.url_list);
-      if (!url2 && video.playAddr && video.playAddr.length && video.playAddr[0].src) {
-        url2 = video.playAddr[0].src;
-      }
+      var addr2 = Array.isArray(video.play_addr) ? {} : (video.play_addr || {});
+      var url2 = pickUrl(addr2.url_list) || video.playApi ||
+        firstPlayAddrSrc(video.play_addr) || firstPlayAddrSrc(video.playAddr);
       if (url2) {
         unique.push({
           url: url2,
           mediaType: 'video',
           resolution: resText(addr2.width || video.width, addr2.height || video.height),
           bitRate: 0,
-          dataSize: Number(addr2.data_size) || 0,
+          dataSize: Number(
+            addr2.data_size || video.dataSize || firstPlayAddrSize(video.playAddr)
+          ) || 0,
           gearName: ''
         });
       }
@@ -153,12 +185,29 @@ const String kDouyinSniffJs = r'''
       return true;
     } catch (e) { return false; }
   }
+  // 是否拿到带分辨率和码率的完整画质档位
+  function hasCompleteQuality(items) {
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].bitRate > 0 && items[i].resolution) return true;
+    }
+    return false;
+  }
+  // 普通视频发送策略：完整档位立即发，降级兜底结果需等待 8 秒防止抢跑
+  function sendVideoItems(items) {
+    if (!items || !items.length) return false;
+    if (hasCompleteQuality(items)) return sendItems(items, false);
+    if (Date.now() - (window.__dyStartTime || 0) < 8000) {
+      log('已发现基础视频流，正在等待完整画质列表(bit_rate)...');
+      return false;
+    }
+    return sendItems(items, false);
+  }
   // 单地址兜底：图文页不启用，避免误抓实况视频或背景音乐
   function reportSingle(raw, trusted, w, h) {
     if (S.sent || location.href.indexOf('/note/') !== -1) return;
     var url = clean(raw);
     if (!url || url === S.lastUrl || (!trusted && !isMediaUrl(url))) return;
-    if (sendItems([{ url: url, mediaType: 'video', resolution: resText(w, h) }], false)) S.lastUrl = url;
+    if (sendVideoItems([{ url: url, mediaType: 'video', resolution: resText(w, h) }])) S.lastUrl = url;
   }
   // 网络钩子只挂载一次；每次重复注入只执行提取
   function hookNetwork() {
@@ -210,13 +259,24 @@ const String kDouyinSniffJs = r'''
       } else {
         var video = node.video || ((node.play_addr || node.playAddr || node.bit_rate) ? node : null);
         var tiers = collectVideos(video);
-        if (tiers.length && sendItems(tiers, false)) return;
+        if (tiers.length && sendVideoItems(tiers)) return;
       }
       for (var key in node) {
         if (hasImages && key === 'video') continue;
         if (node[key] && typeof node[key] === 'object') queue.push(node[key]);
       }
     }
+  }
+  // 读取播放器中的 awemeInfo.video.bitRateList（页面只有播放器数据时的来源）
+  function scanPlayerData() {
+    if (location.href.indexOf('/note/') !== -1) return false;
+    try {
+      var v = window.player && window.player.config && window.player.config.awemeInfo
+        && window.player.config.awemeInfo.video;
+      if (!v) return false;
+      var tiers = collectVideos(v);
+      return tiers.length ? sendVideoItems(tiers) : false;
+    } catch (e) { return false; }
   }
   // #RENDER_DATA 缺失或解析失败时静默跳过，继续扫描其它数据源
   function scanRenderData() {
@@ -247,11 +307,16 @@ const String kDouyinSniffJs = r'''
     if (S.sent) return;
     try { scanTree(window.__INIT_PROPS__); } catch (e) {}
     if (S.sent) return;
+    scanPlayerData(); if (S.sent) return;
     scanPace(); if (S.sent) return;
     scanPlayer();
   }
   hookNetwork();
   tryExtractNow();
-  window.__douyinSnifferReset = function () { S.sent = false; S.lastUrl = ''; S.logs = {}; };
+  window.__douyinSnifferReset = function () {
+    S.sent = false; S.lastUrl = ''; S.logs = {};
+    window.__dyStartTime = Date.now();
+    window.__dyStartHref = location.href;
+  };
 })();
 ''';

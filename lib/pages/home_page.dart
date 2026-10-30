@@ -183,7 +183,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('抖音无水印下载器'),
+        title: const Text('余音 - 抖音无水印下载'),
         actions: [
           TextButton(
             onPressed: _busy ? null : _openLoginPage,
