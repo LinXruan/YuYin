@@ -13,9 +13,10 @@ class VideoDownloader {
   final Dio _dio;
 
   /// 下载视频到临时目录并保存进系统相册。
-  /// [onProgress] 回调下载进度（0.0 ~ 1.0）。
+  /// [cookie] 为 WebView 登录态；[onProgress] 回调下载进度（0.0 ~ 1.0）。
   Future<void> downloadToGallery(
     String videoUrl, {
+    String? cookie,
     required void Function(double progress) onProgress,
   }) async {
     final tempDir = await getTemporaryDirectory();
@@ -32,6 +33,7 @@ class VideoDownloader {
             'User-Agent': DouyinSniffer.desktopUserAgent,
             'Referer': 'https://www.douyin.com/',
             'Origin': 'https://www.douyin.com',
+            if (cookie != null && cookie.isNotEmpty) 'Cookie': cookie,
           },
         ),
         onReceiveProgress: (received, total) {

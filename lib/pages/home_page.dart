@@ -28,6 +28,11 @@ class _HomePageState extends State<HomePage> {
   bool _busy = false;
   double? _progress;
   int _lastPercent = -1;
+  String _resolutionLabel = '';
+
+  /// 日志中展示的分辨率后缀（未知时为空）
+  String get _resolutionTag =>
+      _resolutionLabel.isEmpty ? '' : '（$_resolutionLabel）';
 
   @override
   void dispose() {
@@ -48,7 +53,7 @@ class _HomePageState extends State<HomePage> {
     _lastPercent = percent;
     setState(() {
       _progress = progress;
-      final line = '已捕获无水印地址，正在下载 $percent%...';
+      final line = '已捕获无水印地址$_resolutionTag，正在下载 $percent%...';
       if (_logs.isNotEmpty && _logs.last.startsWith('已捕获无水印地址')) {
         _logs[_logs.length - 1] = line;
       } else {
@@ -80,6 +85,7 @@ class _HomePageState extends State<HomePage> {
       _busy = true;
       _progress = null;
       _lastPercent = -1;
+      _resolutionLabel = '';
       _logs..clear()..add('正在提取短链...');
     });
 
@@ -92,9 +98,14 @@ class _HomePageState extends State<HomePage> {
 
     try {
       _addLog('正在后台加载网页嗅探...');
-      final videoUrl = await _sniffer.sniffVideoUrl(url);
-      _addLog('已捕获无水印地址，正在下载 0%...');
-      await _downloader.downloadToGallery(videoUrl, onProgress: _updateProgress);
+      final result = await _sniffer.sniffVideoUrl(url);
+      _resolutionLabel = result.resolutionLabel;
+      _addLog('已捕获无水印地址$_resolutionTag，正在下载 0%...');
+      await _downloader.downloadToGallery(
+        result.videoUrl,
+        cookie: result.cookie,
+        onProgress: _updateProgress,
+      );
       _addLog('已保存到相册！');
     } catch (error) {
       _addLog('操作失败：${_friendlyError(error)}');
