@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'pages/home_page.dart';
+import 'pages/app_shell.dart';
 
 void main() {
   runApp(const YuYinApp());
@@ -19,7 +19,7 @@ class YuYinApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.pink),
         useMaterial3: true,
       ),
-      home: const HomePage(),
+      home: const AppShell(),
     );
   }
 }
