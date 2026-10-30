@@ -84,3 +84,63 @@
 2. 更新 `lib/main.dart` 指向 `HomePage`。
 3. 运行 `flutter analyze` 确保零警告零错误。
 4. 提醒用户确认未开启模拟器后，运行 `flutter build apk --debug` 验证能否正常打出 APK 包。
+
+
+---
+
+## 增量升级计划：支持账号登录与 1080P/4K 最高画质提取 (Step 8 ~ Step 10)
+
+### ⚠️ 执行铁律（同上）
+1. **单步执行锁**：每次只准执行 1 个 Step！跑通 `flutter analyze` 并向用户汇报后必须立即停下，等待用户输入“继续”再执行下一步。
+2. **文件行数红线**：任何新建或修改后的 `.dart` 文件严格控制在 200 行以内。
+
+---
+
+### Step 8：新增可视化“抖音网页登录与验证”页面 (`lib/pages/login_webview_page.dart`)
+**目标**：利用 Android `WebView` 全局自动共享 Cookie 的特性，提供一个可视化浏览器页面，供用户登录抖音账号（或手动滑块过验证码），登录后的 Cookie 会自动保存在本地并供后台嗅探器使用。
+
+1. 新建 `lib/pages/login_webview_page.dart`（严格小于 150 行）：
+   - 使用 `StatefulWidget` 创建 `LoginWebViewPage`。
+   - 初始化一个新的 `WebViewController`：
+     - `setJavaScriptMode(JavaScriptMode.unrestricted)`
+     - **关键**：`setUserAgent` 必须与 `lib/services/douyin_sniffer.dart` 中使用的 User-Agent 保持完全一致（推荐统一使用 PC 端 Chrome UA，方便触发 1080P/4K 高清流及扫码/手机号登录）。
+     - 默认加载 `https://www.douyin.com/`。
+   - 页面顶部 `AppBar`：
+     - 标题显示“登录抖音（获取高清画质）”。
+     - 右侧放一个“刷新”图标按钮和“完成返回”文字按钮（点击 `Navigator.pop(context, true)`）。
+   - 页面顶部放一条醒目的浅色提示栏：“提示：请在下方页面完成登录（若遇验证码请手动滑块），看到头像出现后点击右上角【完成返回】即可永久生效。”
+   - 页面主体全屏展示 `WebViewWidget(controller: _controller)`（支持手势缩放或正常滑动，方便用户在手机上操作 PC 网页登录弹窗）。
+2. 在 `lib/pages/home_page.dart` 的 `AppBar` 右上角新增一个“账号登录/提画质”按钮，点击跳转到 `LoginWebViewPage`（注意保持 `home_page.dart` 总行数不超过 200 行）。
+3. 运行 `flutter analyze` 确保无语法和规范错误。
+4. **完成后立即停下并向用户汇报，等待指令再进入 Step 9。**
+
+---
+
+### Step 9：升级嗅探 JS 脚本以优先提取最高分辨率 (`lib/services/js_script_builder.dart`)
+**目标**：登录后抖音返回的数据包中，视频对象包含 `bit_rate` 数组（内含 1080P、720P、540P 等不同档位）。修改 JS 提取逻辑，确保优先挑选码率（`bit_rate`）最高或分辨率最大的无水印直链。
+
+1. 打开 `lib/services/js_script_builder.dart`（可同时参考根目录的 `抖音下载视频油猴脚本.js`）。
+2. 检查并升级从 JSON 数据（如 `aweme_detail.video` 或 `_ROUTER_DATA`）中提取视频 URL 的 JS 函数：
+   - 当拿到 `video` 对象时，先判断 `video.bit_rate` 是否为非空数组。
+   - 如果 `video.bit_rate` 存在，遍历该数组，按照元素中的 `bit_rate` 数值（或 `play_addr.width * play_addr.height`）从大到小排序，取排在第一位的最高清档位的 `play_addr.url_list[0]`。
+   - 如果没有 `bit_rate` 数组，再回退读取 `video.play_addr.url_list[0]`。
+   - 注意：抖音 `url_list` 通常有 3 个备用 CDN 地址，优先挑选以 `https://www.douyin.com/aweme/v1/play/` 或包含 `video_id` 的稳定直链，并把 `playwm` 替换为 `play`。
+3. 在回传给 Flutter 的 JSON 消息中，顺带传回当前抓到的分辨率描述（如 `width`、`height`），方便用户在 UI 日志里直观看到“已捕获 1080x1920 高清无水印地址”。
+4. 运行 `flutter analyze` 确保零报错。
+5. **完成后立即停下并向用户汇报，等待指令再进入 Step 10。**
+
+---
+
+### Step 10：同步 Cookie 给下载器并支持预览验证 (`lib/services/douyin_sniffer.dart` & `lib/services/video_downloader.dart`)
+**目标**：部分高清 1080P/4K 视频直链在下载时还会校验 Cookie，且后台嗅探若遇到验证码需要提醒用户去登录页处理。
+
+1. 修改 `lib/services/douyin_sniffer.dart`：
+   - 在注入 JS 抓到视频直链的同时，通过 `runJavaScriptReturningResult('document.cookie')` 获取当前 WebView 的最新 Cookie 字符串。
+   - 将 `{videoUrl, cookie, resolution}` 一并返回给调用方。
+   - 若页面标题或 DOM 中检测到“验证码中间页”，提前终止等待并提示用户：“触发抖音滑块验证，请点击右上角【账号登录】手动滑块解锁”。
+2. 修改 `lib/services/video_downloader.dart`：
+   - 在 `downloadToGallery` 方法中增加可选参数 `String? cookie`。
+   - 若 `cookie` 不为空，将其加入 `Dio` 的请求头 `headers['Cookie'] = cookie`，确保高清视频流不会因缺少登录态而被降级或报 403。
+3. 在 `lib/pages/home_page.dart` 的状态日志中展示抓到的分辨率（例如：`正在下载 1080P 视频...`），确保所有 `.dart` 文件均未超过 200 行。
+4. 运行 `flutter analyze` 和 `flutter test`。
+5. **完成后向用户汇报最终结果。**

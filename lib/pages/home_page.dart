@@ -8,6 +8,8 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../services/douyin_sniffer.dart';
 import '../services/video_downloader.dart';
 import '../utils/url_parser.dart';
+import '../widgets/log_panel.dart';
+import 'login_webview_page.dart';
 
 /// 主界面：输入分享口令，嗅探无水印地址并保存到相册
 class HomePage extends StatefulWidget {
@@ -61,6 +63,14 @@ class _HomePageState extends State<HomePage> {
     if (data?.text != null && mounted) _inputController.text = data!.text!;
   }
 
+  /// 打开抖音网页登录页；登录 Cookie 由 WebView 全局共享给嗅探器
+  Future<void> _openLoginPage() async {
+    final done = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const LoginWebViewPage()),
+    );
+    if (done == true) _addLog('登录完成，Cookie 已保存，可重新解析获取高清画质');
+  }
+
   /// 主流程：提取短链 -> WebView 嗅探 -> 下载保存
   Future<void> _startDownload() async {
     if (_busy) return;
@@ -110,7 +120,15 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('抖音无水印下载器')),
+      appBar: AppBar(
+        title: const Text('抖音无水印下载器'),
+        actions: [
+          TextButton(
+            onPressed: _busy ? null : _openLoginPage,
+            child: const Text('账号登录/提画质'),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -151,22 +169,7 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 12),
               LinearProgressIndicator(value: _busy ? _progress : 0),
               const SizedBox(height: 16),
-              Expanded(
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: SingleChildScrollView(
-                    child: Text(
-                      _logs.isEmpty ? '运行日志会显示在这里' : _logs.join('\n'),
-                      style: const TextStyle(fontSize: 13, height: 1.6),
-                    ),
-                  ),
-                ),
-              ),
+              Expanded(child: LogPanel(logs: _logs)),
               // 1x1 透明 WebView：保持页面存活，确保 JS 定时器持续执行
               SizedBox(
                 width: 1,
