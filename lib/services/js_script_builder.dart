@@ -54,6 +54,54 @@ const String kDouyinSniffJs = r'''
     w = Number(w) || 0; h = Number(h) || 0;
     return w > 0 && h > 0 ? w + 'x' + h : '';
   }
+  // 普通视频：遍历 bit_rate 提取全部清晰度档位，按码率从高到低排序
+  function collectVideos(video) {
+    if (!video) return [];
+    var list = Array.isArray(video.bit_rate) ? video.bit_rate.slice() : [];
+    var items = [];
+    for (var i = 0; i < list.length; i++) {
+      var b = list[i] || {}, addr = b.play_addr || {};
+      var url = pickUrl(addr.url_list);
+      if (!url) continue;
+      items.push({
+        url: url,
+        mediaType: 'video',
+        resolution: resText(addr.width || video.width, addr.height || video.height),
+        bitRate: Number(b.bit_rate) || 0,
+        dataSize: Number(addr.data_size) || 0,
+        gearName: b.gear_name || b.gearName || ''
+      });
+    }
+    // 码率高的档位排在前面，方便界面把第一项标为“最高画质”
+    items.sort(function (a, b) { return (b.bitRate || 0) - (a.bitRate || 0); });
+    var unique = [], keys = {};
+    for (var j = 0; j < items.length; j++) {
+      var it = items[j];
+      var key = it.gearName || (it.resolution + '_' + it.bitRate);
+      if (keys[key]) continue;
+      keys[key] = true;
+      unique.push(it);
+    }
+    // bit_rate 为空或全部无效时，回退到顶层 play_addr 作为唯一档位
+    if (!unique.length) {
+      var addr2 = video.play_addr || {};
+      var url2 = pickUrl(addr2.url_list);
+      if (!url2 && video.playAddr && video.playAddr.length && video.playAddr[0].src) {
+        url2 = video.playAddr[0].src;
+      }
+      if (url2) {
+        unique.push({
+          url: url2,
+          mediaType: 'video',
+          resolution: resText(addr2.width || video.width, addr2.height || video.height),
+          bitRate: 0,
+          dataSize: Number(addr2.data_size) || 0,
+          gearName: ''
+        });
+      }
+    }
+    return unique;
+  }
   // 静态图：优先 jpeg/jpg 原图，否则取 url_list 最后一项
   function pickImage(img) {
     if (!img || !img.url_list || !img.url_list.length) return '';
@@ -78,17 +126,28 @@ const String kDouyinSniffJs = r'''
     return items;
   }
   // 按 url 去重后一次性回传
-  function sendItems(items) {
+  function sendItems(items, isImagePost) {
     if (S.sent || !items || !items.length) return false;
     var unique = [], seen = {};
     for (var i = 0; i < items.length; i++) {
       var url = clean(items[i].url); if (!url || seen[url]) continue;
       seen[url] = true;
-      unique.push({ url: url, mediaType: items[i].mediaType, resolution: items[i].resolution || '' });
+      unique.push({
+        url: url,
+        mediaType: items[i].mediaType,
+        resolution: items[i].resolution || '',
+        bitRate: items[i].bitRate || 0,
+        dataSize: items[i].dataSize || 0,
+        gearName: items[i].gearName || ''
+      });
     }
     if (!unique.length || !window.DouyinChannel) return false;
     try {
-      window.DouyinChannel.postMessage(JSON.stringify({ type: 'result', items: unique }));
+      window.DouyinChannel.postMessage(JSON.stringify({
+        type: 'result',
+        isImagePost: !!isImagePost,
+        items: unique
+      }));
       S.sent = true;
       log('解析完成: 共 ' + unique.length + ' 个资源');
       return true;
@@ -99,7 +158,7 @@ const String kDouyinSniffJs = r'''
     if (S.sent || location.href.indexOf('/note/') !== -1) return;
     var url = clean(raw);
     if (!url || url === S.lastUrl || (!trusted && !isMediaUrl(url))) return;
-    if (sendItems([{ url: url, mediaType: 'video', resolution: resText(w, h) }])) S.lastUrl = url;
+    if (sendItems([{ url: url, mediaType: 'video', resolution: resText(w, h) }], false)) S.lastUrl = url;
   }
   // 网络钩子只挂载一次；每次重复注入只执行提取
   function hookNetwork() {
@@ -147,10 +206,11 @@ const String kDouyinSniffJs = r'''
       var hasImages = Array.isArray(node.images) && node.images.length > 0;
       if (hasImages) {
         var items = collectImages(node.images);
-        if (items.length && sendItems(items)) return;
+        if (items.length && sendItems(items, true)) return;
       } else {
-        var best = pickBest(node.video || ((node.play_addr || node.playAddr || node.bit_rate) ? node : null));
-        if (best && best.url && sendItems([{ url: best.url, mediaType: 'video', resolution: resText(best.width, best.height) }])) return;
+        var video = node.video || ((node.play_addr || node.playAddr || node.bit_rate) ? node : null);
+        var tiers = collectVideos(video);
+        if (tiers.length && sendItems(tiers, false)) return;
       }
       for (var key in node) {
         if (hasImages && key === 'video') continue;
