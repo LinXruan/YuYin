@@ -30,7 +30,7 @@
 - Flutter 3.47.6 / Dart 3.13.5
 - JDK 17
 - 仅 Android（minSdk 24 / targetSdk 36）
-- 包名：`com.debug.yuyin`
+- 包名：debug `com.debug.yuyin` / release `com.release.yuyin`
 - 版本：`1.0.0+112`
 
 ```bash
@@ -38,9 +38,15 @@ flutter pub get
 flutter analyze
 flutter test
 flutter build apk --debug
+flutter build apk --release   # 使用本机独立的 release 私钥签名
 ```
 
-APK 输出：`build/app/outputs/flutter-apk/app-debug.apk`
+APK 输出：
+
+- debug：`build/app/outputs/flutter-apk/app-debug.apk`
+- release：`build/app/outputs/flutter-apk/app-release.apk`
+
+release 签名读取 `android/key.properties` 与 `android/app/yuyin-release.jks`（均不提交到仓库，需自行备份）。debug / release 包名不同，可同时安装。
 
 ## 项目结构
 
