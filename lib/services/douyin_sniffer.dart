@@ -35,6 +35,20 @@ class DouyinSniffer {
   bool _webviewShareFallback = false;
   Timer? _webviewFallbackDelay;
   Timer? _webviewFallbackTimer;
+  Timer? _lateFallbackTimer;
+
+  /// 主页面类型（URL 只用于选择 C 的延迟，不代表作品内容）
+  DouyinWorkPage _workPageKind = DouyinWorkPage.unknown;
+  bool _degradedVideoSeen = false;
+  bool _shareFallbackFailed = false;
+  String? _sourceUrl;
+  String? _awemePageUrl;
+  DateTime _taskStartedAt = DateTime.now();
+  final Set<String> _blockedSchemes = <String>{};
+  String? _lastWebResourceError;
+  bool _loggedNonWebPage = false;
+
+  bool get _isNotePage => _workPageKind == DouyinWorkPage.note;
 
   /// JS 调试日志回调，由主界面设置
   void Function(String message)? onLog;
@@ -49,7 +63,13 @@ class DouyinSniffer {
       )
       ..setNavigationDelegate(
         NavigationDelegate(
+          onNavigationRequest: _onNavigationRequest,
+          onWebResourceError: _onWebResourceError,
           onPageStarted: (url) {
+            if (!UrlParser.isAllowedNavigationUrl(url)) {
+              _logNonWebPage(url);
+              return;
+            }
             // 新页面开始加载后才接受回传，避免旧页面的延迟消息
             _acceptMessages = true;
             _handlePageUrl(url, _taskId);
@@ -60,6 +80,10 @@ class DouyinSniffer {
             _handlePageUrl(change.url, _taskId);
           },
           onPageFinished: (url) {
+            if (!UrlParser.isAllowedNavigationUrl(url)) {
+              _logNonWebPage(url);
+              return;
+            }
             _handlePageUrl(url, _taskId);
             _injectScript();
             _checkCaptcha(url, _taskId);
@@ -70,6 +94,12 @@ class DouyinSniffer {
 
   /// 供主界面挂载隐藏 WebViewWidget 使用
   WebViewController get controller => _controller;
+
+  /// 用户输入的原始链接
+  String? get sourceUrl => _sourceUrl;
+
+  /// 第一次带 awemeId 的主页面 URL（不会记录 C 分享页）
+  String? get awemePageUrl => _awemePageUrl;
 
   /// 加载分享链接并等待 JS 回传，最长等待 30 秒
   Future<SniffResult> sniffVideoUrl(String shareUrl) async {
@@ -85,6 +115,17 @@ class DouyinSniffer {
     _shareFallbackStarted = false;
     _shareVideoFallback = null;
     _webviewShareFallback = false;
+    _workPageKind = DouyinWorkPage.unknown;
+    _degradedVideoSeen = false;
+    _shareFallbackFailed = false;
+    _sourceUrl = shareUrl;
+    _awemePageUrl = null;
+    _taskStartedAt = DateTime.now();
+    _blockedSchemes.clear();
+    _lastWebResourceError = null;
+    _loggedNonWebPage = false;
+    _lateFallbackTimer?.cancel();
+    _lateFallbackTimer = null;
 
     _timeoutTimer?.cancel();
     _timeoutTimer = Timer(const Duration(seconds: 30), () {
@@ -139,16 +180,74 @@ class DouyinSniffer {
     return completer.future;
   }
 
+  /// 拦截非网页协议，防止分享页拉起 snssdk1128:// 等 App 深链
+  NavigationDecision _onNavigationRequest(NavigationRequest request) {
+    final url = request.url;
+    if (UrlParser.isAllowedNavigationUrl(url)) {
+      return NavigationDecision.navigate;
+    }
+    final scheme = _schemeOf(url);
+    if (_blockedSchemes.add(scheme)) {
+      final shortUrl =
+          url.length > 120 ? '${url.substring(0, 120)}...' : url;
+      onLog?.call('已拦截外部跳转(scheme=$scheme): $shortUrl');
+    }
+    return NavigationDecision.prevent;
+  }
+
+  /// 只记录主 frame 的网页加载错误，用于诊断深链/网络问题
+  void _onWebResourceError(WebResourceError error) {
+    if (error.isForMainFrame == false) return;
+    if (error.description.contains('ERR_ABORTED')) return;
+    final text = '${error.errorCode} ${error.description}';
+    if (_lastWebResourceError == text) return;
+    _lastWebResourceError = text;
+    debugPrint('[WebResourceError] $text url=${error.url ?? ''}');
+    onLog?.call('网页加载错误: ${error.description}');
+  }
+
   /// 记录最终页面 URL，并在拿到 awemeId 后启动分享页并行兜底
   void _handlePageUrl(String? url, int taskId) {
     if (url == null || url.isEmpty || _disposed || taskId != _taskId) return;
+    if (!UrlParser.isAllowedNavigationUrl(url)) {
+      _logNonWebPage(url);
+      return;
+    }
     _lastPageUrl = url;
+
+    // C 分享页自身的 /share/video/ 不能覆盖主页面类型
+    if (!_webviewShareFallback) {
+      final kind = UrlParser.classifyWorkPage(url);
+      final wasNote = _isNotePage;
+      if (kind != DouyinWorkPage.unknown) {
+        _workPageKind = kind;
+      }
+
+      final awemeId = UrlParser.extractAwemeId(url);
+      if (awemeId != null &&
+          (_awemePageUrl == null || kind == DouyinWorkPage.note)) {
+        _awemePageUrl = url;
+      }
+
+      // B 失败时还没识别出 /note/，随后识别到了就重新安排 3 秒 C
+      if (!wasNote &&
+          _isNotePage &&
+          _shareFallbackFailed &&
+          _targetAwemeId != null) {
+        _scheduleWebViewShareFallback(
+          _targetAwemeId!,
+          taskId,
+          const Duration(seconds: 3),
+        );
+      }
+    }
+
     final awemeId = UrlParser.extractAwemeId(url);
     if (awemeId == null) return;
     _maybeStartShareFallback(awemeId, taskId);
   }
 
-  /// 同一任务只启动一次分享页请求
+  /// 同一任务只启动一次 Dio 分享页请求
   void _maybeStartShareFallback(String awemeId, int taskId) {
     if (_shareFallbackStarted || _webviewShareFallback) return;
     final completer = _completer;
@@ -185,41 +284,130 @@ class DouyinSniffer {
       // WebView 先完成或新任务开始时会被主动取消，不必显示为失败
       if (e.message.contains('cancel')) return;
       if (taskId == _taskId && !(_completer?.isCompleted ?? true)) {
-        onLog?.call('分享页兜底失败: ${e.message}');
-        _scheduleWebViewShareFallback(awemeId, taskId);
+        _handleShareFallbackFailure(awemeId, taskId, e.message);
       }
     } catch (e) {
       if (taskId == _taskId && !(_completer?.isCompleted ?? true)) {
-        onLog?.call('分享页兜底失败: $e');
-        _scheduleWebViewShareFallback(awemeId, taskId);
+        _handleShareFallbackFailure(awemeId, taskId, '$e');
       }
     }
   }
 
-  /// B 失败后延迟 3 秒再切 WebView，给主页面 fetch 最后一次机会
-  void _scheduleWebViewShareFallback(String awemeId, int taskId) {
+  /// B 失败：图文页 3 秒后切 C；视频页先等主 WebView
+  void _handleShareFallbackFailure(
+    String awemeId,
+    int taskId,
+    String message,
+  ) {
+    _shareFallbackFailed = true;
+    if (_isNotePage) {
+      onLog?.call('分享页兜底失败: $message（3 秒后切换 WebView 兜底）');
+      _scheduleWebViewShareFallback(
+        awemeId,
+        taskId,
+        const Duration(seconds: 3),
+      );
+    } else {
+      onLog?.call('视频页分享页兜底不可用，继续等待主 WebView');
+      _scheduleWebViewShareFallback(
+        awemeId,
+        taskId,
+        const Duration(seconds: 8),
+      );
+    }
+  }
+
+  /// 安排 C 的延迟；note 页 3 秒，其他页面 8 秒后再判断
+  void _scheduleWebViewShareFallback(
+    String awemeId,
+    int taskId,
+    Duration delay,
+  ) {
     if (_webviewShareFallback || _disposed || taskId != _taskId) return;
     _webviewFallbackDelay?.cancel();
-    _webviewFallbackDelay = Timer(const Duration(seconds: 3), () {
+    _lateFallbackTimer?.cancel();
+
+    _webviewFallbackDelay = Timer(delay, () {
       if (_disposed || taskId != _taskId) return;
       final completer = _completer;
       if (completer == null || completer.isCompleted) return;
-      unawaited(_startWebViewShareFallback(awemeId, taskId));
+
+      if (_isNotePage) {
+        unawaited(_startWebViewShareFallback(awemeId, taskId));
+        return;
+      }
+      if (_degradedVideoSeen) {
+        // 已确认是视频：不立即切走，改为约 18 秒的迟到兜底
+        _scheduleLateWebViewFallback(awemeId, taskId);
+      } else {
+        unawaited(_startWebViewShareFallback(awemeId, taskId));
+      }
+    });
+  }
+
+  /// 视频页的迟到兜底：主页面 12 秒降级结果优先，仍未完成才切分享页
+  void _scheduleLateWebViewFallback(String awemeId, int taskId) {
+    if (_webviewShareFallback || _disposed || taskId != _taskId) return;
+    _lateFallbackTimer?.cancel();
+
+    final elapsed = DateTime.now().difference(_taskStartedAt);
+    final remaining = const Duration(seconds: 18) - elapsed;
+    final delay = remaining.isNegative ? Duration.zero : remaining;
+
+    _lateFallbackTimer = Timer(delay, () {
+      if (_disposed || taskId != _taskId) return;
+      final completer = _completer;
+      if (completer == null || completer.isCompleted) return;
+      if (!_degradedVideoSeen) return;
+      unawaited(
+        _startWebViewShareFallback(awemeId, taskId, lateFallback: true),
+      );
     });
   }
 
   /// C：切换移动端 UA，用隐藏 WebView 加载分享页，复用现有 JS 扫描 _ROUTER_DATA
-  Future<void> _startWebViewShareFallback(String awemeId, int taskId) async {
+  Future<void> _startWebViewShareFallback(
+    String awemeId,
+    int taskId, {
+    bool lateFallback = false,
+  }) async {
     if (_disposed || taskId != _taskId || _webviewShareFallback) return;
     final completer = _completer;
     if (completer == null || completer.isCompleted) return;
 
+    // 非图文页且已确认视频：普通 C 不启动；只有迟到兜底才允许
+    if (!_isNotePage && _degradedVideoSeen && !lateFallback) {
+      onLog?.call('已确认视频作品，取消分享页切换，保留主 WebView');
+      return;
+    }
+
+    // 时间预算：C 必须在主 30 秒超时前结束
+    final elapsed = DateTime.now().difference(_taskStartedAt);
+    final remaining = const Duration(seconds: 30) - elapsed;
+    if (remaining <= const Duration(seconds: 6)) {
+      onLog?.call('任务剩余时间不足，跳过分享页兜底');
+      return;
+    }
+    var timeout = const Duration(seconds: 12);
+    if (remaining - timeout < const Duration(seconds: 2)) {
+      timeout = remaining - const Duration(seconds: 2);
+      if (timeout < const Duration(seconds: 5)) {
+        timeout = const Duration(seconds: 5);
+      }
+    }
+
     _webviewShareFallback = true;
-    onLog?.call('分享页兜底切换到 WebView: awemeId=$awemeId');
+    final kindLabel = lateFallback
+        ? '视频最后兜底'
+        : (_isNotePage ? '图文页' : '非图文页');
+    onLog?.call('分享页兜底切换到 WebView（$kindLabel）: awemeId=$awemeId');
 
     try {
       await _controller.setUserAgent(DouyinShareApi.iphoneUserAgent);
-      if (_disposed || taskId != _taskId || !_webviewShareFallback) return;
+      if (_disposed || taskId != _taskId || !_webviewShareFallback) {
+        await _restoreDesktopUserAgent();
+        return;
+      }
       await _controller.loadRequest(
         Uri.parse('https://www.iesdouyin.com/share/video/$awemeId/'),
       );
@@ -232,19 +420,30 @@ class DouyinSniffer {
       return;
     }
 
-    if (_disposed || taskId != _taskId || !_webviewShareFallback) return;
+    if (_disposed || taskId != _taskId || !_webviewShareFallback) {
+      await _restoreDesktopUserAgent();
+      return;
+    }
 
     _webviewFallbackTimer?.cancel();
-    _webviewFallbackTimer = Timer(const Duration(seconds: 12), () {
+    _webviewFallbackTimer = Timer(timeout, () {
       if (_disposed || taskId != _taskId || !_webviewShareFallback) return;
       final current = _completer;
       if (current == null || current.isCompleted) return;
-      onLog?.call('分享页兜底未返回作品数据（可能触发风控）');
-      _finishWithError(
-        TimeoutException('分享页兜底失败，请稍后重试或使用账号登录'),
-        taskId: taskId,
-      );
+      final message = _shareFallbackErrorMessage();
+      onLog?.call(message);
+      _finishWithError(TimeoutException(message), taskId: taskId);
     });
+  }
+
+  /// 区分深链中断和无数据，避免统一误报“风控”
+  String _shareFallbackErrorMessage() {
+    final error = _lastWebResourceError ?? '';
+    if (error.contains('ERR_UNKNOWN_URL_SCHEME') ||
+        error.contains('ERR_ABORTED')) {
+      return '分享页被深链中断，请稍后重试';
+    }
+    return '分享页兜底未返回作品数据，请稍后重试';
   }
 
   Future<void> _restoreDesktopUserAgent() async {
@@ -254,6 +453,19 @@ class DouyinSniffer {
     } catch (e) {
       debugPrint('恢复桌面 UA 失败: $e');
     }
+  }
+
+  /// 非网页协议地址：停止注入和消息接收，只记录一次
+  void _logNonWebPage(String url) {
+    if (_loggedNonWebPage) return;
+    _loggedNonWebPage = true;
+    onLog?.call('页面已变为非网页地址(scheme=${_schemeOf(url)})，停止注入');
+  }
+
+  String _schemeOf(String url) {
+    final index = url.indexOf(':');
+    if (index <= 0) return url.isEmpty ? 'unknown' : url;
+    return url.substring(0, index).toLowerCase();
   }
 
   /// 接收 JS 通过 DouyinChannel 回传的 JSON 消息
@@ -267,6 +479,18 @@ class DouyinSniffer {
         if (msg.isNotEmpty) {
           debugPrint('[JS-Sniffer] $msg');
           onLog?.call(msg);
+        }
+        return;
+      }
+      if (data['type'] == 'hint') {
+        if (data['kind'] == 'video-waiting') {
+          final hintId = data['awemeId']?.toString() ?? '';
+          if (hintId.isNotEmpty && hintId == _targetAwemeId) {
+            if (!_degradedVideoSeen) {
+              _degradedVideoSeen = true;
+              onLog?.call('已确认视频作品，保留主 WebView 等待完整画质');
+            }
+          }
         }
         return;
       }
@@ -386,6 +610,8 @@ class DouyinSniffer {
     _webviewFallbackDelay = null;
     _webviewFallbackTimer?.cancel();
     _webviewFallbackTimer = null;
+    _lateFallbackTimer?.cancel();
+    _lateFallbackTimer = null;
     _shareApi.cancelPending();
     if (_webviewShareFallback) {
       _webviewShareFallback = false;

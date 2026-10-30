@@ -2,7 +2,9 @@
 const String kDouyinSniffJs = r'''
 (function () {
   // Dart 每 1.2 秒重复注入一次，结果与日志状态必须挂到 window 上共享
-  var S = window.__dyState || (window.__dyState = { sent: false, lastUrl: '', logs: {} });
+  var S = window.__dyState || (window.__dyState = {
+    sent: false, lastUrl: '', logs: {}, videoHintSent: false, degraded: false
+  });
   // 记录本次嗅探的起始时间；页面地址变化时重新计时
   if (!window.__dyStartTime || window.__dyStartHref !== location.href) {
     window.__dyStartTime = Date.now();
@@ -33,6 +35,17 @@ const String kDouyinSniffJs = r'''
       var id = info && (info.aweme_id || info.awemeId);
       return id === null || id === undefined ? '' : String(id);
     } catch (e) { return ''; }
+  }
+  // 当前页面是否为 iesdouyin 移动分享页
+  function isSharePage() {
+    try { return location.hostname.indexOf('iesdouyin.com') !== -1; } catch (e) { return false; }
+  }
+  // 图文/图文滑动页：禁用单视频 DOM/播放器兜底
+  function isNotePageUrl() {
+    try {
+      return location.href.indexOf('/note/') !== -1 ||
+        location.href.indexOf('/slides/') !== -1;
+    } catch (e) { return false; }
   }
   // 只扫描这些作品接口，避免评论/推荐/搜索响应里的图片字段抢跑
   function isAwemeApiUrl(url) {
@@ -228,19 +241,39 @@ const String kDouyinSniffJs = r'''
     }
     return false;
   }
-  // 普通视频发送策略：完整档位立即发，降级兜底结果需等待 8 秒防止抢跑
+  // 普通视频发送策略：完整档位立即发；
+  // 主页面降级结果等待 12 秒，分享页发现基础流立即发
   function sendVideoItems(items) {
     if (!items || !items.length) return false;
     if (hasCompleteQuality(items)) return sendItems(items, false);
-    if (Date.now() - (window.__dyStartTime || 0) < 8000) {
+
+    S.degraded = true;
+    var sharePage = isSharePage();
+
+    // 主页面发现降级视频时通知 Flutter，便于延迟/取消 WebView 分享页兜底
+    if (!sharePage && !S.videoHintSent) {
+      S.videoHintSent = true;
+      try {
+        window.DouyinChannel && window.DouyinChannel.postMessage(
+          JSON.stringify({
+            type: 'hint',
+            kind: 'video-waiting',
+            awemeId: S.targetId || ''
+          })
+        );
+      } catch (e) {}
+    }
+
+    if (!sharePage && Date.now() - (window.__dyStartTime || 0) < 12000) {
       log('已发现基础视频流，正在等待完整画质列表(bit_rate)...');
       return false;
     }
+    if (sharePage) log('分享页发现基础视频流，立即回传');
     return sendItems(items, false);
   }
   // 单地址兜底：图文页不启用，避免误抓实况视频或背景音乐
   function reportSingle(raw, trusted, w, h) {
-    if (S.sent || location.href.indexOf('/note/') !== -1) return;
+    if (S.sent || isNotePageUrl()) return;
     var pid = playerAwemeId();
     if (S.targetId && pid && pid !== S.targetId) return;
     var url = clean(raw);
@@ -310,7 +343,7 @@ const String kDouyinSniffJs = r'''
     } catch (e) {}
   }
   function scanPlayer() {
-    if (location.href.indexOf('/note/') !== -1) return;
+    if (isNotePageUrl()) return;
     var videos = document.getElementsByTagName('video');
     for (var i = 0; i < videos.length && !S.sent; i++) {
       var v = videos[i]; reportSingle(v.currentSrc || v.src, true, v.videoWidth, v.videoHeight);
@@ -346,7 +379,7 @@ const String kDouyinSniffJs = r'''
   }
   // 读取播放器中的 awemeInfo.video.bitRateList（页面只有播放器数据时的来源）
   function scanPlayerData() {
-    if (location.href.indexOf('/note/') !== -1) return false;
+    if (isNotePageUrl()) return false;
     try {
       var info = window.player && window.player.config && window.player.config.awemeInfo;
       var v = info && info.video;
@@ -394,6 +427,7 @@ const String kDouyinSniffJs = r'''
   tryExtractNow();
   window.__douyinSnifferReset = function () {
     S.sent = false; S.lastUrl = ''; S.logs = {}; S.targetId = '';
+    S.videoHintSent = false; S.degraded = false;
     window.__dyStartTime = Date.now();
     window.__dyStartHref = location.href;
   };

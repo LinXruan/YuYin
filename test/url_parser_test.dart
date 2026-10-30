@@ -124,4 +124,120 @@ void main() {
       );
     });
   });
+
+  group('UrlParser.isAllowedNavigationUrl', () {
+    test('允许 http/https/about', () {
+      expect(
+        UrlParser.isAllowedNavigationUrl(
+          'https://www.douyin.com/video/7300000000000000000',
+        ),
+        isTrue,
+      );
+      expect(
+        UrlParser.isAllowedNavigationUrl('http://www.douyin.com/'),
+        isTrue,
+      );
+      expect(
+        UrlParser.isAllowedNavigationUrl('HTTPS://WWW.DOUYIN.COM/'),
+        isTrue,
+      );
+      expect(UrlParser.isAllowedNavigationUrl('about:blank'), isTrue);
+    });
+
+    test('拦截应用深链与非网页协议', () {
+      expect(
+        UrlParser.isAllowedNavigationUrl(
+          'snssdk1128://aweme/detail/7300000000000000000',
+        ),
+        isFalse,
+      );
+      expect(
+        UrlParser.isAllowedNavigationUrl('intent://scan/#Intent;end'),
+        isFalse,
+      );
+      expect(
+        UrlParser.isAllowedNavigationUrl('javascript:void(0)'),
+        isFalse,
+      );
+      expect(
+        UrlParser.isAllowedNavigationUrl('data:text/html,hello'),
+        isFalse,
+      );
+      expect(
+        UrlParser.isAllowedNavigationUrl('file:///sdcard/test.html'),
+        isFalse,
+      );
+      expect(UrlParser.isAllowedNavigationUrl(''), isFalse);
+    });
+  });
+
+  group('UrlParser.classifyWorkPage', () {
+    test('/note/ 与 /slides/ 判为 note', () {
+      expect(
+        UrlParser.classifyWorkPage(
+          'https://www.douyin.com/note/7300000000000000000',
+        ),
+        DouyinWorkPage.note,
+      );
+      expect(
+        UrlParser.classifyWorkPage(
+          'https://www.douyin.com/slides/7300000000000000000',
+        ),
+        DouyinWorkPage.note,
+      );
+      expect(
+        UrlParser.classifyWorkPage(
+          'https://www.iesdouyin.com/share/note/7300000000000000000/',
+        ),
+        DouyinWorkPage.note,
+      );
+    });
+
+    test('/video/ 判为 video', () {
+      expect(
+        UrlParser.classifyWorkPage(
+          'https://www.douyin.com/video/7300000000000000000',
+        ),
+        DouyinWorkPage.video,
+      );
+      expect(
+        UrlParser.classifyWorkPage(
+          'https://www.iesdouyin.com/share/video/7300000000000000000/',
+        ),
+        DouyinWorkPage.video,
+      );
+    });
+
+    test('短链、modal_id、其他主机判为 unknown', () {
+      expect(
+        UrlParser.classifyWorkPage('https://v.douyin.com/iYxxxx/'),
+        DouyinWorkPage.unknown,
+      );
+      expect(
+        UrlParser.classifyWorkPage(
+          'https://www.douyin.com/discover?modal_id=7300000000000000000',
+        ),
+        DouyinWorkPage.unknown,
+      );
+      expect(
+        UrlParser.classifyWorkPage(
+          'https://www.example.com/note/7300000000000000000',
+        ),
+        DouyinWorkPage.unknown,
+      );
+      expect(
+        UrlParser.classifyWorkPage(
+          'https://douyin.com.evil.com/note/7300000000000000000',
+        ),
+        DouyinWorkPage.unknown,
+      );
+      expect(
+        UrlParser.classifyWorkPage(
+          'snssdk1128://aweme/detail/7300000000000000000',
+        ),
+        DouyinWorkPage.unknown,
+      );
+      expect(UrlParser.classifyWorkPage(null), DouyinWorkPage.unknown);
+    });
+  });
 }
