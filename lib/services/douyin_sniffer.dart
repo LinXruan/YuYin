@@ -22,6 +22,9 @@ class DouyinSniffer {
   bool _acceptMessages = false;
   bool _disposed = false;
 
+  /// JS 调试日志回调，由主界面设置
+  void Function(String message)? onLog;
+
   DouyinSniffer() {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -83,6 +86,17 @@ class DouyinSniffer {
     try {
       final data = jsonDecode(message.message);
       if (data is! Map) return;
+
+      // JS 调试日志：打印到控制台并转发给界面日志框
+      if (data['type'] == 'log') {
+        final msg = data['msg']?.toString() ?? '';
+        if (msg.isNotEmpty) {
+          debugPrint('[JS-Sniffer] $msg');
+          onLog?.call(msg);
+        }
+        return;
+      }
+
       final url = data['videoUrl'] as String?;
       if (url == null || url.isEmpty) return;
       _finishWithUrl(

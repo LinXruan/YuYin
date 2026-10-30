@@ -12,6 +12,20 @@ const String kDouyinSniffJs = r'''
   if (window.__douyinSnifferInstalled) return;
   window.__douyinSnifferInstalled = true;
   var sent = false, lastUrl = '';
+  var logCache = {};
+
+  // 向 Flutter 发送去重后的调试日志
+  function log(msg) {
+    if (logCache[msg]) return;
+    logCache[msg] = true;
+    try {
+      if (window.DouyinChannel && typeof window.DouyinChannel.postMessage === 'function') {
+        window.DouyinChannel.postMessage(JSON.stringify({ type: 'log', msg: msg }));
+      }
+    } catch (e) {}
+  }
+
+  log('脚本已注入: ' + location.href);
 
   // 清洗地址：实体解码、补全协议、去水印
   function clean(raw) {
@@ -62,7 +76,8 @@ const String kDouyinSniffJs = r'''
         best = {
           url: url,
           width: addr.width || video.width,
-          height: addr.height || video.height
+          height: addr.height || video.height,
+          rate: s
         };
       }
     }
@@ -82,6 +97,7 @@ const String kDouyinSniffJs = r'''
     if (!window.DouyinChannel || typeof window.DouyinChannel.postMessage !== 'function') return;
     var data = { videoUrl: url, width: width || 0, height: height || 0 };
     try {
+      log('回传无水印地址: ' + url);
       window.DouyinChannel.postMessage(JSON.stringify(data));
       sent = true;
       lastUrl = url;
@@ -96,7 +112,10 @@ const String kDouyinSniffJs = r'''
         try {
           var input = arguments[0];
           var url = typeof input === 'string' ? input : (input && input.url) || '';
-          if (isMediaUrl(url)) report(url, false);
+          if (isMediaUrl(url)) {
+            log('捕获 fetch 媒体请求: ' + url);
+            report(url, false);
+          }
         } catch (e) {}
         return rawFetch.apply(this, arguments);
       };
@@ -111,7 +130,10 @@ const String kDouyinSniffJs = r'''
     if (!rawOpen.__douyinHooked) {
       var hookedOpen = function (method, url) {
         try {
-          if (isMediaUrl(url)) report(url, false);
+          if (isMediaUrl(url)) {
+            log('捕获 XHR 媒体请求: ' + url);
+            report(url, false);
+          }
           var xhr = this;
           xhr.addEventListener('load', function () {
             try { scanTree(JSON.parse(xhr.responseText)); } catch (e) {}
@@ -129,6 +151,7 @@ const String kDouyinSniffJs = r'''
     var videos = document.getElementsByTagName('video');
     for (var i = 0; i < videos.length; i++) {
       var v = videos[i];
+      if (v.currentSrc || v.src) log('读取到播放器地址: ' + (v.currentSrc || v.src));
       report(v.currentSrc || v.src, true, v.videoWidth, v.videoHeight);
       if (sent) return;
       var sources = v.getElementsByTagName('source');
@@ -150,6 +173,8 @@ const String kDouyinSniffJs = r'''
         ((node.play_addr || node.playAddr || node.bit_rate) ? node : null);
       var best = pickBest(video);
       if (best) {
+        log('解析到最高画质: ' + (best.width || '?') + 'x' + (best.height || '?') +
+          ' 码率=' + (best.rate || '未知'));
         report(best.url, true, best.width, best.height);
         if (sent) return;
       }
@@ -163,8 +188,10 @@ const String kDouyinSniffJs = r'''
   function scanJson() {
     var node = document.getElementById('RENDER_DATA');
     if (node && node.textContent) {
+      log('读取到 #RENDER_DATA');
       try { scanTree(JSON.parse(decodeURIComponent(node.textContent))); } catch (e) {}
     }
+    if (window._ROUTER_DATA) log('读取到 _ROUTER_DATA');
     try { scanTree(window._ROUTER_DATA); } catch (e) {}
   }
 
@@ -175,6 +202,9 @@ const String kDouyinSniffJs = r'''
     if (sent) return;
     scanPlayer();
     if (sent) return;
+    if (!document.getElementsByTagName('video').length) {
+      log('页面暂未发现 video 标签，等待加载...');
+    }
   }
 
   scan();
@@ -184,6 +214,7 @@ const String kDouyinSniffJs = r'''
   window.__douyinSnifferReset = function () {
     sent = false;
     lastUrl = '';
+    logCache = {};
   };
 })();
 ''';

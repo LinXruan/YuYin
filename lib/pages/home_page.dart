@@ -26,6 +26,7 @@ class _HomePageState extends State<HomePage> {
 
   final List<String> _logs = [];
   bool _busy = false;
+  bool _showDebugWebView = false;
   double? _progress;
   int _lastPercent = -1;
   String _resolutionLabel = '';
@@ -33,6 +34,15 @@ class _HomePageState extends State<HomePage> {
   /// 日志中展示的分辨率后缀（未知时为空）
   String get _resolutionTag =>
       _resolutionLabel.isEmpty ? '' : '（$_resolutionLabel）';
+
+  @override
+  void initState() {
+    super.initState();
+    // 把 JS 内部调试日志转发到界面日志框
+    _sniffer.onLog = (message) {
+      if (mounted) _addLog('[JS] $message');
+    };
+  }
 
   @override
   void dispose() {
@@ -179,14 +189,26 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 12),
               LinearProgressIndicator(value: _busy ? _progress : 0),
-              const SizedBox(height: 16),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('显示后台嗅探网页（调试排错用）'),
+                value: _showDebugWebView,
+                onChanged: (value) => setState(() => _showDebugWebView = value),
+              ),
               Expanded(child: LogPanel(logs: _logs)),
-              // 1x1 透明 WebView：保持页面存活，确保 JS 定时器持续执行
-              SizedBox(
-                width: 1,
-                height: 1,
+              // 关闭调试时保持 1x1 透明；开启时放大展示后台网页
+              Container(
+                width: double.infinity,
+                height: _showDebugWebView ? 300 : 1,
+                decoration: _showDebugWebView
+                    ? BoxDecoration(
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                      )
+                    : null,
                 child: Opacity(
-                  opacity: 0,
+                  opacity: _showDebugWebView ? 1 : 0,
                   child: WebViewWidget(controller: _sniffer.controller),
                 ),
               ),
