@@ -16,7 +16,8 @@ class LogPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: SingleChildScrollView(
-        child: Text(
+        // 使用 SelectableText，支持长按选中并复制部分日志
+        child: SelectableText(
           logs.isEmpty ? '运行日志会显示在这里' : logs.join('\n'),
           style: const TextStyle(fontSize: 13, height: 1.6),
         ),

@@ -50,8 +50,8 @@ class _LoginWebViewPageState extends State<LoginWebViewPage> {
             color: Theme.of(context).colorScheme.primaryContainer,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: const Text(
-              '提示：请在下方页面完成登录（若遇验证码请手动滑块），'
-              '看到头像出现后点击右上角【完成返回】即可永久生效。',
+              '请在下方页面完成登录（双指可缩放），看到头像在右上角，即可生效。'
+              '推荐保存登陆状态。点击【完成返回】可以隐藏提示。',
               style: TextStyle(fontSize: 12, height: 1.5),
             ),
           ),

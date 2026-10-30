@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
+import '../app_info.dart';
 import '../services/douyin_sniffer.dart';
 import '../services/video_downloader.dart';
 import '../utils/log_controller.dart';
-import '../widgets/debug_webview_host.dart';
+import '../utils/login_state_store.dart';
 import 'history_page.dart';
 import 'login_webview_page.dart';
 import 'parse_page.dart';
@@ -11,7 +13,7 @@ import 'settings_page.dart';
 
 /// 应用主框架：底部三个主页面（解析 / 历史 / 设置）
 ///
-/// 长期服务（嗅探器、下载器、日志、调试预览开关）都由这里统一持有，
+/// 长期服务（嗅探器、下载器、日志、登录状态）都由这里统一持有，
 /// 保证切换 Tab 或进入次级页面时后台 WebView 不会被销毁。
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -24,10 +26,9 @@ class _AppShellState extends State<AppShell> {
   final DouyinSniffer _sniffer = DouyinSniffer();
   final VideoDownloader _downloader = VideoDownloader();
   final LogController _logs = LogController();
-  final ValueNotifier<bool> _debugVisible = ValueNotifier(false);
   final ValueNotifier<bool> _busy = ValueNotifier(false);
+  final ValueNotifier<bool> _loggedIn = ValueNotifier(false);
 
-  OverlayEntry? _webViewEntry;
   int _index = 0;
 
   static const List<String> _titles = ['余音', '历史', '设置'];
@@ -35,37 +36,22 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
-    // JS 内部调试日志统一加 [嗅探] 前缀后写入共享日志
-    _sniffer.onLog = (message) => _logs.add('[嗅探] $message');
+    // JS 内部调试日志统一加 [解析] 前缀后写入共享日志
+    _sniffer.onLog = (message) => _logs.add('[解析] $message');
 
-    // 首帧后把常驻 WebView 宿主插入根 Overlay；
-    // Navigator 会把非路由 entry 重新排到所有路由之上。
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _webViewEntry != null) return;
-      final overlay = Overlay.of(context, rootOverlay: true);
-      final entry = OverlayEntry(
-        maintainState: true,
-        opaque: false,
-        builder: (_) => DebugWebViewHost(
-          controller: _sniffer.controller,
-          visible: _debugVisible,
-        ),
-      );
-      overlay.insert(entry);
-      _webViewEntry = entry;
+    // 恢复上次“完成返回”后留下的登录标记（不保存任何账号信息）
+    LoginStateStore.isLoggedIn().then((value) {
+      if (mounted) _loggedIn.value = value;
     });
   }
 
   @override
   void dispose() {
-    // 先移除 WebView 宿主，再释放服务和 notifier
-    _webViewEntry?.remove();
-    _webViewEntry = null;
     _sniffer.onLog = null;
     _sniffer.dispose();
     _logs.dispose();
-    _debugVisible.dispose();
     _busy.dispose();
+    _loggedIn.dispose();
     super.dispose();
   }
 
@@ -74,9 +60,36 @@ class _AppShellState extends State<AppShell> {
     final done = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const LoginWebViewPage()),
     );
-    if (done == true) {
+    if (done == true && mounted) {
+      _loggedIn.value = true;
+      await LoginStateStore.markLoggedIn();
       _logs.add('登录完成，Cookie 已保存，可重新解析获取高清画质');
     }
+  }
+
+  /// 未登录时先说明登录用途；已登录（我的主页）直接进入登录页
+  Future<void> _onAccountTap(bool loggedIn) async {
+    if (!loggedIn) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('登录提示'),
+          content: const Text(loginNotice),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('继续登录'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+    await _openLoginPage();
   }
 
   void _selectTab(int index) {
@@ -92,33 +105,51 @@ class _AppShellState extends State<AppShell> {
         actions: [
           if (_index == 0)
             ValueListenableBuilder<bool>(
-              valueListenable: _busy,
-              builder: (context, busy, _) => TextButton(
-                onPressed: busy ? null : _openLoginPage,
-                child: const Text('账号登录/提画质'),
+              valueListenable: _loggedIn,
+              builder: (context, loggedIn, _) => ValueListenableBuilder<bool>(
+                valueListenable: _busy,
+                builder: (context, busy, _) => TextButton(
+                  onPressed: busy ? null : () => _onAccountTap(loggedIn),
+                  child: Text(loggedIn ? '我的主页' : '账号登录/提画质'),
+                ),
               ),
             ),
         ],
       ),
-      body: IndexedStack(
-        index: _index,
+      body: Stack(
         children: [
-          ParsePage(
-            sniffer: _sniffer,
-            downloader: _downloader,
-            logs: _logs,
-            busy: _busy,
-            // 解析出结果、准备弹选择面板前，确保用户看到的是解析页
-            onRequestParseTab: () {
-              if (mounted && _index != 0) setState(() => _index = 0);
-            },
+          IndexedStack(
+            index: _index,
+            children: [
+              ParsePage(
+                sniffer: _sniffer,
+                downloader: _downloader,
+                logs: _logs,
+                busy: _busy,
+                // 解析出结果、准备弹选择面板前，确保用户看到的是解析页
+                onRequestParseTab: () {
+                  if (mounted && _index != 0) setState(() => _index = 0);
+                },
+              ),
+              const HistoryPage(),
+              SettingsPage(logs: _logs, sniffer: _sniffer),
+            ],
           ),
-          const HistoryPage(),
-          SettingsPage(
-            logs: _logs,
-            sniffer: _sniffer,
-            debugVisible: _debugVisible,
-            busy: _busy,
+          // 常驻隐藏 WebView：只保留 1x1 透明挂载，切换页面时解析不中断
+          Positioned(
+            left: 0,
+            bottom: 0,
+            width: 1,
+            height: 1,
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: 0,
+                child: WebViewWidget(
+                  key: const ValueKey('douyin-sniffer-webview'),
+                  controller: _sniffer.controller,
+                ),
+              ),
+            ),
           ),
         ],
       ),
