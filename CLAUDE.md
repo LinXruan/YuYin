@@ -1,26 +1,48 @@
-# 项目开发守则 (Flutter Android)
+# 项目开发守则（余音 / Flutter Android）
 
-## 1. 技术栈与目标平台
-- **框架与语言**：Flutter 3.47.6 / Dart 3.13.5
-- **目标平台**：仅开发 Android 端（忽略 Chrome/Web 及 Windows 桌面端的所有警告与配置）。
+## 1. 项目概况
 
-## 2. 常用命令与验证流程
-每次修改完 Dart 代码后，请优先运行轻量级的静态检查，不要动辄跑完整的 APK 构建：
-- **拉取依赖**：`flutter pub get`
-- **代码静态检查（必跑）**：`flutter analyze`（改完代码后先用它检查语法错误，速度最快）
-- **运行测试**：`flutter test`
-- **构建测试包**：`flutter build apk --debug`
-- **视觉验证脚本**：`D:\Install\anaconda3\envs\deepseek\python.exe tool\verify_launch_match.py`
+- **应用**：余音（YuYin），Android 端抖音无水印视频 / 图集 / 实况图下载工具。
+- **包名 / 版本**：`com.debug.yuyin` / `1.0.0+112`（以 `pubspec.yaml` 和 `lib/app_info.dart` 为准）。
+- **技术栈**：Flutter 3.47.6 / Dart 3.13.5，Material 3，仅 Android（忽略 Web / Windows）。
+- **依赖**：`webview_flutter`、`dio`、`path_provider`、`gal`；不引入第三方状态管理。
+- **现状**：解析、登录、画质/图集选择、下载、调试日志、关于页均已完成；历史页暂为占位。
 
-## 3. 本地环境避坑指南（重要）
-在终端执行命令时，必须严格遵守以下本地环境限制：
-- **PowerShell**：已经升级到7.6.9版本了，默认使用PowerShell 7.6.9
-- **Python 调用规范**：所有 Python 命令默认使用 conda 的 `deepseek` 环境，请使用完整路径 `D:\Install\anaconda3\envs\deepseek\python.exe`，或在单条命令中使用 `conda run -n deepseek python ...`。**严禁使用 `python3`**（会误调 MSYS2 环境导致缺包报错）；PATH 上的 `python` 指向 base 环境，也不要直接使用。VSCode 的默认解释器已通过
-- **ADB 调用**：`platform-tools` 已加入当前用户的 PATH，新开的终端可直接运行 `adb`。若当前会话仍找不到 `adb`（PATH 未刷新），使用完整路径 `%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe`。运行 `tool\verify_launch_match.py` 时通常无需再传 `--adb`。
-- **模拟器与内存保护**：可用模拟器 AVD 名称为 `Medium_Phone_API_37.0`。由于物理内存为 16GB 且 Gradle 分配了 `-Xmx8G`，在执行首次构建或重度 Gradle 编译时，**不要同时开启模拟器**，以免内存溢出。
-- **JDK 版本**：Flutter 已固定使用 JDK 17（已执行 `flutter config --jdk-dir="C:\Program Files\Eclipse Adoptium\jdk-17.0.20.101-hotspot"`），`JAVA_HOME` 也指向该 JDK，不再使用 Android Studio 自带的 JBR 25。若出现 Java 版本问题，先运行 `flutter doctor -v` 确认 "Java binary at" 是否为 JDK 17。
+## 2. 常用命令
 
-## 4. Dart / Flutter 编码规范
-- **极简原则**：我是编程新手，请使用最直观、标准的 Flutter 官方组件实现功能，除非我明确要求，否则不要引入复杂的第三方状态管理框架（优先使用基础的 `StatefulWidget` / `setState` 或项目中已有的方案）。
-- **组件拆分**：保持单个 `.dart` 文件精简（大约 200 行内），复杂的 UI 块请拆分为独立的 Widget 组件。
-- **注释要求**：关键业务逻辑与 UI 结构请加上简明的中文注释。
+- `flutter pub get`
+- `flutter analyze`（修改 Dart 后必跑）
+- `flutter test`
+- `flutter build apk --debug`（需要完整构建时再跑）
+- 安装到真机（`adb` 不在 PATH 时用完整路径）：
+  `%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe install -r build\app\outputs\flutter-apk\app-debug.apk`
+- 重新生成应用图标：
+  `D:\Install\anaconda3\envs\deepseek\python.exe tool\generate_app_icon.py`
+
+## 3. 环境要点
+
+- **JDK 17**：Flutter 已固定使用 JDK 17；Java 版本异常时先运行 `flutter doctor -v` 确认。
+- **Python**：工具脚本统一使用 conda `deepseek` 环境的完整路径，禁止 `python3`。
+- **内存**：物理内存 16GB，Gradle 配置 `-Xmx8G`；首次或重度构建时不要同时开模拟器。
+- **真机**：设备由用户连接并测试；不要擅自卸载用户已安装的旧版本或清除应用数据。
+
+## 4. 项目结构与关键约束
+
+- `lib/pages/app_shell.dart`：三 Tab（解析 / 历史 / 设置）、全局服务、常驻 1x1 隐藏 WebView。
+- `lib/pages/parse_page.dart`：解析流程；取消画质 / 图片选择时调用 `sniffer.cancelActiveTask()`。
+- `lib/services/douyin_sniffer.dart`：
+  - 一个 `WebViewController` 只能挂载一个 `WebViewWidget`；
+  - 任务完成后 `_isTaskActive` 守卫会阻止页面跳转重新开启嗅探；
+  - `cancelActiveTask()` 会停止定时器与分享页请求，并加载 `about:blank`。
+- `lib/utils/log_controller.dart`：解析页与调试页共享日志，日志前缀为 `[解析]`。
+- `lib/pages/debug_page.dart`、`lib/widgets/log_panel.dart`：日志支持长按选中复制，并提供复制全部日志。
+- `lib/utils/login_state_store.dart`：只写本地登录标记，不保存账号信息。
+- `lib/app_info.dart`：版本、仓库、作者、登录提示、免责声明统一维护。
+- Android 图标 / 启动页使用 PNG（`mipmap-*/ic_launcher_foreground.png`、`drawable-*/launch_logo.png`）；不要改回 vector 前景。
+
+## 5. 编码规范
+
+- 使用最直观的 Flutter 官方组件；除非明确要求，不引入复杂第三方状态管理。
+- 复杂 UI 拆成独立 Widget；UI 文件尽量控制在 200 行左右，核心服务文件可按可读性适当超出。
+- 关键业务逻辑和 UI 结构写简明中文注释。
+- 修改版本号 / 包名时同步 `pubspec.yaml`、`lib/app_info.dart`、`android/app/build.gradle.kts` 和 MainActivity。
