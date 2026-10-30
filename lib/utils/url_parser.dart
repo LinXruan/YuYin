@@ -18,11 +18,46 @@ class UrlParser {
     return null;
   }
 
+  /// 从抖音链接中提取作品 awemeId（10~25 位数字），失败返回 null。
+  /// 支持 /video/{id}、/note/{id}、/slides/{id}、?modal_id={id}。
+  static String? extractAwemeId(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.host.isEmpty || !_isSupportedHost(uri.host)) {
+      return null;
+    }
+
+    const idPattern = r'\d{10,25}';
+    final pathMatch =
+        RegExp('/(?:video|note|slides)/($idPattern)(?:/|\$)')
+            .firstMatch(uri.path);
+    if (pathMatch != null) return pathMatch.group(1);
+
+    final modalId = uri.queryParameters['modal_id'];
+    if (modalId != null && RegExp('^$idPattern\$').hasMatch(modalId)) {
+      return modalId;
+    }
+
+    // 兜底：对整串 URL 再匹配一次，兼容被重定向/包裹的链接
+    final rawPath =
+        RegExp('/(?:video|note|slides)/($idPattern)').firstMatch(url);
+    if (rawPath != null) return rawPath.group(1);
+    return RegExp('[?&]modal_id=($idPattern)').firstMatch(url)?.group(1);
+  }
+
   /// 判断链接域名是否为抖音（douyin.com 及其子域名）
   static bool _isDouyinLink(String url) {
     final uri = Uri.tryParse(url);
     final host = uri?.host.toLowerCase() ?? '';
     return host == 'douyin.com' || host.endsWith('.douyin.com');
+  }
+
+  /// 判断域名是否属于抖音（含 iesdouyin 分享页）
+  static bool _isSupportedHost(String host) {
+    final h = host.toLowerCase();
+    return h == 'douyin.com' ||
+        h.endsWith('.douyin.com') ||
+        h == 'iesdouyin.com' ||
+        h.endsWith('.iesdouyin.com');
   }
 
   /// 去掉 URL 末尾粘连的英文标点（如句号、逗号、右括号等）

@@ -37,7 +37,7 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     // 把 JS 内部调试日志转发到界面日志框
     _sniffer.onLog = (message) {
-      if (mounted) _addLog('[JS] $message');
+      if (mounted) _addLog('[嗅探] $message');
     };
   }
 
