@@ -56,4 +56,72 @@ void main() {
       );
     });
   });
+
+  group('UrlParser.extractAwemeId', () {
+    test('从 /video/ 长链提取作品 ID', () {
+      expect(
+        UrlParser.extractAwemeId(
+          'https://www.douyin.com/video/7693396647648409855'
+          '?previous_page=app_code_link',
+        ),
+        '7693396647648409855',
+      );
+    });
+
+    test('从 /note/ 链接提取作品 ID', () {
+      expect(
+        UrlParser.extractAwemeId(
+          'https://www.douyin.com/note/7300000000000000000',
+        ),
+        '7300000000000000000',
+      );
+    });
+
+    test('从 /slides/ 链接提取作品 ID', () {
+      expect(
+        UrlParser.extractAwemeId(
+          'https://www.douyin.com/slides/7300000000000000000',
+        ),
+        '7300000000000000000',
+      );
+    });
+
+    test('从 modal_id 查询参数提取作品 ID', () {
+      expect(
+        UrlParser.extractAwemeId(
+          'https://www.douyin.com/discover?modal_id=7300000000000000000',
+        ),
+        '7300000000000000000',
+      );
+    });
+
+    test('iesdouyin 分享页也能提取作品 ID', () {
+      expect(
+        UrlParser.extractAwemeId(
+          'https://www.iesdouyin.com/share/video/7300000000000000000/',
+        ),
+        '7300000000000000000',
+      );
+    });
+
+    test('短链没有作品 ID 时返回 null', () {
+      expect(UrlParser.extractAwemeId('https://v.douyin.com/iYxxxx/'), isNull);
+    });
+
+    test('非抖音链接返回 null', () {
+      expect(
+        UrlParser.extractAwemeId(
+          'https://www.youtube.com/video/7300000000000000000',
+        ),
+        isNull,
+      );
+    });
+
+    test('ID 长度不在 10~25 位时返回 null', () {
+      expect(
+        UrlParser.extractAwemeId('https://www.douyin.com/video/12345'),
+        isNull,
+      );
+    });
+  });
 }

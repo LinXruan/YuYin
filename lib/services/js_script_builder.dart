@@ -12,6 +12,42 @@ const String kDouyinSniffJs = r'''
     if (S.logs[msg]) return; S.logs[msg] = true;
     try { window.DouyinChannel && window.DouyinChannel.postMessage(JSON.stringify({ type: 'log', msg: msg })); } catch (e) {}
   }
+  // 当前页面目标作品 ID（/video、/note、/slides、modal_id）
+  function getTargetAwemeId() {
+    try {
+      var m = location.pathname.match(/\/(?:video|note|slides)\/(\d{10,25})/) ||
+        location.search.match(/[?&]modal_id=(\d{10,25})/);
+      return m ? m[1] : '';
+    } catch (e) { return ''; }
+  }
+  // 节点自身的 aweme_id，统一转字符串比较，避免大整数精度问题
+  function getNodeAwemeId(node) {
+    if (!node) return '';
+    var id = node.aweme_id || node.awemeId || node.item_id;
+    return id === null || id === undefined ? '' : String(id);
+  }
+  // 播放器当前作品的 aweme_id
+  function playerAwemeId() {
+    try {
+      var info = window.player && window.player.config && window.player.config.awemeInfo;
+      var id = info && (info.aweme_id || info.awemeId);
+      return id === null || id === undefined ? '' : String(id);
+    } catch (e) { return ''; }
+  }
+  // 只扫描这些作品接口，避免评论/推荐/搜索响应里的图片字段抢跑
+  function isAwemeApiUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    return /\/aweme\/v1\/web\/aweme\/(detail|post|favorite|like|article)(\/|\?|$)/.test(url);
+  }
+  // 从详情接口 URL 的 aweme_id 参数取目标 ID
+  function awemeIdFromUrl(url) {
+    try {
+      var m = String(url || '').match(/[?&]aweme_id=(\d{10,25})/);
+      return m ? m[1] : '';
+    } catch (e) { return ''; }
+  }
+  S.targetId = getTargetAwemeId();
+  if (S.targetId) log('目标作品: ' + S.targetId);
   if (!S.injected) { S.injected = true; log('脚本已注入: ' + location.href); }
   // 清洗地址：实体解码、补全协议、去水印
   function clean(raw) {
@@ -205,6 +241,8 @@ const String kDouyinSniffJs = r'''
   // 单地址兜底：图文页不启用，避免误抓实况视频或背景音乐
   function reportSingle(raw, trusted, w, h) {
     if (S.sent || location.href.indexOf('/note/') !== -1) return;
+    var pid = playerAwemeId();
+    if (S.targetId && pid && pid !== S.targetId) return;
     var url = clean(raw);
     if (!url || url === S.lastUrl || (!trusted && !isMediaUrl(url))) return;
     if (sendVideoItems([{ url: url, mediaType: 'video', resolution: resText(w, h) }])) S.lastUrl = url;
@@ -216,11 +254,39 @@ const String kDouyinSniffJs = r'''
     try {
       var rawFetch = window.fetch;
       if (rawFetch) window.fetch = function () {
+        var args = arguments;
+        var input = args[0];
+        var url = typeof input === 'string' ? input : (input && input.url) || '';
         try {
-          var input = arguments[0], url = typeof input === 'string' ? input : (input && input.url) || '';
           if (isMediaUrl(url)) { log('捕获 fetch 媒体请求'); reportSingle(url, false); }
         } catch (e) {}
-        return rawFetch.apply(this, arguments);
+        var promise = rawFetch.apply(this, args);
+        try {
+          if (!isMediaUrl(url) && promise && typeof promise.then === 'function') {
+            promise.then(function (res) {
+              try {
+                if (!res || !isAwemeApiUrl(url)) return;
+                var type = '';
+                try { type = (res.headers.get('content-type') || '').toLowerCase(); } catch (e) {}
+                if (type.indexOf('video/') === 0 || type.indexOf('image/') === 0 ||
+                  type.indexOf('application/octet-stream') !== -1) return;
+                var length = 0;
+                try { length = Number(res.headers.get('content-length')) || 0; } catch (e) {}
+                if (length > 4 * 1024 * 1024) return;
+                var cloned = res.clone();
+                cloned.text().then(function (text) {
+                  try {
+                    if (S.sent) return;
+                    var json = JSON.parse(text);
+                    log('命中作品接口，开始解析响应');
+                    scanTree(json, awemeIdFromUrl(url));
+                  } catch (e) {}
+                }).catch(function () {});
+              } catch (e) {}
+            }).catch(function () {});
+          }
+        } catch (e) {}
+        return promise;
       };
     } catch (e) {}
     try {
@@ -228,9 +294,16 @@ const String kDouyinSniffJs = r'''
       XMLHttpRequest.prototype.open = function (method, url) {
         try {
           if (isMediaUrl(url)) { log('捕获 XHR 媒体请求'); reportSingle(url, false); }
-          var xhr = this; xhr.addEventListener('load', function () {
-            try { scanTree(JSON.parse(xhr.responseText)); } catch (e) {}
-          });
+          if (isAwemeApiUrl(url)) {
+            var xhr = this; xhr.addEventListener('load', function () {
+              try {
+                if (S.sent) return;
+                var json = JSON.parse(xhr.responseText);
+                log('命中作品接口，开始解析响应');
+                scanTree(json, awemeIdFromUrl(url));
+              } catch (e) {}
+            });
+          }
         } catch (e) {}
         return rawOpen.apply(this, arguments);
       };
@@ -246,12 +319,16 @@ const String kDouyinSniffJs = r'''
     }
   }
   // 广度遍历：最多 3 万节点，Set 防止循环引用导致死循环
-  function scanTree(root) {
+  function scanTree(root, restrictAwemeId) {
     if (!root) return;
+    var filterId = S.targetId || restrictAwemeId || '';
     var queue = [root], qi = 0, seen = new Set(), guard = 0;
     while (qi < queue.length && guard++ < 30000 && !S.sent) {
       var node = queue[qi++];
       if (!node || typeof node !== 'object' || seen.has(node)) continue; seen.add(node);
+      var nodeId = getNodeAwemeId(node);
+      // 有 ID 且与目标不一致：整棵子树跳过，避免推荐作品的 video/images 抢跑
+      if (filterId && nodeId && nodeId !== filterId) continue;
       var hasImages = Array.isArray(node.images) && node.images.length > 0;
       if (hasImages) {
         var items = collectImages(node.images);
@@ -271,9 +348,11 @@ const String kDouyinSniffJs = r'''
   function scanPlayerData() {
     if (location.href.indexOf('/note/') !== -1) return false;
     try {
-      var v = window.player && window.player.config && window.player.config.awemeInfo
-        && window.player.config.awemeInfo.video;
+      var info = window.player && window.player.config && window.player.config.awemeInfo;
+      var v = info && info.video;
       if (!v) return false;
+      var pid = info.aweme_id || info.awemeId;
+      if (S.targetId && pid !== null && pid !== undefined && String(pid) !== S.targetId) return false;
       var tiers = collectVideos(v);
       return tiers.length ? sendVideoItems(tiers) : false;
     } catch (e) { return false; }
@@ -314,7 +393,7 @@ const String kDouyinSniffJs = r'''
   hookNetwork();
   tryExtractNow();
   window.__douyinSnifferReset = function () {
-    S.sent = false; S.lastUrl = ''; S.logs = {};
+    S.sent = false; S.lastUrl = ''; S.logs = {}; S.targetId = '';
     window.__dyStartTime = Date.now();
     window.__dyStartHref = location.href;
   };
