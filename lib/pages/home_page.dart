@@ -170,6 +170,33 @@ class _HomePageState extends State<HomePage> {
     return [picked];
   }
 
+  /// 一键复制当前网页地址和日志面板内容，便于发送给开发者排查
+  Future<void> _copyLogs() async {
+    if (_logs.isEmpty) {
+      _addLog('暂无可复制的日志');
+      return;
+    }
+
+    var currentUrl = '';
+    try {
+      currentUrl = await _sniffer.controller.currentUrl() ?? '';
+    } catch (e) {
+      debugPrint('读取当前网页地址失败: $e');
+    }
+
+    final buffer = StringBuffer();
+    if (currentUrl.isNotEmpty) {
+      buffer.writeln('当前网页: $currentUrl');
+    }
+    buffer.write(_logs.join('\n'));
+
+    await Clipboard.setData(ClipboardData(text: buffer.toString()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('日志已复制到剪贴板')),
+    );
+  }
+
   /// 把异常转换成简短的中文提示
   String _friendlyError(Object error) {
     if (error is TimeoutException) return '嗅探超时，请检查链接是否有效后重试';
@@ -230,11 +257,23 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 12),
               LinearProgressIndicator(value: _busy ? _progress : 0),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('显示后台嗅探网页（调试排错用）'),
-                value: _showDebugWebView,
-                onChanged: (value) => setState(() => _showDebugWebView = value),
+              Row(
+                children: [
+                  Expanded(
+                    child: SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('显示后台嗅探网页（调试排错用）'),
+                      value: _showDebugWebView,
+                      onChanged: (value) =>
+                          setState(() => _showDebugWebView = value),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _copyLogs,
+                    icon: const Icon(Icons.copy, size: 18),
+                    label: const Text('复制日志'),
+                  ),
+                ],
               ),
               Expanded(child: LogPanel(logs: _logs)),
               // 关闭调试时保持 1x1 透明；开启时放大展示后台网页

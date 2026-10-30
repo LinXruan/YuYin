@@ -193,13 +193,18 @@
 
 ---
 
-## Step 34：构建 APK
+## Step 34：首页一键复制日志 + 构建安装 APK
 
-1. 检查确认没有运行电脑端模拟器。
-2. 运行 `flutter build apk --debug`。
-3. 若已通过 USB 连接真机，运行 `adb install -r build\app\outputs\flutter-apk\app-debug.apk`。
-4. 汇报 APK 路径与验证结果。
-5. 若 A/B/C 真机仍失败，再评估 Step 35（按需）：
+1. 修改 `lib/pages/home_page.dart`：
+   - 在「显示后台嗅探网页（调试排错用）」开关右侧新增【复制日志】按钮，便于一键复制排查信息；
+   - 点击后把**当前后台 WebView 地址 + 日志面板全部内容**写入系统剪贴板；
+   - 复制成功弹出 SnackBar「日志已复制到剪贴板」；日志为空时提示「暂无可复制的日志」。
+2. 运行 `flutter analyze` 和 `flutter test`。
+3. 检查确认没有运行电脑端模拟器。
+4. 运行 `flutter build apk --debug`。
+5. 若已通过 USB 连接真机，运行 `adb install -r build\app\outputs\flutter-apk\app-debug.apk`。
+6. 汇报 APK 路径、安装结果与验证结果。
+7. 若 A/B/C 真机仍失败，再评估 Step 35（按需）：
    - 从 `__pace_f` RSC 片段提取嵌入 JSON（复杂、易碎）；
    - 换 `flutter_inappwebview` 使用 document-start 用户脚本和响应拦截（回归风险最高）。
 
@@ -213,7 +218,7 @@
 - `lib/services/douyin_share_api.dart`（新建）：Dio 分享页请求 + 纯解析函数。
 - `lib/services/js_script_builder.dart`：fetch JSON 扫描、目标 awemeId 锚定、白名单、日志。
 - `lib/services/douyin_sniffer.dart`：URL 跟踪、并行兜底、WebView 分享页兜底、taskId/完成幂等。
-- `lib/pages/home_page.dart`：日志前缀 `[JS]` → `[嗅探]`。
+- `lib/pages/home_page.dart`：日志前缀 `[JS]` → `[嗅探]`；新增【复制日志】按钮。
 - `test/url_parser_test.dart`：awemeId 用例。
 - `test/douyin_share_api_test.dart`（新建）：解析 fixture。
 - `lib/models/media_item.dart`：不改。
@@ -279,7 +284,8 @@
    - 多实况图：预览出现 `实况视频 (LIVE)`，可同时保存静态图和实况视频。
    - 短链 `v.douyin.com`：重定向后正确提取 awemeId。
    - 解析中切换新链接：旧任务报“已有新任务”，新任务正常，无串扰。
-5. `flutter build apk --debug` 构建成功。
+5. 点击「复制日志」后，剪贴板内容包含当前后台网页地址与完整日志，并出现 SnackBar 提示。
+6. `flutter build apk --debug` 构建成功。
 
 ## 主要风险与应对
 
