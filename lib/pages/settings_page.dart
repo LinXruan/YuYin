@@ -11,59 +11,38 @@ class SettingsPage extends StatelessWidget {
     super.key,
     required this.logs,
     required this.sniffer,
-    required this.debugVisible,
-    required this.busy,
   });
 
   final LogController logs;
   final DouyinSniffer sniffer;
-  final ValueNotifier<bool> debugVisible;
-  final ValueNotifier<bool> busy;
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: busy,
-      builder: (context, isBusy, _) {
-        return ListView(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          children: [
-            ListTile(
-              leading: const Icon(Icons.bug_report_outlined),
-              title: const Text('调试'),
-              subtitle: const Text('运行日志、后台网页预览与日志复制'),
-              trailing: const Icon(Icons.chevron_right),
-              enabled: !isBusy,
-              onTap: isBusy
-                  ? null
-                  : () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => DebugPage(
-                            logs: logs,
-                            sniffer: sniffer,
-                            debugVisible: debugVisible,
-                          ),
-                        ),
-                      ),
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: [
+        ListTile(
+          leading: const Icon(Icons.bug_report_outlined),
+          title: const Text('调试'),
+          subtitle: const Text('运行日志、日志复制与网页地址'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => DebugPage(logs: logs, sniffer: sniffer),
             ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: const Text('关于'),
-              subtitle: const Text('版本信息、开源地址与免责声明'),
-              trailing: const Icon(Icons.chevron_right),
-              enabled: !isBusy,
-              onTap: isBusy
-                  ? null
-                  : () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const AboutPage(),
-                        ),
-                      ),
-            ),
-          ],
-        );
-      },
+          ),
+        ),
+        const Divider(height: 1),
+        ListTile(
+          leading: const Icon(Icons.info_outline),
+          title: const Text('关于'),
+          subtitle: const Text('版本信息、开源地址与免责声明'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const AboutPage()),
+          ),
+        ),
+      ],
     );
   }
 }

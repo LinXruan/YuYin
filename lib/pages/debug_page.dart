@@ -3,81 +3,59 @@ import 'package:flutter/services.dart';
 
 import '../services/douyin_sniffer.dart';
 import '../utils/log_controller.dart';
-import '../widgets/debug_webview_host.dart';
 import '../widgets/log_panel.dart';
 
-/// 调试页：运行日志、复制日志、后台 WebView 预览
-class DebugPage extends StatefulWidget {
+/// 调试页：运行日志、复制日志
+class DebugPage extends StatelessWidget {
   const DebugPage({
     super.key,
     required this.logs,
     required this.sniffer,
-    required this.debugVisible,
   });
 
   final LogController logs;
   final DouyinSniffer sniffer;
-  final ValueNotifier<bool> debugVisible;
 
-  @override
-  State<DebugPage> createState() => _DebugPageState();
-}
-
-class _DebugPageState extends State<DebugPage> {
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     // 局部 ScaffoldMessenger：避免复制提示在返回后残留在解析页
     return ScaffoldMessenger(
-      child: PopScope(
-        onPopInvokedWithResult: (didPop, result) {
-          if (didPop) widget.debugVisible.value = false;
-        },
-        child: ValueListenableBuilder<bool>(
-          valueListenable: widget.debugVisible,
-          builder: (context, visible, _) {
-            return Scaffold(
-              appBar: AppBar(
-                title: const Text('调试'),
-                actions: [
-                  Builder(
-                    builder: (buttonContext) => IconButton(
-                      tooltip: '复制日志',
-                      onPressed: () => _copyLogs(buttonContext),
-                      icon: const Icon(Icons.copy),
-                    ),
-                  ),
-                ],
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('调试'),
+          actions: [
+            Builder(
+              builder: (buttonContext) => IconButton(
+                tooltip: '复制日志',
+                onPressed: () => _copyLogs(buttonContext),
+                icon: const Icon(Icons.copy),
               ),
-              body: Column(
-                children: [
-                  SwitchListTile(
-                    title: const Text('显示后台嗅探网页'),
-                    subtitle: const Text('开启后网页会覆盖在屏幕底部，用于调试排错'),
-                    value: visible,
-                    onChanged: (value) => widget.debugVisible.value = value,
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        16,
-                        12,
-                        16,
-                        // 预览面板打开时给日志区留出底部空间
-                        visible ? kDebugPanelHeight + 12 : 16,
-                      ),
-                      child: ValueListenableBuilder<List<String>>(
-                        valueListenable: widget.logs,
-                        builder: (context, lines, _) {
-                          return LogPanel(logs: lines);
-                        },
-                      ),
-                    ),
-                  ),
-                ],
+            ),
+          ],
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '长按日志可选中复制',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-            );
-          },
+              const SizedBox(height: 8),
+              Expanded(
+                child: ValueListenableBuilder<List<String>>(
+                  valueListenable: logs,
+                  builder: (context, lines, _) {
+                    return LogPanel(logs: lines);
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -85,16 +63,16 @@ class _DebugPageState extends State<DebugPage> {
 
   /// 复制链接来源和日志，便于发送给开发者排查
   Future<void> _copyLogs(BuildContext context) async {
-    if (widget.logs.value.isEmpty) {
-      widget.logs.add('暂无可复制的日志');
+    if (logs.value.isEmpty) {
+      logs.add('暂无可复制的日志');
       return;
     }
 
-    final sourceUrl = widget.sniffer.sourceUrl ?? '';
-    final awemePageUrl = widget.sniffer.awemePageUrl ?? '';
+    final sourceUrl = sniffer.sourceUrl ?? '';
+    final awemePageUrl = sniffer.awemePageUrl ?? '';
     var currentUrl = '';
     try {
-      currentUrl = await widget.sniffer.controller.currentUrl() ?? '';
+      currentUrl = await sniffer.controller.currentUrl() ?? '';
     } catch (e) {
       debugPrint('读取当前网页地址失败: $e');
     }
@@ -108,23 +86,12 @@ class _DebugPageState extends State<DebugPage> {
         currentUrl.isNotEmpty) {
       buffer.writeln();
     }
-    buffer.write(widget.logs.joined);
+    buffer.write(logs.joined);
 
     await Clipboard.setData(ClipboardData(text: buffer.toString()));
     if (!context.mounted) return;
-
-    final visible = widget.debugVisible.value;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('日志已复制到剪贴板'),
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.fromLTRB(
-          16,
-          0,
-          16,
-          visible ? kDebugPanelHeight + 12 : 16,
-        ),
-      ),
+      const SnackBar(content: Text('日志已复制到剪贴板')),
     );
   }
 }

@@ -84,6 +84,8 @@ class _ParsePageState extends State<ParsePage> {
       final selected = await _chooseItems(result);
       if (!mounted) return;
       if (selected == null || selected.isEmpty) {
+        // 取消后立即停止后台嗅探和网页加载，避免日志继续刷
+        widget.sniffer.cancelActiveTask();
         widget.logs.add('已取消下载');
         return;
       }
@@ -166,51 +168,71 @@ class _ParsePageState extends State<ParsePage> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: widget.busy,
-      builder: (context, busy, _) {
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            TextField(
-              controller: _inputController,
-              minLines: 3,
-              maxLines: 5,
-              decoration: const InputDecoration(
-                labelText: '抖音分享口令 / 链接',
-                hintText: '粘贴分享口令或链接，例如 https://v.douyin.com/xxxx/',
-                border: OutlineInputBorder(),
-                alignLabelWithHint: true,
-              ),
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        Expanded(
+          child: ValueListenableBuilder<bool>(
+            valueListenable: widget.busy,
+            builder: (context, busy, _) {
+              return ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  TextField(
+                    controller: _inputController,
+                    minLines: 3,
+                    maxLines: 5,
+                    decoration: const InputDecoration(
+                      labelText: '抖音分享口令 / 链接',
+                      hintText:
+                          '粘贴分享口令或链接，例如 https://v.douyin.com/xxxx/',
+                      border: OutlineInputBorder(),
+                      alignLabelWithHint: true,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: busy ? null : _pasteFromClipboard,
+                        child: const Text('粘贴'),
+                      ),
+                      TextButton(
+                        onPressed: busy ? null : _inputController.clear,
+                        child: const Text('清空'),
+                      ),
+                    ],
+                  ),
+                  FilledButton.icon(
+                    onPressed: busy ? null : _startParse,
+                    icon: const Icon(Icons.download),
+                    label: Text(busy ? '处理中...' : '解析作品'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  LinearProgressIndicator(value: busy ? _progress : 0),
+                  const SizedBox(height: 16),
+                  _StatusCard(logs: widget.logs),
+                  const SizedBox(height: 16),
+                ],
+              );
+            },
+          ),
+        ),
+        // 页面底部标识文字（仅展示，不可点击）
+        Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 10),
+          child: Text(
+            '本地、解析、隐私',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: 16,
+              color: Colors.grey.shade600,
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                TextButton(
-                  onPressed: busy ? null : _pasteFromClipboard,
-                  child: const Text('粘贴'),
-                ),
-                TextButton(
-                  onPressed: busy ? null : _inputController.clear,
-                  child: const Text('清空'),
-                ),
-              ],
-            ),
-            FilledButton.icon(
-              onPressed: busy ? null : _startParse,
-              icon: const Icon(Icons.download),
-              label: Text(busy ? '处理中...' : '解析作品'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
-            const SizedBox(height: 16),
-            LinearProgressIndicator(value: busy ? _progress : 0),
-            const SizedBox(height: 16),
-            _StatusCard(logs: widget.logs),
-          ],
-        );
-      },
+          ),
+        ),
+      ],
     );
   }
 }

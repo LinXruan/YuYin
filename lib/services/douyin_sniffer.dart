@@ -50,6 +50,12 @@ class DouyinSniffer {
 
   bool get _isNotePage => _workPageKind == DouyinWorkPage.note;
 
+  /// 当前是否仍在等待解析结果；任务完成后不再重新注入脚本或接收消息
+  bool get _isTaskActive {
+    final completer = _completer;
+    return !_disposed && completer != null && !completer.isCompleted;
+  }
+
   /// JS 调试日志回调，由主界面设置
   void Function(String message)? onLog;
 
@@ -66,6 +72,8 @@ class DouyinSniffer {
           onNavigationRequest: _onNavigationRequest,
           onWebResourceError: _onWebResourceError,
           onPageStarted: (url) {
+            // 任务结束后页面仍可能继续跳转，不能再重新开启嗅探
+            if (!_isTaskActive) return;
             if (!UrlParser.isAllowedNavigationUrl(url)) {
               _logNonWebPage(url);
               return;
@@ -76,10 +84,12 @@ class DouyinSniffer {
             _injectScript();
           },
           onUrlChange: (change) {
+            if (!_isTaskActive) return;
             // 重定向/SPA history 变化时补一次最终 URL 识别
             _handlePageUrl(change.url, _taskId);
           },
           onPageFinished: (url) {
+            if (!_isTaskActive) return;
             if (!UrlParser.isAllowedNavigationUrl(url)) {
               _logNonWebPage(url);
               return;
@@ -187,7 +197,7 @@ class DouyinSniffer {
       return NavigationDecision.navigate;
     }
     final scheme = _schemeOf(url);
-    if (_blockedSchemes.add(scheme)) {
+    if (_blockedSchemes.add(scheme) && _isTaskActive) {
       final shortUrl =
           url.length > 120 ? '${url.substring(0, 120)}...' : url;
       onLog?.call('已拦截外部跳转(scheme=$scheme): $shortUrl');
@@ -197,6 +207,7 @@ class DouyinSniffer {
 
   /// 只记录主 frame 的网页加载错误，用于诊断深链/网络问题
   void _onWebResourceError(WebResourceError error) {
+    if (!_isTaskActive) return;
     if (error.isForMainFrame == false) return;
     if (error.description.contains('ERR_ABORTED')) return;
     final text = '${error.errorCode} ${error.description}';
@@ -635,6 +646,26 @@ class DouyinSniffer {
     } catch (e) {
       debugPrint('注入嗅探脚本失败: $e');
     }
+  }
+
+  /// 用户取消下载/选择后，立即停止后台嗅探与网页加载
+  void cancelActiveTask() {
+    _taskId++;
+    _acceptMessages = false;
+
+    final completer = _completer;
+    if (completer != null && !completer.isCompleted) {
+      completer.completeError(StateError('用户已取消解析'));
+    }
+    _completer = null;
+    _stopTimers();
+
+    // webview_flutter 没有 stopLoading，用 about:blank 终止当前页面加载
+    unawaited(
+      _controller.loadRequest(Uri.parse('about:blank')).catchError((Object error) {
+        debugPrint('停止网页加载失败: $error');
+      }),
+    );
   }
 
   void dispose() {
