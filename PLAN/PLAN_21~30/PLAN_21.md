@@ -1,67 +1,83 @@
-# PLAN_21：启动页与应用图标全量视觉修正方案（版本 1.1.0+124 -> 1.1.0+125）
+# PLAN_21：启动页与应用图标视觉修正及应用内主题深度联动方案（版本 1.1.0+125 -> 1.1.0+126）
 
 ## 一、需求背景与深度根因剖析
 
-针对用户实测反馈的 4 项关键视觉问题，排查出具体的工程底层根因：
+针对用户实测反馈的视觉与主题联动问题，排查出具体的工程底层根因：
 
-1. **暗夜启动图清晰但亮色启动图仍然很糊且为方形**：
-   - **根因**：`res/` 目录下残留了旧的各个密度位图 `drawable-hdpi/launch_logo.png`、`mdpi`、`xhdpi`、`xxhdpi`、`xxxhdpi`。在系统处于亮色模式时，Android 系统**优先按屏幕密度去匹配带修饰符的 `drawable-xxxhdpi/launch_logo.png` 位图**，从而无视了无密度修饰的 `drawable/launch_logo.xml` 矢量图！而暗色模式因为我们之前新建了 `drawable-night/launch_logo.xml` 且没有位图干扰，所以能正确命中矢量图。
-2. **暗模式图标变成一整个深棕色色块**：
-   - **根因**：在 `values-night/colors.xml` 中配置了 `<color name="ic_launcher_background">#3E001D</color>`。而桌面图标前景音符 `ic_launcher_foreground.png` 自身的颜色也是 `#3E001D`！背景与前景颜色 100% 相同，重叠渲染后直接融为一团纯深棕色色块。
-3. **桌面图标无法跟随系统暗夜模式动态切换**：
-   - **根因**：Android 系统的 Launcher（桌面启动器）在应用安装时便将应用的 `mipmap/ic_launcher` 位图读取并固化在桌面缓存中。系统层级不支持通过 `values-night` 动态热替换普通品牌桌面图标。在 `values-night` 中放入深色背景，不仅无法动态响应系统切换，反而会导致在夜间模式下安装的用户图标被彻底污染变黑。
-4. **圆角和方角图标中的音符大小不一致（方角偏小 33%）**：
-   - **根因**：`tool/generate_app_icon.py` 中，圆角图标裁剪自自适应图标的 72dp 安全区（音符占图标高度约 75%），而方形图标却直接整幅 1024 画布缩放（音符占图标高度仅 50%），导致方形图标音符严重偏小。
+1. **暗夜启动图清晰但亮色启动图仍然很糊且为方形**（*已于 125 解决*）：
+   - **根因**：`res/` 目录下残留了旧的各个密度位图 `drawable-*/launch_logo.png`。在系统处于亮色模式时，Android 系统优先匹配带密度修饰符的位图，无视了矢量的 `drawable/launch_logo.xml`。
+2. **暗模式图标变成一整个深棕色色块**（*已于 125 解决*）：
+   - **根因**：在 `values-night/colors.xml` 中错误配置了 `<color name="ic_launcher_background">#3E001D</color>`，与前景音符颜色重叠渲染成纯深棕大方块。
+3. **桌面图标无法跟随系统暗夜模式动态切换**（*已于 125 解决*）：
+   - **根因**：Android 系统的 Launcher 在安装时缓存固化图标。品牌图标应保持一致的经典浅粉底+深红紫音符，不应在夜间模式被污染变暗。
+4. **圆角和方角图标中的音符大小不一致（方角偏小 33%）**（*已于 125 解决*）：
+   - **根因**：旧脚本中方形图标未按 72dp/108dp（66.7%）安全区裁剪，音符仅占画布 50%，导致相比圆角图标显著偏小。
+5. **【126 核心修复】启动页亮/暗仅与系统匹配，未与应用内设置联动**：
+   - **表现**：系统为亮色模式，但在软件“设置 -> 外观设置”中选择“深色模式”，冷启动应用时，启动页依然呈现白色浅色启动图，直到 Flutter 首帧渲染后才变成深色，产生刺眼的闪白。
+   - **根因**：Android 原生系统启动窗口（Starting Window / SplashScreen）及 Activity 的初始 `windowBackground`，默认仅根据系统全局的 `Configuration.uiMode` 去匹配 `res/values` 或 `res/values-night`，对 Flutter 内部在沙盒中存储的主题标志（`theme_mode.flag`）毫不知情。
 
 ---
 
-## 二、详细解决方案与设计
+## 二、详细解决方案与架构设计
 
 ```mermaid
 flowchart TD
-    subgraph 启动页修正
-        DelOldPNG[彻底删除 drawable-*/launch_logo.png 位图] --> ForceXML[系统强制且唯一匹配 launch_logo.xml 矢量]
-        ForceXML --> ResultSplash[白天与夜间均呈现 100% 锐利居中矢量圆底音符]
+    subgraph Flutter层
+        UI[用户在设置中选择外观模式] --> Store[ThemeStore.setThemeMode]
+        Store --> SaveFlag[写入本地 theme_mode.flag]
+        Store --> Channel[通过 MethodChannel 发送 setThemeMode 消息]
     end
 
-    subgraph 桌面图标修正
-        DelNightBg[从 values-night 中移除 ic_launcher_background] --> KeepBrand[保持余音经典品牌色: 粉底 #FFD8E4 + 深红紫音符 #3E001D]
-        FixScript[重构 generate_app_icon.py 方角裁剪逻辑] --> AlignSize[圆角与方角音符尺寸 100% 像素级对齐]
-        AlignSize --> ReGen[重新生成所有分辨率桌面图标]
+    subgraph Android原生层
+        Channel --> NativeHandler[MainActivity 接收平台通道调用]
+        NativeHandler --> API31[Android 12+ API 31: 调用 UiModeManager.setApplicationNightMode]
+        API31 --> SysPersist[系统级持久化该应用的主题偏好]
+        SysPersist --> OSWindow[下次冷启动: OS WindowManager SplashScreen 精准呈现对应深/浅色]
+
+        NativeHandler --> WinBg[动态设置 Activity window.setBackgroundDrawableResource]
+        WinBg --> NoFlash[冷启动及热重绘时 Activity 窗口零闪白/零闪黑]
     end
 ```
 
-### 1. 彻底清除启动页旧位图，强制全矢量
-- 删除 `android/app/src/main/res/drawable-hdpi/launch_logo.png`
-- 删除 `android/app/src/main/res/drawable-mdpi/launch_logo.png`
-- 删除 `android/app/src/main/res/drawable-xhdpi/launch_logo.png`
-- 删除 `android/app/src/main/res/drawable-xxhdpi/launch_logo.png`
-- 删除 `android/app/src/main/res/drawable-xxxhdpi/launch_logo.png`
-- 确保 `drawable/` 下仅保留 `launch_logo.xml` 与 `drawable-night/launch_logo.xml`，白天与夜间均呈现像素级锐利的矢量居中音符图标。
+### 1. Android 12+ (API 31+) 官方应用级夜间模式持久化联动
+- 利用 Android 官方推荐的 `UiModeManager.setApplicationNightMode(int mode)` API：
+  - 用户选“深色模式”：同步设置 `MODE_NIGHT_YES`；
+  - 用户选“浅色模式”：同步设置 `MODE_NIGHT_NO`；
+  - 用户选“跟随系统”：同步设置 `MODE_NIGHT_FOLLOW_SYSTEM`；
+- **核心价值**：该状态由 Android 系统服务自动按应用包名持久化存储。在下次应用冷启动（即系统创建 Activity 进程前），Android WindowManager 读取该持久化配置，**直接使用对应暗夜或浅色主题（`values-night-v31` 或 `values-v31`）渲染系统级 SplashScreen**，从根本上解决“系统亮、软件暗”时系统启动窗闪白的问题。
 
-### 2. 修复桌面图标色彩：移除暗夜背景污染，维护品牌一致性
-- 修改 `android/app/src/main/res/values-night/colors.xml`：
-  - 彻底删除 `<color name="ic_launcher_background">#3E001D</color>`，仅保留暗夜启动背景 `<color name="launch_background">#141213</color>`；
-  - 桌面图标背景始终统一使用 `res/values/colors.xml` 中的经典粉色 `#FFD8E4`；
-  - 彻底杜绝暗色模式下“音符与背景同色变成深棕大方块”的严重渲染 bug。
+### 2. Activity 启动窗口背景双重保障（全版本兼容）
+- 在 `MainActivity.kt` 的 `onCreate(savedInstanceState: Bundle?)` 中，于 `super.onCreate` 之前读取 `theme_mode.flag`：
+  - 如果为 `dark`：显式调用 `window.setBackgroundDrawableResource(R.drawable.launch_background_dark)`；
+  - 如果为 `light`：显式调用 `window.setBackgroundDrawableResource(R.drawable.launch_background_light)`；
+  - 如果为 `system`：调用 `window.setBackgroundDrawableResource(R.drawable.launch_background)`；
+- 并在 Android 12+ 上补位同步 `uiModeManager.applicationNightMode`；
+- 新增显式资源文件：
+  - `res/drawable/launch_logo_light.xml`（显式浅色矢量音符）；
+  - `res/drawable/launch_logo_dark.xml`（显式暗色矢量音符）；
+  - `res/drawable/launch_background_light.xml`（显式浅色背景图层）；
+  - `res/drawable/launch_background_dark.xml`（显式暗夜背景图层）；
+  - `res/values/colors.xml` 添加对应的独立颜色定义。
 
-### 3. 重构图标生成脚本，统一圆角与方角音符尺寸
-- 修改 `tool/generate_app_icon.py`：
-  - `render_square_icon` 同样采用 `(72.0 / 108.0)` 的可视安全区比例进行居中裁剪，使方形图标中的音符尺寸、笔画粗细、视觉下移偏量与圆形图标 **100% 像素级完全一致**；
-  - 移除原脚本中生成 `launch_logo.png` 的废弃逻辑（启动页已全面矢量化）；
-  - 使用环境 Python 重新生成全部密度 `ic_launcher.png`、`ic_launcher_round.png` 与 `ic_launcher_foreground.png`。
+### 3. Flutter <-> Native MethodChannel 双向通信
+- 建立原生通道 `MethodChannel('com.debug.yuyin/theme')`：
+  - 在 `ThemeStore.init()` 启动恢复主题时触发同步；
+  - 在 `ThemeStore.setThemeMode()` 用户点击切换时实时触发同步；
+  - 由于 `AndroidManifest.xml` 中 `MainActivity` 已经配置了 `android:configChanges` 包含 `uiMode`，设置 `setApplicationNightMode` **不会引起 Activity 销毁重建**，Flutter 维持当前流畅运行与热重绘。
 
 ---
 
 ## 三、用户审查要点（User Review Required）
 
 > [!IMPORTANT]
-> **版本号提升**：全项目版本号从 `1.1.0+124` 升级至 **`1.1.0+125`**。
+> **版本号提升**：全项目版本号从 `1.1.0+125` 升级至 **`1.1.0+126`**。
 > 涉及文件：`pubspec.yaml`、`lib/app_info.dart`、`README.md`、`GEMINI.md`、`CLAUDE.md`。
 
-> [!NOTE]
-> **关于桌面图标随系统暗夜模式切换的技术说明**：
-> 在 Android 系统规范中，应用的正式桌面 Launcher 图标代表应用品牌 Identity，各主流应用（微信、抖音、支付宝等）均保持统一的品牌辨识度，不随系统夜间模式变黑变暗（否则在深色壁纸下无法辨别）。去除错误覆盖的深棕色背景后，余音在浅色和暗色系统下都将呈现清晰干净的粉色音符品牌图标。
+> [!TIP]
+> **关于系统启动页切换机制**：
+> 1. 用户在软件内选择“深色模式”后，即刻生效并将应用级夜间模式注册到 Android 系统；
+> 2. 当划掉应用重新打开（冷启动）时，无论系统处于亮色还是暗色，系统的启动窗口和图标都将精准对应软件内的深色/浅色偏好；
+> 3. 选择“跟随系统”时，自动恢复与系统全局外观同步。
 
 ---
 
@@ -69,12 +85,15 @@ flowchart TD
 
 | 序号 | 文件路径 | 修改类型 | 说明 |
 |:---|:---|:---|:---|
-| 1 | `android/app/src/main/res/drawable-*/launch_logo.png` | DELETE | 删除全部 5 个旧密度位图，强制走矢量 XML |
-| 2 | `android/app/src/main/res/values-night/colors.xml` | MODIFY | 移除错误的 `ic_launcher_background` 深棕色覆盖 |
-| 3 | `tool/generate_app_icon.py` | MODIFY | 方角与圆角音符比例 100% 对齐，移除废弃启动图生成 |
-| 4 | `android/app/src/main/res/mipmap-*/` | MODIFY | 重新生成比例严格一致的桌面图标资源 |
-| 5 | `pubspec.yaml` / `lib/app_info.dart` | MODIFY | 版本号提升至 `1.1.0+125` |
-| 6 | `README.md` / `GEMINI.md` / `CLAUDE.md` | MODIFY | 同步更新版本号记录与说明 |
+| 1 | `android/app/src/main/res/values/colors.xml` | MODIFY | 补充 `launch_background_light` 与 `launch_background_dark` 显式色彩 |
+| 2 | `android/app/src/main/res/drawable/launch_logo_light.xml` | CREATE | 显式浅色矢量音符图标资源 |
+| 3 | `android/app/src/main/res/drawable/launch_logo_dark.xml` | CREATE | 显式暗夜矢量音符图标资源 |
+| 4 | `android/app/src/main/res/drawable/launch_background_light.xml` | CREATE | 显式浅色启动页背景组合层（API 21+ 兼容） |
+| 5 | `android/app/src/main/res/drawable/launch_background_dark.xml` | CREATE | 显式暗夜启动页背景组合层（API 21+ 兼容） |
+| 6 | `android/app/src/main/kotlin/com/debug/yuyin/MainActivity.kt` | MODIFY | 实现 `onCreate` 背景预设、`UiModeManager.setApplicationNightMode` 及 MethodChannel 监听 |
+| 7 | `lib/utils/theme_store.dart` | MODIFY | `setThemeMode` 与 `init` 中增加 MethodChannel 原生同步调用 |
+| 8 | `pubspec.yaml` / `lib/app_info.dart` | MODIFY | 版本号提升至 `1.1.0+126` |
+| 9 | `README.md` / `GEMINI.md` / `CLAUDE.md` | MODIFY | 同步更新版本号记录与说明 |
 
 ---
 
@@ -83,11 +102,9 @@ flowchart TD
 1. **静态代码分析与单元测试**：
    - 运行 `flutter analyze` 确保 0 errors / 0 warnings；
    - 运行 `flutter test` 确保 68 个测试用例全部通过。
-2. **模拟器 / 实机验证**：
-   - **亮模式启动页验证**：在浅色系统下启动应用，观察启动图与暗夜模式一样清晰锐利、圆形粉底音符居中，无方形黑边或拉伸模糊；
-   - **暗模式启动页验证**：在深色系统下启动应用，确认依然保持高清深色矢量启动图；
-   - **桌面图标对比验证**：在深色和浅色系统下安装/查看桌面图标，确认图标背景与音符颜色清晰分明，绝非纯深棕大色块；
-   - **方角与圆角音符尺寸对比验证**：对比方角和圆角图标，确认音符大小比例完全一致。
+2. **模拟器 / 实机场景测试**：
+   - **场景 A（系统亮，软件暗）**：系统全局开启亮色，余音外观设置选“深色模式”，划掉后台冷启动，验证启动画面背景为深黑色（#141213）且音符为粉色暗夜矢量图，无任何闪白；
+   - **场景 B（系统暗，软件亮）**：系统全局开启暗色，余音外观设置选“浅色模式”，划掉后台冷启动，验证启动画面背景为浅粉白（#FFF7FA）且音符为深色矢量图，无任何闪黑；
+   - **场景 C（跟随系统）**：余音选“跟随系统”，随系统深色/浅色切换，冷启动均完全跟随系统。
 3. **完整构建验证**：
-   - 编译生成 `1.1.0+125` Debug APK。
-
+   - 编译生成 `1.1.0+126` Debug APK。
