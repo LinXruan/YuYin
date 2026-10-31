@@ -31,7 +31,7 @@
 - JDK 17
 - 仅 Android（minSdk 24 / targetSdk 36）
 - 包名：debug `com.debug.yuyin` / release `com.release.yuyin`
-- 版本：`1.0.0+114`
+- 版本：`1.0.0+115`
 
 ```bash
 flutter pub get
@@ -80,6 +80,7 @@ lib/
 
 - 隐藏 WebView 常驻挂载，切换 Tab 或进入设置页时解析不会中断；
 - 注入 JS 拦截 fetch / XHR 和页面数据，并配合 iesdouyin 分享页接口和分享页 WebView 兜底；
+- 实况图通过主页面 `__pace_f` RSC 数据补充 live video；分享页图片结果作为 3 秒宽限期兜底；
 - 一个 `WebViewController` 同时只挂载一个 `WebViewWidget`；
 - 用户取消画质 / 图片选择时调用 `DouyinSniffer.cancelActiveTask()`，停止后台解析和网页加载；
 - 不使用第三方状态管理，基于 `ValueNotifier` / `setState` 实现。

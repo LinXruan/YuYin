@@ -4,7 +4,8 @@ const String kDouyinSniffJs = r'''
   // Dart 每 1.2 秒重复注入一次，结果与日志状态必须挂到 window 上共享
   var S = window.__dyState || (window.__dyState = {
     sent: false, lastUrl: '', logs: {}, videoHintSent: false, degraded: false,
-    staticHref: '', staticReady: false, staticComplete: false
+    staticHref: '', staticReady: false, staticComplete: false,
+    paceHref: '', paceDone: false
   });
   // 记录本次嗅探的起始时间；页面地址变化时重新计时
   if (!window.__dyStartTime || window.__dyStartHref !== location.href) {
@@ -101,7 +102,12 @@ const String kDouyinSniffJs = r'''
       if (s > score) { score = s; best = { url: url, width: addr.width || video.width, height: addr.height || video.height }; }
     }
     if (!best && video.playAddr && video.playAddr.length && video.playAddr[0].src) {
-      best = { url: video.playAddr[0].src, width: video.playAddr[0].width, height: video.playAddr[0].height };
+      best = {
+        url: video.playAddr[0].src,
+        width: video.playAddr[0].width || video.width,
+        height: video.playAddr[0].height || video.height,
+        dataSize: video.playAddr[0].dataSize || video.dataSize
+      };
     }
     return best;
   }
@@ -184,14 +190,15 @@ const String kDouyinSniffJs = r'''
     }
     return unique;
   }
-  // 静态图：优先 jpeg/jpg 原图，否则取 url_list 最后一项
+  // 静态图：优先 jpeg/jpg 原图，否则取最后一项（兼容 RSC 的 urlList）
   function pickImage(img) {
-    if (!img || !img.url_list || !img.url_list.length) return '';
-    for (var i = 0; i < img.url_list.length; i++) {
-      var u = String(img.url_list[i] || '').toLowerCase();
-      if (u.indexOf('.jpeg') !== -1 || u.indexOf('.jpg') !== -1) return img.url_list[i];
+    var list = img && (img.url_list || img.urlList);
+    if (!list || !list.length) return '';
+    for (var i = 0; i < list.length; i++) {
+      var u = String(list[i] || '').toLowerCase();
+      if (u.indexOf('.jpeg') !== -1 || u.indexOf('.jpg') !== -1) return list[i];
     }
-    return img.url_list[img.url_list.length - 1];
+    return list[list.length - 1];
   }
   // 图集：每张图输出静态原图，实况图额外输出视频
   function collectImages(images) {
@@ -201,7 +208,12 @@ const String kDouyinSniffJs = r'''
       if (imageUrl) items.push({ url: imageUrl, mediaType: 'image', resolution: resText(img.width, img.height) });
       if (img.video) {
         var best = pickBest(img.video);
-        if (best) items.push({ url: best.url, mediaType: 'video', resolution: resText(best.width, best.height) });
+        if (best) items.push({
+          url: best.url,
+          mediaType: 'video',
+          resolution: resText(best.width, best.height),
+          dataSize: best.dataSize || 0
+        });
       }
     }
     if (items.length) log('图集解析: ' + images.length + ' 项, 产出 ' + items.length + ' 个资源');
@@ -406,6 +418,37 @@ const String kDouyinSniffJs = r'''
     scanRenderData(); if (S.sent) return;
     try { scanTree(window.__INIT_PROPS__); } catch (e) {}
   }
+  // 解析 Next.js RSC flight：去掉行号/tag 前缀后逐行 JSON.parse
+  function scanPace() {
+    if (S.sent) return false;
+    var re = /self\.__pace_f\.push\(\[1\s*,\s*"((?:[^"\\]|\\.)*)"\s*\]\)/g;
+    var scripts = document.getElementsByTagName('script');
+    var found = false;
+    for (var i = 0; i < scripts.length && !S.sent; i++) {
+      var text = scripts[i].textContent || '';
+      if (text.indexOf('__pace_f') === -1) continue;
+      found = true;
+      re.lastIndex = 0;
+      var m;
+      while ((m = re.exec(text)) && !S.sent) {
+        var payload;
+        try { payload = JSON.parse('"' + m[1] + '"'); } catch (e) { continue; }
+        var lines = payload.split('\n');
+        for (var j = 0; j < lines.length && !S.sent; j++) {
+          var line = lines[j];
+          var colon = line.indexOf(':');
+          if (colon <= 0) continue;
+          var body = line.substring(colon + 1);
+          var candidates = [body];
+          if (body.length > 1 && /^[A-Z$]/.test(body.charAt(0))) candidates.push(body.substring(1));
+          for (var k = 0; k < candidates.length && !S.sent; k++) {
+            try { scanTree(JSON.parse(candidates[k])); } catch (e) {}
+          }
+        }
+      }
+    }
+    return found;
+  }
   function tryExtractNow() {
     if (S.sent) return;
     var href = location.href;
@@ -413,6 +456,10 @@ const String kDouyinSniffJs = r'''
       S.staticHref = href;
       S.staticReady = false;
       S.staticComplete = false;
+    }
+    if (S.paceHref !== href) {
+      S.paceHref = href;
+      S.paceDone = false;
     }
     // 首次注入时 HTML 可能还没解析完，_ROUTER_DATA 尚不存在
     if (!S.staticReady && document.readyState !== 'loading') {
@@ -423,6 +470,11 @@ const String kDouyinSniffJs = r'''
       S.staticComplete = true;
       scanStatic(); if (S.sent) return;
     }
+    if (!S.paceDone && document.readyState !== 'loading') {
+      var found = scanPace();
+      if (found) S.paceDone = true;
+      if (S.sent) return;
+    }
     scanPlayerData(); if (S.sent) return;
     scanPlayer();
   }
@@ -432,6 +484,7 @@ const String kDouyinSniffJs = r'''
     S.sent = false; S.lastUrl = ''; S.logs = {}; S.targetId = '';
     S.videoHintSent = false; S.degraded = false;
     S.staticHref = ''; S.staticReady = false; S.staticComplete = false;
+    S.paceHref = ''; S.paceDone = false;
     window.__dyStartTime = Date.now();
     window.__dyStartHref = location.href;
   };
