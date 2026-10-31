@@ -8,7 +8,7 @@
 ## 1. 项目概况
 
 - **应用**：余音（YuYin），Android 端抖音无水印视频 / 图集 / 实况图下载工具。
-- **包名 / 版本**：debug 版 `com.debug.yuyin`，release 版 `com.release.yuyin`；版本 `1.0.0+112`（以 `pubspec.yaml` 和 `lib/app_info.dart` 为准）。
+- **包名 / 版本**：debug 版 `com.debug.yuyin`，release 版 `com.release.yuyin`；版本 `1.0.0+113`（以 `pubspec.yaml` 和 `lib/app_info.dart` 为准）。
 - **技术栈**：Flutter 3.47.6 / Dart 3.13.5，Material 3，仅 Android（忽略 Web / Windows）。
 - **依赖**：`webview_flutter`、`dio`、`path_provider`、`gal`；不引入第三方状态管理。
 - **现状**：解析、登录、画质/图集选择、下载、调试日志、关于页均已完成；历史页暂为占位。
@@ -41,6 +41,7 @@
 - `lib/services/douyin_sniffer.dart`：
   - 一个 `WebViewController` 只能挂载一个 `WebViewWidget`；
   - 任务完成后 `_isTaskActive` 守卫会阻止页面跳转重新开启嗅探；
+  - 日志接收 `_acceptLogs` 与结果接收 `_acceptMessages` 分离；取消任务时两者都关闭；
   - `cancelActiveTask()` 会停止定时器与分享页请求，并加载 `about:blank`。
 - `lib/utils/log_controller.dart`：解析页与调试页共享日志，日志前缀为 `[解析]`。
 - `lib/pages/debug_page.dart`、`lib/widgets/log_panel.dart`：日志支持长按选中复制，并提供复制全部日志。

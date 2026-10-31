@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../models/media_item.dart';
 import '../services/douyin_sniffer.dart';
 import '../services/video_downloader.dart';
 import '../utils/log_controller.dart';

@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../models/media_item.dart';
 import 'douyin_sniffer.dart';
 
 /// 视频/图片下载与相册保存服务
@@ -18,45 +19,6 @@ class VideoDownloader {
     'Referer': 'https://www.douyin.com/',
     'Origin': 'https://www.douyin.com',
   };
-
-  /// 下载单个视频并保存进系统相册（旧版首页仍在使用的单视频流程）
-  Future<void> downloadToGallery(
-    String videoUrl, {
-    String? cookie,
-    required void Function(double progress) onProgress,
-  }) async {
-    final tempDir = await getTemporaryDirectory();
-    final fileName = 'douyin_${DateTime.now().millisecondsSinceEpoch}.mp4';
-    final tempPath = '${tempDir.path}${Platform.pathSeparator}$fileName';
-
-    try {
-      await _downloadFile(
-        videoUrl,
-        tempPath,
-        cookie: cookie,
-        onProgress: onProgress,
-      );
-      onProgress(1.0);
-      await _ensureGalleryAccess();
-      await Gal.putVideo(tempPath);
-    } finally {
-      // 无论成功与否都删除临时文件，避免占用空间
-      await _deleteIfExists(tempPath);
-    }
-  }
-
-  /// 批量下载嗅探结果中的全部资源（保留给旧调用方）。
-  Future<void> downloadMediaList(
-    SniffResult result, {
-    required void Function(int current, int total, double itemProgress)
-        onProgress,
-  }) {
-    return downloadItems(
-      result.items,
-      cookie: result.cookie,
-      onProgress: onProgress,
-    );
-  }
 
   /// 下载用户选中的资源列表（单个画质档位或勾选的图片/实况）。
   /// [onProgress] 参数依次为：当前序号（从 1 开始）、总数、当前文件进度（0.0 ~ 1.0）。

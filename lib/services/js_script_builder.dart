@@ -224,13 +224,14 @@ const String kDouyinSniffJs = r'''
     }
     if (!unique.length || !window.DouyinChannel) return false;
     try {
+      // 先发日志再发结果，确保 Dart 在关闭日志接收前能看到收尾信息
+      log('解析完成: 共 ' + unique.length + ' 个资源');
       window.DouyinChannel.postMessage(JSON.stringify({
         type: 'result',
         isImagePost: !!isImagePost,
         items: unique
       }));
       S.sent = true;
-      log('解析完成: 共 ' + unique.length + ' 个资源');
       return true;
     } catch (e) { return false; }
   }
@@ -264,6 +265,7 @@ const String kDouyinSniffJs = r'''
       } catch (e) {}
     }
 
+    // 主页面降级等待 12 秒；与 Dart 侧 18 秒迟到兜底、30 秒主超时独立，修改需同步检查
     if (!sharePage && Date.now() - (window.__dyStartTime || 0) < 12000) {
       log('已发现基础视频流，正在等待完整画质列表(bit_rate)...');
       return false;

@@ -31,7 +31,7 @@
 - JDK 17
 - 仅 Android（minSdk 24 / targetSdk 36）
 - 包名：debug `com.debug.yuyin` / release `com.release.yuyin`
-- 版本：`1.0.0+112`
+- 版本：`1.0.0+113`
 
 ```bash
 flutter pub get
@@ -85,7 +85,7 @@ lib/
 
 ## 测试
 
-`flutter test` 覆盖 URL 解析、分享页解析和日志控制器，共 35 个单元测试。
+`flutter test` 覆盖 URL 解析、分享页解析、日志控制器和嗅探纯逻辑，共 43 个单元测试。
 
 ## 开源与作者
 

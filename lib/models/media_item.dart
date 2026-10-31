@@ -40,9 +40,6 @@ class MediaItem {
     );
   }
 
-  /// 供日志展示的中文类型名
-  String get typeLabel => type == MediaType.video ? '视频' : '图片';
-
   /// 常见画质标签（竖屏按短边计算），未知时返回空字符串
   String get resolutionLabel {
     final parts = (resolution ?? '').split('x');
