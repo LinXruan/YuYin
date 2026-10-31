@@ -37,14 +37,6 @@ FOREGROUND_SIZES = {
     "xxhdpi": 324,
     "xxxhdpi": 432,
 }
-# 启动页 logo：72dp 浅粉圆底 + 音符（与桌面图标可视圆形区域 72dp 严格一致）
-LAUNCH_LOGO_SIZES = {
-    "mdpi": 72,
-    "hdpi": 108,
-    "xhdpi": 144,
-    "xxhdpi": 216,
-    "xxxhdpi": 288,
-}
 
 
 def draw_note(
@@ -91,14 +83,15 @@ def render_round_icon_from_adaptive(foreground: Image.Image) -> Image.Image:
     return round_icon
 
 
-def render_square_icon(font_path: Path) -> Image.Image:
-    """渲染浅粉方形背景 + 音符的图标（用于旧版 Android 方形图标）。"""
-    size = 1024
-    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(canvas)
-    draw.rectangle((0, 0, size - 1, size - 1), fill=BACKGROUND)
-    draw_note(draw, font_path, size, 0.50)
-    return canvas
+def render_square_icon(foreground: Image.Image) -> Image.Image:
+    """渲染浅粉方形背景 + 音符的图标（裁切 central 72dp 区域，与圆角图标音符比例严格一致）。"""
+    size = foreground.width
+    crop_size = int(size * (72.0 / 108.0))
+    offset = (size - crop_size) // 2
+
+    bg = Image.new("RGBA", (size, size), BACKGROUND)
+    composite = Image.alpha_composite(bg, foreground)
+    return composite.crop((offset, offset, offset + crop_size, offset + crop_size))
 
 
 def save_scaled(image: Image.Image, path: Path, size: int) -> None:
@@ -116,7 +109,7 @@ def main() -> None:
 
     foreground = render_foreground(args.font)
     round_icon = render_round_icon_from_adaptive(foreground)
-    square_icon = render_square_icon(args.font)
+    square_icon = render_square_icon(foreground)
 
     for density, size in LAUNCHER_SIZES.items():
         save_scaled(square_icon, RES_DIR / f"mipmap-{density}" / "ic_launcher.png", size)
@@ -134,14 +127,6 @@ def main() -> None:
             size,
         )
         print(f"foreground {density}: {size}x{size}")
-
-    for density, size in LAUNCH_LOGO_SIZES.items():
-        save_scaled(
-            round_icon,
-            RES_DIR / f"drawable-{density}" / "launch_logo.png",
-            size,
-        )
-        print(f"launch logo {density}: {size}x{size}")
 
 
 if __name__ == "__main__":
