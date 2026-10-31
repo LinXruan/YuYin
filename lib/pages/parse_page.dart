@@ -36,7 +36,8 @@ class ParsePage extends StatefulWidget {
 class _ParsePageState extends State<ParsePage> {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _inputScrollController = ScrollController();
-  double? _progress;
+  final ValueNotifier<double?> _downloadProgress = ValueNotifier(null);
+  CancelToken? _downloadCancelToken;
   String _lastProgressKey = '';
 
   Timer? _hideScrollTimer;
@@ -47,6 +48,9 @@ class _ParsePageState extends State<ParsePage> {
   @override
   void dispose() {
     _hideScrollTimer?.cancel();
+    _downloadCancelToken?.cancel('页面已销毁');
+    _downloadCancelToken = null;
+    _downloadProgress.dispose();
     _inputController.dispose();
     _inputScrollController.dispose();
     super.dispose();
@@ -111,10 +115,8 @@ class _ParsePageState extends State<ParsePage> {
     FocusScope.of(context).unfocus();
 
     widget.logs.reset('正在提取短链...');
-    setState(() {
-      _progress = null;
-      _lastProgressKey = '';
-    });
+    _downloadProgress.value = null;
+    _lastProgressKey = '';
     widget.busy.value = true;
 
     final url = UrlParser.extractDouyinUrl(_inputController.text);
@@ -145,22 +147,27 @@ class _ParsePageState extends State<ParsePage> {
       }
 
       widget.logs.add('开始下载 ${selected.length} 个选中资源...');
+      _downloadCancelToken = CancelToken();
       await widget.downloader.downloadItems(
         selected,
         cookie: result.cookie,
+        cancelToken: _downloadCancelToken,
         onProgress: _updateBatchProgress,
       );
+      if (!mounted) return;
       widget.logs.add(
         selected.length == 1
             ? '已保存到相册！'
             : '全部 ${selected.length} 个资源已无水印保存至系统相册！',
       );
     } catch (error) {
+      if (!mounted) return;
       widget.logs.add('操作失败：${_friendlyError(error)}');
     } finally {
+      _downloadCancelToken = null;
       if (mounted) {
         widget.busy.value = false;
-        setState(() => _progress = null);
+        _downloadProgress.value = null;
       }
     }
   }
@@ -189,7 +196,7 @@ class _ParsePageState extends State<ParsePage> {
     return [picked];
   }
 
-  /// 刷新批量下载进度（同一行内更新，避免刷屏）
+  /// 刷新批量下载进度（仅驱动局部进度条更新，避免触发整体界面重绘）
   void _updateBatchProgress(int current, int total, double itemProgress) {
     final percent = (itemProgress * 100).round();
     final key = '$current/$total/$percent';
@@ -202,9 +209,7 @@ class _ParsePageState extends State<ParsePage> {
       '正在下载第',
       '正在下载第 $current/$total 个资源（$percent%）...',
     );
-    setState(() {
-      _progress = overall.clamp(0.0, 1.0).toDouble();
-    });
+    _downloadProgress.value = overall.clamp(0.0, 1.0).toDouble();
   }
 
   /// 把异常转换成简短的中文提示
@@ -297,7 +302,10 @@ class _ParsePageState extends State<ParsePage> {
                             : () {
                                 _inputController.clear();
                                 _hideScrollTimer?.cancel();
-                                setState(() => _showScrollIndicator = false);
+                                _hideScrollTimer = null;
+                                if (_showScrollIndicator) {
+                                  setState(() => _showScrollIndicator = false);
+                                }
                               },
                         icon: const Icon(Icons.delete_outline_rounded, size: 18),
                         label: const Text('清空'),
@@ -314,7 +322,14 @@ class _ParsePageState extends State<ParsePage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  LinearProgressIndicator(value: busy ? _progress : 0),
+                  ValueListenableBuilder<double?>(
+                    valueListenable: _downloadProgress,
+                    builder: (context, progress, _) {
+                      return LinearProgressIndicator(
+                        value: busy ? progress : 0,
+                      );
+                    },
+                  ),
                   const SizedBox(height: 16),
                   _StatusCard(logs: widget.logs),
                   const SizedBox(height: 16),

@@ -219,8 +219,17 @@ class DouyinSniffer {
       _log('重置嗅探状态失败: $e');
     }
 
+    final uri = Uri.tryParse(shareUrl);
+    if (uri == null) {
+      _finishWithError(
+        FormatException('无效的请求链接: $shareUrl'),
+        taskId: taskId,
+      );
+      return completer.future;
+    }
+
     try {
-      await _controller.loadRequest(Uri.parse(shareUrl));
+      await _controller.loadRequest(uri);
     } catch (e) {
       _finishWithError(e, taskId: taskId);
     }
@@ -615,7 +624,9 @@ class DouyinSniffer {
     var cookie = '';
     try {
       cookie = _jsResultToString(
-        await _controller.runJavaScriptReturningResult('document.cookie'),
+        await _controller
+            .runJavaScriptReturningResult('document.cookie')
+            .timeout(const Duration(seconds: 3)),
       );
     } catch (e) {
       _log('读取 Cookie 失败: $e');
@@ -640,6 +651,13 @@ class DouyinSniffer {
     _log(summary);
     completer.complete(result);
     if (identical(_completer, completer)) _completer = null;
+
+    // 解析成功后立即卸载当前网页，释放 DOM、播放器及后台脚本占用的内存
+    unawaited(
+      _controller.loadRequest(Uri.parse('about:blank')).catchError((Object error) {
+        debugPrint('卸载网页释放内存失败: $error');
+      }),
+    );
   }
 
   /// 检测验证码中间页，命中后提前结束等待

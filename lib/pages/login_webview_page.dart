@@ -60,6 +60,8 @@ class _LoginWebViewPageState extends State<LoginWebViewPage> {
   void dispose() {
     _autoReturnTimer?.cancel();
     _injectTimer?.cancel();
+    // 退出登录页时，主动导航到 about:blank 彻底终止后台网络请求与 JS 脚本
+    _controller.loadRequest(Uri.parse('about:blank')).catchError((_) {});
     super.dispose();
   }
 
@@ -233,7 +235,7 @@ class _LoginWebViewPageState extends State<LoginWebViewPage> {
       color: theme.colorScheme.surfaceContainerHighest,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: const Text(
-        '请在下方完成登录，系统将全自动感知登录状态并返回。',
+        '请在下方完成登录（双指可缩放）',
         style: TextStyle(fontSize: 12, height: 1.5),
       ),
     );
