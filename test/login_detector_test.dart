@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/services/login_detector_script.dart';
+import 'package:yuyin/utils/login_state_store.dart';
 
 void main() {
   group('extractStrictUserFromJson 正向鉴权用例', () {
@@ -113,6 +114,31 @@ void main() {
       expect(kDouyinLoginDetectJs, contains('login_success'));
       expect(kDouyinLoginDetectJs, contains('extractStrictUser'));
       expect(kDouyinLoginDetectJs.contains('nickname'), isFalse);
+    });
+  });
+
+  group('LoginStateStore.hasLoginSession Cookie 会话检测', () {
+    test('空 Cookie 或仅游客 Cookie 必须判定为未登录', () {
+      expect(LoginStateStore.hasLoginSession(''), isFalse);
+      expect(
+        LoginStateStore.hasLoginSession('ttwid=1%7Cabc; odin_tt=mock123; passport_csrf_token_default=abc'),
+        isFalse,
+      );
+    });
+
+    test('包含 sessionid / sessionid_ss / sid_guard 等正式会话判定为已登录', () {
+      expect(
+        LoginStateStore.hasLoginSession('ttwid=1%7Cabc; sessionid=mock_session_val; odin_tt=123'),
+        isTrue,
+      );
+      expect(
+        LoginStateStore.hasLoginSession('sessionid_ss=mock_session_ss_val; passport_csrf_token=123'),
+        isTrue,
+      );
+      expect(
+        LoginStateStore.hasLoginSession('sid_guard=mock_guard_token; uid_tt=12345'),
+        isTrue,
+      );
     });
   });
 }

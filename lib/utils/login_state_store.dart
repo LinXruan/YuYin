@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import '../services/login_detector_script.dart';
 
@@ -19,6 +20,36 @@ class LoginStateStore {
     try {
       final file = await _flagFile();
       return await file.exists();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 校验 Cookie 字符串是否包含有效的抖音登录会话标识（纯函数，便于测试）
+  static bool hasLoginSession(String cookie) {
+    if (cookie.isEmpty) return false;
+    final lower = cookie.toLowerCase();
+    return lower.contains('sessionid=') ||
+        lower.contains('sessionid_ss=') ||
+        lower.contains('sid_guard=') ||
+        lower.contains('uid_tt=');
+  }
+
+  /// 查询系统 WebView 本地 Cookie 库中是否依然存有抖音登录会话（微秒级本地查询，0 网络开销）
+  static Future<bool> checkWebViewCookieSession() async {
+    try {
+      final manager = WebViewCookieManager();
+      final cookies = await manager.getCookies(
+        domain: Uri.parse('https://www.douyin.com'),
+      );
+      return cookies.any((c) {
+        final name = c.name.toLowerCase();
+        return (name == 'sessionid' ||
+                name == 'sessionid_ss' ||
+                name == 'sid_guard' ||
+                name == 'uid_tt') &&
+            c.value.isNotEmpty;
+      });
     } catch (_) {
       return false;
     }

@@ -39,9 +39,21 @@ class _AppShellState extends State<AppShell> {
     // JS 内部调试日志统一加 [解析] 前缀后写入共享日志
     _sniffer.onLog = (message) => _logs.add('[解析] $message');
 
-    // 恢复上次留下的登录标记（不保存任何敏感账号信息）
-    LoginStateStore.isLoggedIn().then((value) {
-      if (mounted) _loggedIn.value = value;
+    // 恢复上次留下的登录标记，并静默通过 WebView Cookie 本地库二次校验（0 网络开销）
+    LoginStateStore.isLoggedIn().then((isSaved) async {
+      if (!mounted) return;
+      if (!isSaved) {
+        _loggedIn.value = false;
+        return;
+      }
+      final hasCookie = await LoginStateStore.checkWebViewCookieSession();
+      if (!mounted) return;
+      if (hasCookie) {
+        _loggedIn.value = true;
+      } else {
+        _loggedIn.value = false;
+        await LoginStateStore.clearLogin();
+      }
     });
   }
 
@@ -132,6 +144,7 @@ class _AppShellState extends State<AppShell> {
                 downloader: _downloader,
                 logs: _logs,
                 busy: _busy,
+                loggedIn: _loggedIn,
                 // 解析出结果、准备弹选择面板前，确保用户看到的是解析页
                 onRequestParseTab: () {
                   if (mounted && _index != 0) setState(() => _index = 0);
