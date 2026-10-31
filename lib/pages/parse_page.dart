@@ -39,8 +39,14 @@ class _ParsePageState extends State<ParsePage> {
   double? _progress;
   String _lastProgressKey = '';
 
+  Timer? _hideScrollTimer;
+  bool _showScrollIndicator = false;
+  double _scrollProgress = 0.0;
+  double _thumbHeight = 40.0;
+
   @override
   void dispose() {
+    _hideScrollTimer?.cancel();
     _inputController.dispose();
     _inputScrollController.dispose();
     super.dispose();
@@ -51,7 +57,52 @@ class _ParsePageState extends State<ParsePage> {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     if (data?.text != null && mounted) {
       _inputController.text = data!.text!;
+      if (_inputScrollController.hasClients) {
+        _inputScrollController.jumpTo(0.0);
+      }
     }
+  }
+
+  /// 监听输入框滚动：精确计算滑块尺寸与行程，防遮挡边框，停止后自动渐隐
+  void _handleScrollNotification(ScrollNotification notification) {
+    final metrics = notification.metrics;
+    if (metrics.maxScrollExtent <= 0) {
+      if (_showScrollIndicator) {
+        setState(() => _showScrollIndicator = false);
+      }
+      return;
+    }
+
+    // 轨道有效高度：120dp 容器 - 顶部 8dp - 底部 8dp
+    const double containerHeight = 120.0;
+    const double topPadding = 8.0;
+    const double bottomPadding = 8.0;
+    const double trackHeight = containerHeight - topPadding - bottomPadding; // 104.0
+
+    final double totalContentHeight =
+        metrics.viewportDimension + metrics.maxScrollExtent;
+    final double viewRatio = totalContentHeight > 0
+        ? (metrics.viewportDimension / totalContentHeight).clamp(0.0, 1.0)
+        : 1.0;
+    // 文本量越大，viewRatio 越小，滑块越短；保底 20dp，上限 trackHeight - 12dp
+    final double computedThumbHeight =
+        (trackHeight * viewRatio).clamp(20.0, trackHeight - 12.0);
+
+    final double progress =
+        (metrics.pixels / metrics.maxScrollExtent).clamp(0.0, 1.0);
+
+    setState(() {
+      _scrollProgress = progress;
+      _thumbHeight = computedThumbHeight;
+      _showScrollIndicator = true;
+    });
+
+    _hideScrollTimer?.cancel();
+    _hideScrollTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) {
+        setState(() => _showScrollIndicator = false);
+      }
+    });
   }
 
   /// 主流程：提取短链 -> 嗅探 -> 选择资源 -> 下载选中项
@@ -183,25 +234,51 @@ class _ParsePageState extends State<ParsePage> {
                 children: [
                   SizedBox(
                     height: 120,
-                    child: Scrollbar(
-                      controller: _inputScrollController,
-                      thumbVisibility: true,
-                      thickness: 4,
-                      radius: const Radius.circular(4),
-                      child: TextField(
-                        controller: _inputController,
-                        scrollController: _inputScrollController,
-                        maxLines: null,
-                        expands: true,
-                        textAlignVertical: TextAlignVertical.top,
-                        decoration: const InputDecoration(
-                          labelText: '抖音分享口令 / 链接',
-                          hintText:
-                              '粘贴分享口令或链接，例如 https://v.douyin.com/xxxx/',
-                          border: OutlineInputBorder(),
-                          alignLabelWithHint: true,
+                    child: Stack(
+                      children: [
+                        NotificationListener<ScrollNotification>(
+                          onNotification: (notification) {
+                            if (notification.depth == 0) {
+                              _handleScrollNotification(notification);
+                            }
+                            return false;
+                          },
+                          child: TextField(
+                            controller: _inputController,
+                            scrollController: _inputScrollController,
+                            maxLines: null,
+                            expands: true,
+                            textAlignVertical: TextAlignVertical.top,
+                            decoration: const InputDecoration(
+                              labelText: '抖音分享口令 / 链接',
+                              hintText:
+                                  '粘贴分享口令或链接，例如 https://v.douyin.com/xxxx/',
+                              border: OutlineInputBorder(),
+                              alignLabelWithHint: true,
+                            ),
+                          ),
                         ),
-                      ),
+                        // 悬浮定制滑动指示器：无手势劫持、向左微调防遮挡边框、不滑动渐隐
+                        Positioned(
+                          top: 8.0 + (_scrollProgress * (104.0 - _thumbHeight)),
+                          right: 7.0,
+                          child: IgnorePointer(
+                            child: AnimatedOpacity(
+                              opacity: _showScrollIndicator ? 1.0 : 0.0,
+                              duration: const Duration(milliseconds: 250),
+                              child: Container(
+                                width: 3.0,
+                                height: _thumbHeight,
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary
+                                      .withValues(alpha: 0.65),
+                                  borderRadius: BorderRadius.circular(1.5),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -215,7 +292,13 @@ class _ParsePageState extends State<ParsePage> {
                       ),
                       const SizedBox(width: 8),
                       FilledButton.tonalIcon(
-                        onPressed: busy ? null : _inputController.clear,
+                        onPressed: busy
+                            ? null
+                            : () {
+                                _inputController.clear();
+                                _hideScrollTimer?.cancel();
+                                setState(() => _showScrollIndicator = false);
+                              },
                         icon: const Icon(Icons.delete_outline_rounded, size: 18),
                         label: const Text('清空'),
                       ),
