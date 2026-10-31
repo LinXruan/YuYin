@@ -9,20 +9,38 @@ import '../utils/url_parser.dart';
 import 'douyin_share_api.dart';
 import 'js_script_builder.dart';
 
-export '../models/media_item.dart';
-
 /// 隐藏式 WebView 嗅探服务：抓取无水印视频/图文/实况图直链
+///
+/// 三路结果来源：
+/// - A：主 WebView 注入 JS（主路径）；
+/// - B：Dio 请求 iesdouyin 分享页（[_runShareFallback]）；
+/// - C：切换 iPhone UA 的 WebView 分享页（[_startWebViewShareFallback]）。
+/// A 的 30 秒主超时是所有兜底的总预算，C 必须在超时前结束。
 class DouyinSniffer {
   /// 抖音 PC 网页版使用的桌面 Chrome UA
   static const String desktopUserAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
+  // 主任务与 A/B/C 兜底的时间预算
+  static const Duration _kTaskTimeout = Duration(seconds: 30);
+  static const Duration _kInjectInterval = Duration(milliseconds: 1200);
+  static const Duration _kNoteFallbackDelay = Duration(seconds: 3);
+  static const Duration _kVideoFallbackDelay = Duration(seconds: 8);
+  static const Duration _kLateFallbackAt = Duration(seconds: 18);
+  static const Duration _kWebViewFallbackTimeout = Duration(seconds: 12);
+  static const Duration _kFallbackSafetyMargin = Duration(seconds: 2);
+  static const Duration _kFallbackMinTimeout = Duration(seconds: 5);
+  static const Duration _kFallbackMinRemaining = Duration(seconds: 6);
+
   late final WebViewController _controller;
   Completer<SniffResult>? _completer;
   Timer? _timeoutTimer;
   Timer? _injectTimer;
+
+  /// 结果/提示只接收一次；日志只在本任务页面存续期间接收
   bool _acceptMessages = false;
+  bool _acceptLogs = false;
   bool _disposed = false;
 
   /// 任务序号：异步回调返回时用它丢弃旧任务结果
@@ -47,10 +65,12 @@ class DouyinSniffer {
   final Set<String> _blockedSchemes = <String>{};
   String? _lastWebResourceError;
   bool _loggedNonWebPage = false;
+  bool _loggedInjectFailure = false;
+  bool _loggedCaptchaFailure = false;
 
   bool get _isNotePage => _workPageKind == DouyinWorkPage.note;
 
-  /// 当前是否仍在等待解析结果；任务完成后不再重新注入脚本或接收消息
+  /// 当前是否仍在等待解析结果；任务完成后不再重新注入脚本或接收结果
   bool get _isTaskActive {
     final completer = _completer;
     return !_disposed && completer != null && !completer.isCompleted;
@@ -58,6 +78,12 @@ class DouyinSniffer {
 
   /// JS 调试日志回调，由主界面设置
   void Function(String message)? onLog;
+
+  /// 同时写入 logcat 和调试页日志，确保复制日志包含失败原因
+  void _log(String message) {
+    debugPrint('[JS-Sniffer] $message');
+    onLog?.call(message);
+  }
 
   DouyinSniffer() {
     _controller = WebViewController()
@@ -80,6 +106,7 @@ class DouyinSniffer {
             }
             // 新页面开始加载后才接受回传，避免旧页面的延迟消息
             _acceptMessages = true;
+            _acceptLogs = true;
             _handlePageUrl(url, _taskId);
             _injectScript();
           },
@@ -120,6 +147,7 @@ class DouyinSniffer {
     final completer = Completer<SniffResult>();
     _completer = completer;
     _acceptMessages = false;
+    _acceptLogs = false;
     _lastPageUrl = null;
     _targetAwemeId = null;
     _shareFallbackStarted = false;
@@ -134,15 +162,17 @@ class DouyinSniffer {
     _blockedSchemes.clear();
     _lastWebResourceError = null;
     _loggedNonWebPage = false;
+    _loggedInjectFailure = false;
+    _loggedCaptchaFailure = false;
     _lateFallbackTimer?.cancel();
     _lateFallbackTimer = null;
 
     _timeoutTimer?.cancel();
-    _timeoutTimer = Timer(const Duration(seconds: 30), () {
+    _timeoutTimer = Timer(_kTaskTimeout, () {
       if (taskId != _taskId) return;
       final cached = _shareVideoFallback;
       if (cached != null && cached.items.isNotEmpty) {
-        onLog?.call('主流程超时，使用分享页视频结果兜底');
+        _log('主流程超时，使用分享页视频结果兜底');
         unawaited(_finishWithItems(cached.items, false, taskId));
       } else {
         _finishWithError(
@@ -154,7 +184,7 @@ class DouyinSniffer {
 
     // 多图页会因加载 10+ 张大图导致 onPageFinished 延迟，主动轮询注入兜底
     _injectTimer?.cancel();
-    _injectTimer = Timer.periodic(const Duration(milliseconds: 1200), (_) {
+    _injectTimer = Timer.periodic(_kInjectInterval, (_) {
       if (taskId != _taskId) {
         _stopTimers();
         return;
@@ -170,7 +200,7 @@ class DouyinSniffer {
     try {
       await _controller.setUserAgent(desktopUserAgent);
     } catch (e) {
-      debugPrint('设置桌面 UA 失败: $e');
+      _log('设置桌面 UA 失败: $e');
     }
 
     // 重置上一个页面内的嗅探状态，再加载新链接
@@ -179,7 +209,7 @@ class DouyinSniffer {
         'window.__douyinSnifferReset && window.__douyinSnifferReset();',
       );
     } catch (e) {
-      debugPrint('重置嗅探状态失败: $e');
+      _log('重置嗅探状态失败: $e');
     }
 
     try {
@@ -200,7 +230,7 @@ class DouyinSniffer {
     if (_blockedSchemes.add(scheme) && _isTaskActive) {
       final shortUrl =
           url.length > 120 ? '${url.substring(0, 120)}...' : url;
-      onLog?.call('已拦截外部跳转(scheme=$scheme): $shortUrl');
+      _log('已拦截外部跳转(scheme=$scheme): $shortUrl');
     }
     return NavigationDecision.prevent;
   }
@@ -213,8 +243,8 @@ class DouyinSniffer {
     final text = '${error.errorCode} ${error.description}';
     if (_lastWebResourceError == text) return;
     _lastWebResourceError = text;
-    debugPrint('[WebResourceError] $text url=${error.url ?? ''}');
-    onLog?.call('网页加载错误: ${error.description}');
+    final urlText = (error.url ?? '').isEmpty ? '' : ' url=${error.url}';
+    _log('网页加载错误(${error.errorCode}): ${error.description}$urlText');
   }
 
   /// 记录最终页面 URL，并在拿到 awemeId 后启动分享页并行兜底
@@ -248,7 +278,7 @@ class DouyinSniffer {
         _scheduleWebViewShareFallback(
           _targetAwemeId!,
           taskId,
-          const Duration(seconds: 3),
+          _kNoteFallbackDelay,
         );
       }
     }
@@ -272,8 +302,7 @@ class DouyinSniffer {
 
   /// 并行请求 iesdouyin 分享页；图片提前完成，视频只缓存
   Future<void> _runShareFallback(String awemeId, int taskId) async {
-    onLog?.call('分享页兜底启动: awemeId=$awemeId');
-    debugPrint('[Share-Fallback] page=$_lastPageUrl awemeId=$awemeId');
+    _log('分享页兜底启动: awemeId=$awemeId（page=${_lastPageUrl ?? ''}）');
 
     try {
       final result = await _shareApi.fetchShareItem(awemeId);
@@ -283,13 +312,11 @@ class DouyinSniffer {
       if (_targetAwemeId != null && _targetAwemeId != awemeId) return;
 
       if (result.isImagePost && result.items.isNotEmpty) {
-        onLog?.call('分享页兜底命中: ${result.items.length} 个资源');
+        _log('分享页兜底命中: ${result.items.length} 个资源');
         await _finishWithItems(result.items, true, taskId);
       } else if (result.items.isNotEmpty) {
         _shareVideoFallback = result;
-        onLog?.call(
-          '分享页已取到 ${result.items.length} 个视频档位，等待 WebView 结果',
-        );
+        _log('分享页已取到 ${result.items.length} 个视频档位，等待 WebView 结果');
       }
     } on DouyinShareException catch (e) {
       // WebView 先完成或新任务开始时会被主动取消，不必显示为失败
@@ -312,18 +339,18 @@ class DouyinSniffer {
   ) {
     _shareFallbackFailed = true;
     if (_isNotePage) {
-      onLog?.call('分享页兜底失败: $message（3 秒后切换 WebView 兜底）');
+      _log('分享页兜底失败: $message（3 秒后切换 WebView 兜底）');
       _scheduleWebViewShareFallback(
         awemeId,
         taskId,
-        const Duration(seconds: 3),
+        _kNoteFallbackDelay,
       );
     } else {
-      onLog?.call('视频页分享页兜底不可用，继续等待主 WebView');
+      _log('视频页分享页兜底不可用，继续等待主 WebView');
       _scheduleWebViewShareFallback(
         awemeId,
         taskId,
-        const Duration(seconds: 8),
+        _kVideoFallbackDelay,
       );
     }
   }
@@ -362,7 +389,7 @@ class DouyinSniffer {
     _lateFallbackTimer?.cancel();
 
     final elapsed = DateTime.now().difference(_taskStartedAt);
-    final remaining = const Duration(seconds: 18) - elapsed;
+    final remaining = _kLateFallbackAt - elapsed;
     final delay = remaining.isNegative ? Duration.zero : remaining;
 
     _lateFallbackTimer = Timer(delay, () {
@@ -388,30 +415,23 @@ class DouyinSniffer {
 
     // 非图文页且已确认视频：普通 C 不启动；只有迟到兜底才允许
     if (!_isNotePage && _degradedVideoSeen && !lateFallback) {
-      onLog?.call('已确认视频作品，取消分享页切换，保留主 WebView');
+      _log('已确认视频作品，取消分享页切换，保留主 WebView');
       return;
     }
 
     // 时间预算：C 必须在主 30 秒超时前结束
     final elapsed = DateTime.now().difference(_taskStartedAt);
-    final remaining = const Duration(seconds: 30) - elapsed;
-    if (remaining <= const Duration(seconds: 6)) {
-      onLog?.call('任务剩余时间不足，跳过分享页兜底');
+    final timeout = webViewFallbackTimeoutFor(elapsed);
+    if (timeout == null) {
+      _log('任务剩余时间不足，跳过分享页兜底');
       return;
-    }
-    var timeout = const Duration(seconds: 12);
-    if (remaining - timeout < const Duration(seconds: 2)) {
-      timeout = remaining - const Duration(seconds: 2);
-      if (timeout < const Duration(seconds: 5)) {
-        timeout = const Duration(seconds: 5);
-      }
     }
 
     _webviewShareFallback = true;
     final kindLabel = lateFallback
         ? '视频最后兜底'
         : (_isNotePage ? '图文页' : '非图文页');
-    onLog?.call('分享页兜底切换到 WebView（$kindLabel）: awemeId=$awemeId');
+    _log('分享页兜底切换到 WebView（$kindLabel）: awemeId=$awemeId');
 
     try {
       await _controller.setUserAgent(DouyinShareApi.iphoneUserAgent);
@@ -424,7 +444,7 @@ class DouyinSniffer {
       );
     } catch (e) {
       if (taskId == _taskId && !(_completer?.isCompleted ?? true)) {
-        onLog?.call('分享页 WebView 兜底失败: $e');
+        _log('分享页 WebView 兜底失败: $e');
       }
       _webviewShareFallback = false;
       unawaited(_restoreDesktopUserAgent());
@@ -441,15 +461,31 @@ class DouyinSniffer {
       if (_disposed || taskId != _taskId || !_webviewShareFallback) return;
       final current = _completer;
       if (current == null || current.isCompleted) return;
-      final message = _shareFallbackErrorMessage();
-      onLog?.call(message);
+      final message = shareFallbackErrorMessage(_lastWebResourceError);
+      _log(message);
       _finishWithError(TimeoutException(message), taskId: taskId);
     });
   }
 
+  /// 计算 C 分享页 WebView 兜底的超时；剩余时间不足时返回 null
+  @visibleForTesting
+  static Duration? webViewFallbackTimeoutFor(Duration elapsed) {
+    final remaining = _kTaskTimeout - elapsed;
+    if (remaining <= _kFallbackMinRemaining) return null;
+    var timeout = _kWebViewFallbackTimeout;
+    if (remaining - timeout < _kFallbackSafetyMargin) {
+      timeout = remaining - _kFallbackSafetyMargin;
+      if (timeout < _kFallbackMinTimeout) {
+        timeout = _kFallbackMinTimeout;
+      }
+    }
+    return timeout;
+  }
+
   /// 区分深链中断和无数据，避免统一误报“风控”
-  String _shareFallbackErrorMessage() {
-    final error = _lastWebResourceError ?? '';
+  @visibleForTesting
+  static String shareFallbackErrorMessage(String? lastWebResourceError) {
+    final error = lastWebResourceError ?? '';
     if (error.contains('ERR_UNKNOWN_URL_SCHEME') ||
         error.contains('ERR_ABORTED')) {
       return '分享页被深链中断，请稍后重试';
@@ -470,7 +506,7 @@ class DouyinSniffer {
   void _logNonWebPage(String url) {
     if (_loggedNonWebPage) return;
     _loggedNonWebPage = true;
-    onLog?.call('页面已变为非网页地址(scheme=${_schemeOf(url)})，停止注入');
+    _log('页面已变为非网页地址(scheme=${_schemeOf(url)})，停止注入');
   }
 
   String _schemeOf(String url) {
@@ -481,45 +517,54 @@ class DouyinSniffer {
 
   /// 接收 JS 通过 DouyinChannel 回传的 JSON 消息
   void _onJavaScriptMessage(JavaScriptMessage message) {
-    if (!_acceptMessages) return;
+    if (_disposed) return;
     try {
       final data = jsonDecode(message.message);
       if (data is! Map) return;
+
+      // 日志与结果分开接收：结果只处理一次，日志覆盖到任务收尾
       if (data['type'] == 'log') {
+        if (!_acceptLogs) return;
         final msg = data['msg']?.toString() ?? '';
-        if (msg.isNotEmpty) {
-          debugPrint('[JS-Sniffer] $msg');
-          onLog?.call(msg);
-        }
+        if (msg.isNotEmpty) _log(msg);
         return;
       }
+
+      // hint/result 只在当前任务等待结果期间接收
+      if (!_acceptMessages || !_isTaskActive) return;
       if (data['type'] == 'hint') {
         if (data['kind'] == 'video-waiting') {
           final hintId = data['awemeId']?.toString() ?? '';
           if (hintId.isNotEmpty && hintId == _targetAwemeId) {
             if (!_degradedVideoSeen) {
               _degradedVideoSeen = true;
-              onLog?.call('已确认视频作品，保留主 WebView 等待完整画质');
+              _log('已确认视频作品，保留主 WebView 等待完整画质');
             }
           }
         }
         return;
       }
       if (data['type'] != 'result') return;
-      final rawItems = data['items'];
-      if (rawItems is! List) return;
-      final items = <MediaItem>[];
-      for (final raw in rawItems) {
-        if (raw is! Map) continue;
-        final item = MediaItem.fromJson(Map<String, dynamic>.from(raw));
-        if (item.url.isNotEmpty) items.add(item);
-      }
+      final items = parseChannelItems(data['items']);
       if (items.isNotEmpty) {
         _finishWithItems(items, data['isImagePost'] == true, _taskId);
       }
     } catch (e) {
-      debugPrint('解析 Channel 消息失败: $e');
+      _log('解析 Channel 消息失败: $e');
     }
+  }
+
+  /// 把 Channel result 消息里的 items 数组转成媒体列表（纯函数，便于测试）
+  @visibleForTesting
+  static List<MediaItem> parseChannelItems(Object? rawItems) {
+    if (rawItems is! List) return const <MediaItem>[];
+    final items = <MediaItem>[];
+    for (final raw in rawItems) {
+      if (raw is! Map) continue;
+      final item = MediaItem.fromJson(Map<String, dynamic>.from(raw));
+      if (item.url.isNotEmpty) items.add(item);
+    }
+    return items;
   }
 
   /// 读取 Cookie 后完成当前任务。
@@ -534,6 +579,7 @@ class DouyinSniffer {
     final completer = _completer;
     if (completer == null || completer.isCompleted) return;
 
+    // 结果只处理一次；日志继续接收，等待 Cookie 读取期间的 JS 收尾日志
     _acceptMessages = false;
     _stopTimers();
 
@@ -543,15 +589,17 @@ class DouyinSniffer {
         await _controller.runJavaScriptReturningResult('document.cookie'),
       );
     } catch (e) {
-      debugPrint('读取 Cookie 失败: $e');
+      _log('读取 Cookie 失败: $e');
     }
 
+    // 等待期间可能已开始新任务：此时不能清状态或关闭新任务的日志
     if (taskId != _taskId ||
         !identical(_completer, completer) ||
         completer.isCompleted) {
       return;
     }
 
+    _acceptLogs = false;
     final result = SniffResult(
       items: items,
       cookie: cookie,
@@ -560,9 +608,9 @@ class DouyinSniffer {
     final summary = isImagePost
         ? '解析成功：共发现 ${result.imageCount} 张图片、${result.videoCount} 个视频'
         : '解析成功：共发现 ${result.items.length} 个清晰度档位';
-    debugPrint('[JS-Sniffer] $summary');
-    onLog?.call(summary);
+    _log(summary);
     completer.complete(result);
+    if (identical(_completer, completer)) _completer = null;
   }
 
   /// 检测验证码中间页，命中后提前结束等待
@@ -585,7 +633,10 @@ class DouyinSniffer {
         if (taskId != _taskId) return;
         hit = _jsResultToString(result).isNotEmpty;
       } catch (e) {
-        debugPrint('验证码检测失败: $e');
+        if (!_loggedCaptchaFailure) {
+          _loggedCaptchaFailure = true;
+          _log('验证码检测失败: $e');
+        }
       }
     }
     if (taskId != _taskId) return;
@@ -605,7 +656,7 @@ class DouyinSniffer {
         final decoded = jsonDecode(text);
         if (decoded is String) return decoded;
       } catch (e) {
-        debugPrint('解析 JS 字符串失败: $e');
+        _log('解析 JS 字符串失败: $e');
       }
     }
     return text == 'null' ? '' : text;
@@ -632,9 +683,13 @@ class DouyinSniffer {
 
   /// 超时、取消或异常时结束当前任务
   void _finishWithError(Object error, {int? taskId}) {
+    // 过期任务不能停掉新任务的定时器或分享页请求
     if (taskId != null && taskId != _taskId) return;
-    _stopTimers();
+    _acceptMessages = false;
+    _acceptLogs = false;
     final completer = _completer;
+    _completer = null;
+    _stopTimers();
     if (completer == null || completer.isCompleted) return;
     completer.completeError(error);
   }
@@ -644,7 +699,10 @@ class DouyinSniffer {
     try {
       await _controller.runJavaScript(kDouyinSniffJs);
     } catch (e) {
-      debugPrint('注入嗅探脚本失败: $e');
+      if (!_loggedInjectFailure) {
+        _loggedInjectFailure = true;
+        _log('注入嗅探脚本失败: $e');
+      }
     }
   }
 
@@ -652,12 +710,13 @@ class DouyinSniffer {
   void cancelActiveTask() {
     _taskId++;
     _acceptMessages = false;
+    _acceptLogs = false;
 
     final completer = _completer;
+    _completer = null;
     if (completer != null && !completer.isCompleted) {
       completer.completeError(StateError('用户已取消解析'));
     }
-    _completer = null;
     _stopTimers();
 
     // webview_flutter 没有 stopLoading，用 about:blank 终止当前页面加载
@@ -672,6 +731,7 @@ class DouyinSniffer {
     _disposed = true;
     _taskId++;
     _acceptMessages = false;
+    _acceptLogs = false;
     _finishWithError(StateError('嗅探服务已释放'));
   }
 }
