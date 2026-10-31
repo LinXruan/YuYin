@@ -31,7 +31,7 @@
 - JDK 17
 - 仅 Android（minSdk 24 / targetSdk 36）
 - 包名：debug `com.debug.yuyin` / release `com.release.yuyin`
-- 版本：`1.0.0+115`
+- 版本：`1.0.0+118`
 
 ```bash
 flutter pub get
