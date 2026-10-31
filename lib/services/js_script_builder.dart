@@ -3,7 +3,8 @@ const String kDouyinSniffJs = r'''
 (function () {
   // Dart 每 1.2 秒重复注入一次，结果与日志状态必须挂到 window 上共享
   var S = window.__dyState || (window.__dyState = {
-    sent: false, lastUrl: '', logs: {}, videoHintSent: false, degraded: false
+    sent: false, lastUrl: '', logs: {}, videoHintSent: false, degraded: false,
+    staticHref: '', staticReady: false, staticComplete: false
   });
   // 记录本次嗅探的起始时间；页面地址变化时重新计时
   if (!window.__dyStartTime || window.__dyStartHref !== location.href) {
@@ -398,31 +399,31 @@ const String kDouyinSniffJs = r'''
     try { scanTree(JSON.parse(decodeURIComponent(el.textContent))); }
     catch (e) { log('#RENDER_DATA 解析失败，继续扫描其它数据源'); }
   }
-  // Next.js 流式脚本：self.__pace_f.push([1, "..."])
-  function scanPace() {
-    var re = /self\.__pace_f\.push\(\[1\s*,\s*"((?:[^"\\]|\\.)*)"\s*\]\)/g;
-    var scripts = document.getElementsByTagName('script');
-    for (var i = 0; i < scripts.length && !S.sent; i++) {
-      var text = scripts[i].textContent || ''; if (text.indexOf('__pace_f') === -1) continue;
-      re.lastIndex = 0;
-      var m;
-      while ((m = re.exec(text)) && !S.sent) {
-        try {
-          var payload = JSON.parse('"' + m[1] + '"');
-          try { scanTree(JSON.parse(payload)); } catch (e) { log('__pace_f 片段非 JSON，已跳过'); }
-        } catch (e) {}
-      }
-    }
+  // 静态数据源（SSR JSON）只在 DOM 就绪后扫，每页最多两次
+  function scanStatic() {
+    try { scanTree(window._ROUTER_DATA); } catch (e) {}
+    if (S.sent) return;
+    scanRenderData(); if (S.sent) return;
+    try { scanTree(window.__INIT_PROPS__); } catch (e) {}
   }
   function tryExtractNow() {
     if (S.sent) return;
-    scanRenderData(); if (S.sent) return;
-    try { scanTree(window._ROUTER_DATA); } catch (e) {}
-    if (S.sent) return;
-    try { scanTree(window.__INIT_PROPS__); } catch (e) {}
-    if (S.sent) return;
+    var href = location.href;
+    if (S.staticHref !== href) {
+      S.staticHref = href;
+      S.staticReady = false;
+      S.staticComplete = false;
+    }
+    // 首次注入时 HTML 可能还没解析完，_ROUTER_DATA 尚不存在
+    if (!S.staticReady && document.readyState !== 'loading') {
+      S.staticReady = true;
+      if (document.readyState === 'complete') S.staticComplete = true;
+      scanStatic(); if (S.sent) return;
+    } else if (S.staticReady && !S.staticComplete && document.readyState === 'complete') {
+      S.staticComplete = true;
+      scanStatic(); if (S.sent) return;
+    }
     scanPlayerData(); if (S.sent) return;
-    scanPace(); if (S.sent) return;
     scanPlayer();
   }
   hookNetwork();
@@ -430,6 +431,7 @@ const String kDouyinSniffJs = r'''
   window.__douyinSnifferReset = function () {
     S.sent = false; S.lastUrl = ''; S.logs = {}; S.targetId = '';
     S.videoHintSent = false; S.degraded = false;
+    S.staticHref = ''; S.staticReady = false; S.staticComplete = false;
     window.__dyStartTime = Date.now();
     window.__dyStartHref = location.href;
   };

@@ -1,3 +1,5 @@
+import '../utils/parse_utils.dart';
+
 /// 媒体类型：普通视频、实况图视频或静态图片
 enum MediaType { video, image }
 
@@ -34,8 +36,8 @@ class MediaItem {
       url: json['url']?.toString() ?? '',
       type: isVideo ? MediaType.video : MediaType.image,
       resolution: json['resolution']?.toString(),
-      bitRate: _positiveInt(json['bitRate']),
-      dataSize: _positiveInt(json['dataSize']),
+      bitRate: positiveInt(json['bitRate']),
+      dataSize: positiveInt(json['dataSize']),
       gearName: json['gearName']?.toString(),
     );
   }
@@ -75,16 +77,6 @@ class MediaItem {
     }
     if (size >= 1024) return '${(size / 1024).toStringAsFixed(0)} KB';
     return '$size B';
-  }
-
-  /// 把 JSON 中的数字/字符串统一转成正整数，无效值返回 null
-  static int? _positiveInt(Object? value) {
-    final parsed = value is int
-        ? value
-        : value is num
-            ? value.toInt()
-            : int.tryParse(value?.toString() ?? '');
-    return parsed != null && parsed > 0 ? parsed : null;
   }
 }
 

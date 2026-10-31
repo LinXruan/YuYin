@@ -1,8 +1,10 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/media_item.dart';
+import '../utils/parse_utils.dart';
 
 /// 分享页未返回作品数据（可能触发风控）
 class DouyinShareException implements Exception {
@@ -12,6 +14,11 @@ class DouyinShareException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// 分享页请求被外部取消（新任务/释放），不应作为失败展示
+class DouyinShareCancelledException implements Exception {
+  const DouyinShareCancelledException();
 }
 
 /// 分享页解析结果；Cookie 由 WebView 侧补充
@@ -36,52 +43,162 @@ class DouyinShareApi {
   final Dio _dio;
   CancelToken? _cancelToken;
 
+  /// iesdouyin 的 ttwid 等 Cookie，跨任务缓存；不写入日志
+  String _cookieHeader = '';
+
+  static const Duration _kDefaultTotalTimeout = Duration(seconds: 10);
+
   /// 与油猴脚本一致的 iPhone Safari UA
   static const String iphoneUserAgent =
       'Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) '
       'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 '
       'Mobile/15E148 Safari/604.1';
 
-  /// 请求分享页并解析作品；失败抛出 [DouyinShareException]
+  /// 分享页 URL；Dio 兜底与 WebView 兜底共用
+  static String sharePageUrl(String awemeId) =>
+      'https://www.iesdouyin.com/share/video/$awemeId/';
+
+  /// 请求分享页并解析作品；失败抛出 [DouyinShareException]。
+  ///
+  /// 首次请求可能只拿到风控验证壳和 `Set-Cookie: ttwid`，
+  /// 此时带新 Cookie 重试一次；最多请求两次。
   Future<DouyinShareResult> fetchShareItem(
     String awemeId, {
     CancelToken? cancelToken,
+    Duration totalTimeout = _kDefaultTotalTimeout,
   }) async {
     _cancelToken?.cancel('新的分享页请求开始');
     final token = cancelToken ?? CancelToken();
     _cancelToken = token;
 
     try {
-      final response = await _dio.get<String>(
-        'https://www.iesdouyin.com/share/video/$awemeId/',
-        cancelToken: token,
-        options: Options(
-          responseType: ResponseType.plain,
-          headers: {'User-Agent': iphoneUserAgent},
-        ),
+      return await _fetchWithCookieRetry(awemeId, token).timeout(
+        totalTimeout,
+        onTimeout: () {
+          token.cancel('分享页兜底超时');
+          throw DouyinShareException('分享页兜底超时');
+        },
       );
-      final html = response.data;
-      if (html == null || html.isEmpty) {
-        throw DouyinShareException('分享页响应为空');
-      }
-      final result = parseShareHtml(html, awemeId);
-      if (result == null) {
-        throw DouyinShareException('分享页未返回作品数据，可能触发风控');
-      }
-      return result;
     } on DouyinShareException {
       rethrow;
     } on DioException catch (e) {
+      if (CancelToken.isCancel(e)) {
+        throw const DouyinShareCancelledException();
+      }
       throw DouyinShareException('分享页请求失败: ${e.type.name}');
     } catch (e) {
+      if (e is DouyinShareCancelledException) rethrow;
       throw DouyinShareException('分享页解析失败: $e');
     }
+  }
+
+  Future<DouyinShareResult> _fetchWithCookieRetry(
+    String awemeId,
+    CancelToken token,
+  ) async {
+    final url = sharePageUrl(awemeId);
+    final sentCookie = _cookieHeader;
+    var response = await _get(url, token, sentCookie);
+    _cookieHeader = mergeCookieHeader(
+      _cookieHeader,
+      parseSetCookies(response.headers['set-cookie']),
+    );
+
+    var result = _parseResponse(response.data, awemeId);
+    if (result != null) return result;
+
+    // 验证壳或空数据：只有服务端下发了新 Cookie 才值得重试一次
+    if (_cookieHeader.isNotEmpty && _cookieHeader != sentCookie) {
+      if (token.isCancelled) throw const DouyinShareCancelledException();
+      response = await _get(url, token, _cookieHeader);
+      _cookieHeader = mergeCookieHeader(
+        _cookieHeader,
+        parseSetCookies(response.headers['set-cookie']),
+      );
+      result = _parseResponse(response.data, awemeId);
+      if (result != null) return result;
+    } else if (sentCookie.isNotEmpty) {
+      // 缓存 Cookie 已失效且服务端没有下发新的，清空避免污染后续任务
+      _cookieHeader = '';
+    }
+
+    throw DouyinShareException('分享页未返回作品数据，可能触发风控');
+  }
+
+  Future<Response<String>> _get(
+    String url,
+    CancelToken token,
+    String cookie,
+  ) {
+    return _dio.get<String>(
+      url,
+      cancelToken: token,
+      options: Options(
+        responseType: ResponseType.plain,
+        // 4xx/5xx 也可能带 Set-Cookie，必须读取 body 后再判断
+        validateStatus: (_) => true,
+        headers: {
+          'User-Agent': iphoneUserAgent,
+          if (cookie.isNotEmpty) 'Cookie': cookie,
+        },
+      ),
+    );
+  }
+
+  DouyinShareResult? _parseResponse(String? html, String awemeId) {
+    if (html == null || html.isEmpty) return null;
+    return parseShareHtml(html, awemeId);
   }
 
   /// 取消当前分享页请求（新任务/释放时调用）
   void cancelPending() {
     _cancelToken?.cancel('取消分享页请求');
     _cancelToken = null;
+  }
+
+  /// 从 Set-Cookie 头提取 `name=value`；忽略属性和已过期 Cookie
+  @visibleForTesting
+  static List<String> parseSetCookies(List<String>? setCookies) {
+    if (setCookies == null || setCookies.isEmpty) return const [];
+    final result = <String>[];
+    for (final raw in setCookies) {
+      // 不能按逗号拆：Expires 属性自身含逗号
+      final firstPart = raw.split(';').first.trim();
+      final equalsIndex = firstPart.indexOf('=');
+      if (equalsIndex <= 0) continue;
+
+      final name = firstPart.substring(0, equalsIndex).trim();
+      final value = firstPart.substring(equalsIndex + 1).trim();
+      if (name.isEmpty || value.isEmpty) continue;
+      if (raw.toLowerCase().contains('max-age=0')) continue;
+      result.add('$name=$value');
+    }
+    return result;
+  }
+
+  /// 合并 Cookie，同名大小写不敏感覆盖；限制 20 项 / 4KB
+  @visibleForTesting
+  static String mergeCookieHeader(String current, List<String> cookies) {
+    final merged = <String, String>{}; // lowerName -> name=value
+
+    void add(String pair) {
+      final equalsIndex = pair.indexOf('=');
+      if (equalsIndex <= 0) return;
+      final name = pair.substring(0, equalsIndex).trim();
+      final value = pair.substring(equalsIndex + 1).trim();
+      if (name.isEmpty || value.isEmpty) return;
+      merged[name.toLowerCase()] = '$name=$value';
+    }
+
+    for (final pair in current.split(';')) {
+      add(pair.trim());
+    }
+    for (final pair in cookies) {
+      add(pair);
+    }
+
+    final header = merged.values.take(20).join('; ');
+    return header.length > 4096 ? '' : header;
   }
 
   // ---------- 纯解析函数（可单测） ----------
@@ -298,21 +415,10 @@ class DouyinShareApi {
     return unique;
   }
 
-  /// 实况图视频：取最高档位
+  /// 实况图视频：取最高档位（parseVideoTiers 已含顶层回退）
   static MediaItem? pickBestVideo(Map<String, dynamic> video) {
     final tiers = parseVideoTiers(video);
-    if (tiers.isNotEmpty) return tiers.first;
-
-    final url = _pickVideoUrl(
-      video['play_addr'] is Map ? _asStringMap(video['play_addr']) : null,
-      video,
-    );
-    if (url.isEmpty) return null;
-    return MediaItem(
-      url: url,
-      type: MediaType.video,
-      resolution: resolutionText(video['width'], video['height']),
-    );
+    return tiers.isEmpty ? null : tiers.first;
   }
 
   /// 静态图：优先 jpeg/jpg，否则取 url_list 最后一项
@@ -344,16 +450,6 @@ class DouyinShareApi {
     final w = positiveInt(width) ?? 0;
     final h = positiveInt(height) ?? 0;
     return w > 0 && h > 0 ? '${w}x$h' : '';
-  }
-
-  /// 转正整数；0/负数/无效值返回 null
-  static int? positiveInt(Object? value) {
-    final parsed = value is int
-        ? value
-        : value is num
-            ? value.toInt()
-            : int.tryParse(value?.toString() ?? '');
-    return parsed != null && parsed > 0 ? parsed : null;
   }
 
   // ---------- 私有工具 ----------
