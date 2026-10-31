@@ -5,7 +5,7 @@ import '../services/douyin_sniffer.dart';
 import '../utils/log_controller.dart';
 import '../widgets/log_panel.dart';
 
-/// 调试页：运行日志、复制日志
+/// 调试页：运行日志、清空日志、复制日志
 class DebugPage extends StatelessWidget {
   const DebugPage({
     super.key,
@@ -25,6 +25,13 @@ class DebugPage extends StatelessWidget {
         appBar: AppBar(
           title: const Text('调试'),
           actions: [
+            Builder(
+              builder: (buttonContext) => IconButton(
+                tooltip: '清空日志',
+                onPressed: () => _clearLogs(buttonContext),
+                icon: const Icon(Icons.delete_sweep_outlined),
+              ),
+            ),
             Builder(
               builder: (buttonContext) => IconButton(
                 tooltip: '复制日志',
@@ -58,6 +65,20 @@ class DebugPage extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  /// 清空当前全部日志
+  void _clearLogs(BuildContext context) {
+    if (logs.value.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('日志已为空')),
+      );
+      return;
+    }
+    logs.clear();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已清空日志')),
     );
   }
 

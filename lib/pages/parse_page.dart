@@ -35,12 +35,14 @@ class ParsePage extends StatefulWidget {
 
 class _ParsePageState extends State<ParsePage> {
   final TextEditingController _inputController = TextEditingController();
+  final ScrollController _inputScrollController = ScrollController();
   double? _progress;
   String _lastProgressKey = '';
 
   @override
   void dispose() {
     _inputController.dispose();
+    _inputScrollController.dispose();
     super.dispose();
   }
 
@@ -179,31 +181,47 @@ class _ParsePageState extends State<ParsePage> {
               return ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  TextField(
-                    controller: _inputController,
-                    minLines: 3,
-                    maxLines: 5,
-                    decoration: const InputDecoration(
-                      labelText: '抖音分享口令 / 链接',
-                      hintText:
-                          '粘贴分享口令或链接，例如 https://v.douyin.com/xxxx/',
-                      border: OutlineInputBorder(),
-                      alignLabelWithHint: true,
+                  SizedBox(
+                    height: 120,
+                    child: Scrollbar(
+                      controller: _inputScrollController,
+                      thumbVisibility: true,
+                      thickness: 4,
+                      radius: const Radius.circular(4),
+                      child: TextField(
+                        controller: _inputController,
+                        scrollController: _inputScrollController,
+                        maxLines: null,
+                        expands: true,
+                        textAlignVertical: TextAlignVertical.top,
+                        decoration: const InputDecoration(
+                          labelText: '抖音分享口令 / 链接',
+                          hintText:
+                              '粘贴分享口令或链接，例如 https://v.douyin.com/xxxx/',
+                          border: OutlineInputBorder(),
+                          alignLabelWithHint: true,
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      TextButton(
+                      FilledButton.tonalIcon(
                         onPressed: busy ? null : _pasteFromClipboard,
-                        child: const Text('粘贴'),
+                        icon: const Icon(Icons.paste_rounded, size: 18),
+                        label: const Text('粘贴'),
                       ),
-                      TextButton(
+                      const SizedBox(width: 8),
+                      FilledButton.tonalIcon(
                         onPressed: busy ? null : _inputController.clear,
-                        child: const Text('清空'),
+                        icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                        label: const Text('清空'),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 4),
                   FilledButton.icon(
                     onPressed: busy ? null : _startParse,
                     icon: const Icon(Icons.download),
