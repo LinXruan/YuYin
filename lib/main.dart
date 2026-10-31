@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'pages/app_shell.dart';
+import 'utils/theme_store.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await ThemeStore.init();
   runApp(const YuYinApp());
 }
 
@@ -10,16 +13,67 @@ void main() {
 class YuYinApp extends StatelessWidget {
   const YuYinApp({super.key});
 
+  static ThemeData _buildLightTheme() {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: Colors.pink,
+      brightness: Brightness.light,
+    ).copyWith(
+      surface: const Color(0xFFFFF7FA),
+      surfaceContainerHighest: const Color(0xFFF3E7EA),
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: scheme.surface,
+      appBarTheme: AppBarTheme(
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+      ),
+    );
+  }
+
+  static ThemeData _buildDarkTheme() {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: Colors.pink,
+      brightness: Brightness.dark,
+    ).copyWith(
+      surface: const Color(0xFF141213),
+      surfaceContainerHighest: const Color(0xFF262123),
+      primary: const Color(0xFFFFB0C8),
+      onPrimary: const Color(0xFF5E1133),
+      primaryContainer: const Color(0xFF7B2949),
+      onPrimaryContainer: const Color(0xFFFFD8E4),
+      onSurface: const Color(0xFFECE0E2),
+      onSurfaceVariant: const Color(0xFFD4C2C6),
+      outline: const Color(0xFF9E8C91),
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: scheme.surface,
+      appBarTheme: AppBarTheme(
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '余音',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.pink),
-        useMaterial3: true,
-      ),
-      home: const AppShell(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeStore.themeModeNotifier,
+      builder: (context, themeMode, _) {
+        return MaterialApp(
+          title: '余音',
+          debugShowCheckedModeBanner: false,
+          theme: _buildLightTheme(),
+          darkTheme: _buildDarkTheme(),
+          themeMode: themeMode,
+          home: const AppShell(),
+        );
+      },
     );
   }
 }

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 启动页：浅粉白背景 + 居中音符图标（PNG，固定 120dp） -->
+<!-- 启动页：自动适配浅色/深色背景 + 居中超清矢量音符图标 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/launch_background" />
-    <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@drawable/launch_logo" />
-    </item>
+    <item
+        android:width="120dp"
+        android:height="120dp"
+        android:gravity="center"
+        android:drawable="@drawable/launch_logo" />
 </layer-list>

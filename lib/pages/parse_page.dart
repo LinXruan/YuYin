@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../models/media_item.dart';
 import '../services/douyin_sniffer.dart';
+import '../utils/login_state_store.dart';
 import '../services/video_downloader.dart';
 import '../utils/log_controller.dart';
 import '../utils/url_parser.dart';
@@ -20,6 +21,7 @@ class ParsePage extends StatefulWidget {
     required this.downloader,
     required this.logs,
     required this.busy,
+    required this.loggedIn,
     required this.onRequestParseTab,
   });
 
@@ -27,6 +29,7 @@ class ParsePage extends StatefulWidget {
   final VideoDownloader downloader;
   final LogController logs;
   final ValueNotifier<bool> busy;
+  final ValueNotifier<bool> loggedIn;
   final VoidCallback onRequestParseTab;
 
   @override
@@ -133,6 +136,14 @@ class _ParsePageState extends State<ParsePage> {
       if (result.items.isEmpty) {
         widget.logs.add('未解析到可下载资源，请检查链接或稍后重试');
         return;
+      }
+
+      // 顺带动态校验登录状态：若显示已登录，但解析 Cookie 缺失 session，说明已被平台注销或失效
+      if (widget.loggedIn.value &&
+          !LoginStateStore.hasLoginSession(result.cookie)) {
+        widget.loggedIn.value = false;
+        await LoginStateStore.clearLogin();
+        widget.logs.add('提示：检测到抖音登录态已失效，已自动恢复为未登录状态');
       }
 
       // 用户可能已切到其他 Tab，先切回解析页再弹选择面板
@@ -345,7 +356,7 @@ class _ParsePageState extends State<ParsePage> {
             '本地、解析、隐私',
             style: theme.textTheme.bodyMedium?.copyWith(
               fontSize: 16,
-              color: Colors.grey.shade600,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
             ),
           ),
         ),

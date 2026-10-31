@@ -30,7 +30,7 @@ Android 端抖音无水印资源下载工具，支持视频、图集和实况图
 
 - Flutter 3.47.6 / Dart 3.13.5，JDK 17
 - 仅 Android，minSdk 24 / targetSdk 36
-- 版本 `1.1.0+122`
+- 版本 `1.1.0+124`
 - 包名：debug `com.debug.yuyin`，release `com.release.yuyin`（可同时安装）
 
 ```bash
