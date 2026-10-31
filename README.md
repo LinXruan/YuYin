@@ -31,7 +31,7 @@
 - JDK 17
 - 仅 Android（minSdk 24 / targetSdk 36）
 - 包名：debug `com.debug.yuyin` / release `com.release.yuyin`
-- 版本：`1.0.0+113`
+- 版本：`1.0.0+114`
 
 ```bash
 flutter pub get
@@ -70,6 +70,7 @@ lib/
 ├── models/media_item.dart
 ├── utils/
 │   ├── url_parser.dart
+│   ├── parse_utils.dart
 │   ├── log_controller.dart
 │   └── login_state_store.dart
 └── widgets/                   # 日志、画质、图片选择组件
@@ -85,7 +86,7 @@ lib/
 
 ## 测试
 
-`flutter test` 覆盖 URL 解析、分享页解析、日志控制器和嗅探纯逻辑，共 43 个单元测试。
+`flutter test` 覆盖 URL 解析、分享页解析与 Cookie 重试、日志控制器和嗅探纯逻辑，共 53 个单元测试。
 
 ## 开源与作者
 

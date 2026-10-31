@@ -32,6 +32,7 @@ class DouyinSniffer {
   static const Duration _kFallbackSafetyMargin = Duration(seconds: 2);
   static const Duration _kFallbackMinTimeout = Duration(seconds: 5);
   static const Duration _kFallbackMinRemaining = Duration(seconds: 6);
+  static const Duration _kShareFallbackBudget = Duration(seconds: 10);
 
   late final WebViewController _controller;
   Completer<SniffResult>? _completer;
@@ -305,7 +306,10 @@ class DouyinSniffer {
     _log('分享页兜底启动: awemeId=$awemeId（page=${_lastPageUrl ?? ''}）');
 
     try {
-      final result = await _shareApi.fetchShareItem(awemeId);
+      final result = await _shareApi.fetchShareItem(
+        awemeId,
+        totalTimeout: _kShareFallbackBudget,
+      );
       if (_disposed || taskId != _taskId) return;
       final completer = _completer;
       if (completer == null || completer.isCompleted) return;
@@ -318,9 +322,10 @@ class DouyinSniffer {
         _shareVideoFallback = result;
         _log('分享页已取到 ${result.items.length} 个视频档位，等待 WebView 结果');
       }
-    } on DouyinShareException catch (e) {
+    } on DouyinShareCancelledException {
       // WebView 先完成或新任务开始时会被主动取消，不必显示为失败
-      if (e.message.contains('cancel')) return;
+      return;
+    } on DouyinShareException catch (e) {
       if (taskId == _taskId && !(_completer?.isCompleted ?? true)) {
         _handleShareFallbackFailure(awemeId, taskId, e.message);
       }
@@ -440,7 +445,7 @@ class DouyinSniffer {
         return;
       }
       await _controller.loadRequest(
-        Uri.parse('https://www.iesdouyin.com/share/video/$awemeId/'),
+        Uri.parse(DouyinShareApi.sharePageUrl(awemeId)),
       );
     } catch (e) {
       if (taskId == _taskId && !(_completer?.isCompleted ?? true)) {
