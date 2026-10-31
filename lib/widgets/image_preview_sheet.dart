@@ -89,6 +89,19 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
                   item.url,
                   headers: widget.headers,
                   fit: BoxFit.contain,
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    final total = progress.expectedTotalBytes;
+                    final loaded = progress.cumulativeBytesLoaded;
+                    final value =
+                        total != null && total > 0 ? loaded / total : null;
+                    return Center(
+                      child: CircularProgressIndicator(
+                        value: value,
+                        strokeWidth: 2,
+                      ),
+                    );
+                  },
                   errorBuilder: (_, _, _) => const Center(
                     child: Icon(Icons.broken_image_outlined, color: Colors.white),
                   ),
@@ -184,6 +197,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
               Image.network(
                 item.url,
                 headers: widget.headers,
+                cacheWidth: 360,
                 fit: BoxFit.cover,
                 loadingBuilder: (context, child, progress) {
                   if (progress == null) return child;

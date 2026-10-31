@@ -216,6 +216,7 @@ const String kDouyinLoginDetectJs = r'''
 
   // 主动探测
   function probeAuthApis() {
+    if (S.isLoggedIn) return;
     try {
       fetch('/aweme/v1/web/user/profile/self/', { credentials: 'include' })
         .then(function (res) { return res.json(); })
@@ -327,14 +328,7 @@ const String kDouyinLoginDetectJs = r'''
     } catch (e) {}
   }
 
-  // 初始执行一次主动探测
+  // 初始执行一次主动探测（后续由 Dart 周期调度与网络事件监听驱动，杜绝前端高频死循环）
   probeAuthApis();
-
-  // 启动 2 秒间隔轮询探测
-  if (!S.timer) {
-    S.timer = setInterval(function () {
-      probeAuthApis();
-    }, 2000);
-  }
 })();
 ''';

@@ -7,9 +7,25 @@ import 'package:path_provider/path_provider.dart';
 import '../models/media_item.dart';
 import 'douyin_sniffer.dart';
 
+/// 下载被用户或外部主动取消
+class DouyinDownloadCancelledException implements Exception {
+  const DouyinDownloadCancelledException();
+
+  @override
+  String toString() => '下载已取消';
+}
+
 /// 视频/图片下载与相册保存服务
 class VideoDownloader {
-  VideoDownloader({Dio? dio}) : _dio = dio ?? Dio();
+  VideoDownloader({Dio? dio})
+      : _dio = dio ??
+            Dio(
+              BaseOptions(
+                connectTimeout: const Duration(seconds: 15),
+                receiveTimeout: const Duration(seconds: 60),
+                sendTimeout: const Duration(seconds: 15),
+              ),
+            );
 
   final Dio _dio;
 
@@ -25,6 +41,7 @@ class VideoDownloader {
   Future<void> downloadItems(
     List<MediaItem> items, {
     String? cookie,
+    CancelToken? cancelToken,
     required void Function(int current, int total, double itemProgress)
         onProgress,
   }) async {
@@ -36,22 +53,35 @@ class VideoDownloader {
     // 相册权限只需在批量下载开始前申请一次
     await _ensureGalleryAccess();
     final tempDir = await getTemporaryDirectory();
+    final batchTag = DateTime.now().millisecondsSinceEpoch;
 
     for (var i = 0; i < total; i++) {
+      if (cancelToken?.isCancelled ?? false) {
+        throw const DouyinDownloadCancelledException();
+      }
       final item = items[i];
-      final tempPath = '${tempDir.path}${Platform.pathSeparator}'
-          'temp_$i.${_extensionFor(item)}';
+      final tempPath =
+          '${tempDir.path}${Platform.pathSeparator}temp_${batchTag}_$i.${_extensionFor(item)}';
 
       try {
         await _downloadFile(
           item.url,
           tempPath,
           cookie: cookie,
+          cancelToken: cancelToken,
           onProgress: (progress) => onProgress(i + 1, total, progress),
         );
+        if (cancelToken?.isCancelled ?? false) {
+          throw const DouyinDownloadCancelledException();
+        }
         await _putToGallery(tempPath, item.type);
         // 确保界面收到当前项 100% 的完成信号
         onProgress(i + 1, total, 1.0);
+      } on DioException catch (e) {
+        if (CancelToken.isCancel(e)) {
+          throw const DouyinDownloadCancelledException();
+        }
+        rethrow;
       } finally {
         // 每保存完一个文件立即删除，避免批量下载撑爆临时目录
         await _deleteIfExists(tempPath);
@@ -73,11 +103,13 @@ class VideoDownloader {
     String url,
     String path, {
     String? cookie,
+    CancelToken? cancelToken,
     required void Function(double progress) onProgress,
   }) async {
     await _dio.download(
       url,
       path,
+      cancelToken: cancelToken,
       options: Options(
         headers: {
           ..._baseHeaders,
@@ -95,19 +127,27 @@ class VideoDownloader {
 
   /// 根据媒体类型调用 Gal 写入系统相册
   Future<void> _putToGallery(String path, MediaType type) async {
-    if (type == MediaType.video) {
-      await Gal.putVideo(path);
-    } else {
-      await Gal.putImage(path);
+    try {
+      if (type == MediaType.video) {
+        await Gal.putVideo(path);
+      } else {
+        await Gal.putImage(path);
+      }
+    } on GalException catch (e) {
+      throw Exception('保存至相册失败: ${e.type.name}');
     }
   }
 
   /// Android 9 及以下需要运行时存储权限；Android 10+ 自动返回 true
   Future<void> _ensureGalleryAccess() async {
-    if (await Gal.hasAccess()) return;
-    final granted = await Gal.requestAccess();
-    if (!granted) {
-      throw Exception('未获得相册写入权限，无法保存文件');
+    try {
+      if (await Gal.hasAccess()) return;
+      final granted = await Gal.requestAccess();
+      if (!granted) {
+        throw Exception('未获得相册写入权限，无法保存文件');
+      }
+    } on GalException catch (e) {
+      throw Exception('申请相册权限失败: ${e.type.name}');
     }
   }
 
