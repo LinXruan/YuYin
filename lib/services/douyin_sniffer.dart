@@ -33,6 +33,7 @@ class DouyinSniffer {
   static const Duration _kFallbackMinTimeout = Duration(seconds: 5);
   static const Duration _kFallbackMinRemaining = Duration(seconds: 6);
   static const Duration _kShareFallbackBudget = Duration(seconds: 10);
+  static const Duration _kShareImageGrace = Duration(seconds: 3);
 
   late final WebViewController _controller;
   Completer<SniffResult>? _completer;
@@ -50,6 +51,8 @@ class DouyinSniffer {
   String? _targetAwemeId;
   bool _shareFallbackStarted = false;
   DouyinShareResult? _shareVideoFallback;
+  DouyinShareResult? _pendingImageResult;
+  Timer? _imageGraceTimer;
   final DouyinShareApi _shareApi = DouyinShareApi();
   bool _webviewShareFallback = false;
   Timer? _webviewFallbackDelay;
@@ -153,6 +156,9 @@ class DouyinSniffer {
     _targetAwemeId = null;
     _shareFallbackStarted = false;
     _shareVideoFallback = null;
+    _pendingImageResult = null;
+    _imageGraceTimer?.cancel();
+    _imageGraceTimer = null;
     _webviewShareFallback = false;
     _workPageKind = DouyinWorkPage.unknown;
     _degradedVideoSeen = false;
@@ -316,8 +322,8 @@ class DouyinSniffer {
       if (_targetAwemeId != null && _targetAwemeId != awemeId) return;
 
       if (result.isImagePost && result.items.isNotEmpty) {
-        _log('分享页兜底命中: ${result.items.length} 个资源');
-        await _finishWithItems(result.items, true, taskId);
+        _log('分享页兜底命中（等待实况补充）: ${result.items.length} 个资源');
+        _scheduleImageFallback(result, taskId);
       } else if (result.items.isNotEmpty) {
         _shareVideoFallback = result;
         _log('分享页已取到 ${result.items.length} 个视频档位，等待 WebView 结果');
@@ -334,6 +340,24 @@ class DouyinSniffer {
         _handleShareFallbackFailure(awemeId, taskId, '$e');
       }
     }
+  }
+
+  /// 分享页图片结果先作为候选，给主页面 RSC/JS 留出补充实况视频的时间。
+  /// 宽限期内其他来源完成会取消候选；到期仍无结果才用 B 的图片兜底。
+  void _scheduleImageFallback(DouyinShareResult result, int taskId) {
+    if (_disposed || taskId != _taskId) return;
+    _pendingImageResult = result;
+    _imageGraceTimer?.cancel();
+    _imageGraceTimer = Timer(_kShareImageGrace, () {
+      if (_disposed || taskId != _taskId) return;
+      final completer = _completer;
+      if (completer == null || completer.isCompleted) return;
+      final pending = _pendingImageResult;
+      _pendingImageResult = null;
+      _imageGraceTimer = null;
+      if (pending == null || pending.items.isEmpty) return;
+      unawaited(_finishWithItems(pending.items, true, taskId));
+    });
   }
 
   /// B 失败：图文页 3 秒后切 C；视频页先等主 WebView
@@ -679,6 +703,9 @@ class DouyinSniffer {
     _webviewFallbackTimer = null;
     _lateFallbackTimer?.cancel();
     _lateFallbackTimer = null;
+    _imageGraceTimer?.cancel();
+    _imageGraceTimer = null;
+    _pendingImageResult = null;
     _shareApi.cancelPending();
     if (_webviewShareFallback) {
       _webviewShareFallback = false;
