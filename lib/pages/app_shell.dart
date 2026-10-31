@@ -39,7 +39,7 @@ class _AppShellState extends State<AppShell> {
     // JS 内部调试日志统一加 [解析] 前缀后写入共享日志
     _sniffer.onLog = (message) => _logs.add('[解析] $message');
 
-    // 恢复上次“完成返回”后留下的登录标记（不保存任何账号信息）
+    // 恢复上次留下的登录标记（不保存任何敏感账号信息）
     LoginStateStore.isLoggedIn().then((value) {
       if (mounted) _loggedIn.value = value;
     });
@@ -56,14 +56,20 @@ class _AppShellState extends State<AppShell> {
   }
 
   /// 打开抖音网页登录页；Cookie 由 WebView 全局共享给嗅探器
-  Future<void> _openLoginPage() async {
+  Future<void> _openLoginPage({bool initialLoggedIn = false}) async {
     final done = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const LoginWebViewPage()),
+      MaterialPageRoute(
+        builder: (_) => LoginWebViewPage(initialLoggedIn: initialLoggedIn),
+      ),
     );
-    if (done == true && mounted) {
+    if (!mounted) return;
+    if (done == true) {
       _loggedIn.value = true;
-      await LoginStateStore.markLoggedIn();
       _logs.add('登录完成，Cookie 已保存，可重新解析获取高清画质');
+    } else if (done == false) {
+      _loggedIn.value = false;
+      await LoginStateStore.clearLogin();
+      _logs.add('检测到账号已退出登录，恢复未登录状态');
     }
   }
 
@@ -89,7 +95,7 @@ class _AppShellState extends State<AppShell> {
       );
       if (confirmed != true || !mounted) return;
     }
-    await _openLoginPage();
+    await _openLoginPage(initialLoggedIn: loggedIn);
   }
 
   void _selectTab(int index) {

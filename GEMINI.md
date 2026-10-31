@@ -8,7 +8,7 @@
 ## 1. 项目概况
 
 - **应用**：余音（YuYin），Android 端抖音无水印视频 / 图集 / 实况图下载工具。
-- **包名 / 版本**：debug 版 `com.debug.yuyin`，release 版 `com.release.yuyin`；版本 `1.0.0+115`（以 `pubspec.yaml` 和 `lib/app_info.dart` 为准）。
+- **包名 / 版本**：debug 版 `com.debug.yuyin`，release 版 `com.release.yuyin`；版本 `1.0.0+118`（以 `pubspec.yaml` 和 `lib/app_info.dart` 为准）。
 - **技术栈**：Flutter 3.47.6 / Dart 3.13.5，Material 3，仅 Android（忽略 Web / Windows）。
 - **依赖**：`webview_flutter`、`dio`、`path_provider`、`gal`；不引入第三方状态管理。
 - **现状**：解析、登录、画质/图集选择、下载、调试日志、关于页均已完成；历史页暂为占位。
@@ -67,3 +67,30 @@
 - release 包名由 `android/app/build.gradle.kts` 的 `androidComponents.onVariants` 单独设置；`namespace` 与 `MainActivity` 仍为 `com.debug.yuyin`，namespace 只影响代码/资源命名空间，不影响安装后的包名。
 - debug / release 包名不同，可同时安装、数据相互独立，桌面可能出现两个“余音”图标，属预期现象。
 - `android/key.properties` 字段：`storePassword`、`keyPassword`、`keyAlias`、`storeFile`（相对 `android/app/`）。不要把密码或 keystore 写入文档、提交到 Git。
+
+## 7. 模拟器、APK 调试与日志
+
+### 启动模拟器
+
+- 本机 AVD：`Medium_Phone_API_37.0`（WHPX，Play Store x86_64）。
+- 启动：
+  `%LOCALAPPDATA%\Android\Sdk\emulator\emulator.exe -avd Medium_Phone_API_37.0 -memory 3072`
+- 等待启动：`adb wait-for-device`，再用 `adb shell getprop sys.boot_completed` 确认返回 `1`。
+
+### 日志与调试
+
+- 清空并抓取 Flutter / 嗅探日志：
+
+  ```bash
+  adb -s <serial> logcat -c
+  adb -s <serial> logcat -d | grep -E "flutter|JS-Sniffer"
+  ```
+
+- 应用内日志：设置 → 调试 → 复制日志；模拟器与电脑剪贴板互通，点击复制后可在 PowerShell 用 `Get-Clipboard -Raw` 读取。
+- UI 自动化：`uiautomator dump /sdcard/window.xml` 后 `adb pull`；Git Bash 先执行 `export MSYS_NO_PATHCONV=1`，避免 `/sdcard` 被改写；点击/输入用 `adb shell input tap|text|keyevent`。
+- 调试页的 `SelectableText` 日志不暴露给 uiautomator，adb 也读不到模拟器剪贴板；优先用 logcat 或上面的共享剪贴板。
+
+### 注意
+
+- 不得擅自卸载用户已安装的版本或清除应用数据，统一用 `install -r`。
+- 16GB 内存机器不要同时跑 Gradle 重度构建和模拟器。

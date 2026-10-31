@@ -52,11 +52,12 @@ def draw_note(
     font_path: Path,
     canvas: int,
     font_ratio: float,
+    y_shift_ratio: float = 0.04,  # 将音符往正下方适度微调，弥补竖向长音符杆带来的视觉重心偏上问题
 ) -> None:
     font = ImageFont.truetype(str(font_path), int(canvas * font_ratio))
     left, top, right, bottom = draw.textbbox((0, 0), GLYPH, font=font)
     x = (canvas - (right - left)) / 2 - left
-    y = (canvas - (bottom - top)) / 2 - top
+    y = (canvas - (bottom - top)) / 2 - top + (canvas * y_shift_ratio)
     draw.text((x, y), GLYPH, font=font, fill=FOREGROUND)
 
 
@@ -74,7 +75,7 @@ def render_icon(font_path: Path, shape: str, font_ratio: float = 0.62) -> Image.
 
 
 def render_foreground(font_path: Path) -> Image.Image:
-    """自适应图标前景：透明背景 + 居中音符。"""
+    """自适应图标前景：透明背景 + 居中偏下微调音符。"""
     size = 1024
     canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(canvas)
