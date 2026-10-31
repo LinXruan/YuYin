@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../app_info.dart';
 
-/// 关于页：版本信息、开源地址、制作人与免责声明
+/// 关于页：版本信息、开源地址、制作人、反馈群与免责声明
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
 
@@ -65,6 +65,19 @@ class AboutPage extends StatelessWidget {
                     title: Text('制作人'),
                     subtitle: Text(appAuthor),
                   ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.group_outlined),
+                    title: const Text('反馈交流Q群'),
+                    subtitle: const SelectableText(appFeedbackGroup),
+                    trailing: Builder(
+                      builder: (buttonContext) => IconButton(
+                        tooltip: '复制群号',
+                        icon: const Icon(Icons.copy, size: 20),
+                        onPressed: () => _copyFeedbackGroup(buttonContext),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -97,6 +110,15 @@ class AboutPage extends StatelessWidget {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('开源地址已复制到剪贴板')),
+    );
+  }
+
+  /// 复制反馈群号，使用局部 ScaffoldMessenger 显示提示
+  Future<void> _copyFeedbackGroup(BuildContext context) async {
+    await Clipboard.setData(const ClipboardData(text: appFeedbackGroup));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已复制反馈群号')),
     );
   }
 }

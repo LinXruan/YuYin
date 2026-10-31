@@ -1,7 +1,7 @@
 """生成 Android 启动图标：Material Icons 的 music_note 音符。
 
 用法（必须使用项目约定的 deepseek 环境 Python）：
-    D:\\Install\\anaconda3\\envs\\deepseek\\python.exe tool\\generate_app_icon.py
+    D:\Install\anaconda3\envs\deepseek\python.exe tool\generate_app_icon.py
 """
 
 from __future__ import annotations
@@ -37,13 +37,13 @@ FOREGROUND_SIZES = {
     "xxhdpi": 324,
     "xxxhdpi": 432,
 }
-# 启动页 logo：120dp 浅粉圆底 + 音符
+# 启动页 logo：72dp 浅粉圆底 + 音符（与桌面图标可视圆形区域 72dp 严格一致）
 LAUNCH_LOGO_SIZES = {
-    "mdpi": 120,
-    "hdpi": 180,
-    "xhdpi": 240,
-    "xxhdpi": 360,
-    "xxxhdpi": 480,
+    "mdpi": 72,
+    "hdpi": 108,
+    "xhdpi": 144,
+    "xxhdpi": 216,
+    "xxxhdpi": 288,
 }
 
 
@@ -61,25 +61,42 @@ def draw_note(
     draw.text((x, y), GLYPH, font=font, fill=FOREGROUND)
 
 
-def render_icon(font_path: Path, shape: str, font_ratio: float = 0.62) -> Image.Image:
-    """渲染浅粉背景 + 音符的图标（shape=square/round）。"""
-    size = 1024
-    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(canvas)
-    if shape == "round":
-        draw.ellipse((0, 0, size - 1, size - 1), fill=BACKGROUND)
-    else:
-        draw.rectangle((0, 0, size - 1, size - 1), fill=BACKGROUND)
-    draw_note(draw, font_path, size, font_ratio)
-    return canvas
-
-
 def render_foreground(font_path: Path) -> Image.Image:
     """自适应图标前景：透明背景 + 居中偏下微调音符。"""
     size = 1024
     canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(canvas)
     # 0.50 的字号让音符在 72dp 可见区域内约占 55%
+    draw_note(draw, font_path, size, 0.50)
+    return canvas
+
+
+def render_round_icon_from_adaptive(foreground: Image.Image) -> Image.Image:
+    """从 108dp 自适应图标直接裁剪出 72dp 可视圆形，保证圆形图标与桌面完全一致。"""
+    size = foreground.width
+    # 72dp / 108dp 的比例
+    circle_diameter = int(size * (72.0 / 108.0))
+    offset = (size - circle_diameter) // 2
+
+    bg = Image.new("RGBA", (size, size), BACKGROUND)
+    composite = Image.alpha_composite(bg, foreground)
+
+    mask = Image.new("L", (circle_diameter, circle_diameter), 0)
+    mask_draw = ImageDraw.Draw(mask)
+    mask_draw.ellipse((0, 0, circle_diameter - 1, circle_diameter - 1), fill=255)
+
+    cropped = composite.crop((offset, offset, offset + circle_diameter, offset + circle_diameter))
+    round_icon = Image.new("RGBA", (circle_diameter, circle_diameter), (0, 0, 0, 0))
+    round_icon.paste(cropped, (0, 0), mask)
+    return round_icon
+
+
+def render_square_icon(font_path: Path) -> Image.Image:
+    """渲染浅粉方形背景 + 音符的图标（用于旧版 Android 方形图标）。"""
+    size = 1024
+    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(canvas)
+    draw.rectangle((0, 0, size - 1, size - 1), fill=BACKGROUND)
     draw_note(draw, font_path, size, 0.50)
     return canvas
 
@@ -97,12 +114,12 @@ def main() -> None:
     if not args.font.exists():
         raise SystemExit(f"MaterialIcons font not found: {args.font}")
 
-    square = render_icon(args.font, "square")
-    round_icon = render_icon(args.font, "round")
     foreground = render_foreground(args.font)
+    round_icon = render_round_icon_from_adaptive(foreground)
+    square_icon = render_square_icon(args.font)
 
     for density, size in LAUNCHER_SIZES.items():
-        save_scaled(square, RES_DIR / f"mipmap-{density}" / "ic_launcher.png", size)
+        save_scaled(square_icon, RES_DIR / f"mipmap-{density}" / "ic_launcher.png", size)
         save_scaled(
             round_icon,
             RES_DIR / f"mipmap-{density}" / "ic_launcher_round.png",

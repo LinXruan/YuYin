@@ -1,8 +1,9 @@
 /// 应用发布信息统一维护处
 const String appName = '余音';
-const String appVersion = '1.0.0+118';
+const String appVersion = '1.0.0+119';
 const String appRepoUrl = 'https://github.com/LinXruan/YuYin';
 const String appAuthor = 'LinXruan';
+const String appFeedbackGroup = '1132880576';
 
 /// 关于页免责声明
 const String appDisclaimer = '''本项目仅供学习、开发与技术交流使用，禁止任何形式的商业用途。
