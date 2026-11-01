@@ -14,6 +14,7 @@ class LoginStateStore {
 
   static const String _flagFileName = 'login_state.flag';
   static const String _profileFileName = 'login_profile.json';
+  static const String _hidePromptFileName = 'hide_login_prompt.flag';
 
   /// 是否处于登录状态
   static Future<bool> isLoggedIn() async {
@@ -90,6 +91,30 @@ class LoginStateStore {
     }
   }
 
+  /// 用户是否已选择“不再显示”登录提示浮窗
+  static Future<bool> isLoginPromptDismissed() async {
+    try {
+      final file = await _hidePromptFile();
+      return await file.exists();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 设置是否永久隐藏登录提示浮窗（“不再显示”）
+  static Future<void> setLoginPromptDismissed(bool dismissed) async {
+    try {
+      final file = await _hidePromptFile();
+      if (dismissed) {
+        await file.writeAsString('1', flush: true);
+      } else if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {
+      // 忽略存储异常
+    }
+  }
+
   /// 清除登录状态与本地用户信息
   static Future<void> clearLogin() async {
     try {
@@ -110,5 +135,10 @@ class LoginStateStore {
   static Future<File> _profileFile() async {
     final dir = await getApplicationSupportDirectory();
     return File('${dir.path}${Platform.pathSeparator}$_profileFileName');
+  }
+
+  static Future<File> _hidePromptFile() async {
+    final dir = await getApplicationSupportDirectory();
+    return File('${dir.path}${Platform.pathSeparator}$_hidePromptFileName');
   }
 }

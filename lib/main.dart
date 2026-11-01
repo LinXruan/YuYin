@@ -30,6 +30,18 @@ class YuYinApp extends StatelessWidget {
         backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
       ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: const Color(0xFF312B2D),
+        contentTextStyle: const TextStyle(
+          color: Color(0xFFFFF7FA),
+          fontSize: 14,
+        ),
+        actionTextColor: scheme.primary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
@@ -56,6 +68,19 @@ class YuYinApp extends StatelessWidget {
       appBarTheme: AppBarTheme(
         backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: const Color(0xFF2B2527),
+        contentTextStyle: const TextStyle(
+          color: Color(0xFFECE0E2),
+          fontSize: 14,
+        ),
+        actionTextColor: const Color(0xFFFFB0C8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: const BorderSide(color: Color(0xFF3E3639), width: 1),
+        ),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }

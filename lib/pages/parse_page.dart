@@ -23,6 +23,7 @@ class ParsePage extends StatefulWidget {
     required this.busy,
     required this.loggedIn,
     required this.onRequestParseTab,
+    this.onTapAccount,
   });
 
   final DouyinSniffer sniffer;
@@ -31,6 +32,7 @@ class ParsePage extends StatefulWidget {
   final ValueNotifier<bool> busy;
   final ValueNotifier<bool> loggedIn;
   final VoidCallback onRequestParseTab;
+  final VoidCallback? onTapAccount;
 
   @override
   State<ParsePage> createState() => _ParsePageState();
@@ -306,21 +308,6 @@ class _ParsePageState extends State<ParsePage> {
                         icon: const Icon(Icons.paste_rounded, size: 18),
                         label: const Text('粘贴'),
                       ),
-                      const SizedBox(width: 8),
-                      FilledButton.tonalIcon(
-                        onPressed: busy
-                            ? null
-                            : () {
-                                _inputController.clear();
-                                _hideScrollTimer?.cancel();
-                                _hideScrollTimer = null;
-                                if (_showScrollIndicator) {
-                                  setState(() => _showScrollIndicator = false);
-                                }
-                              },
-                        icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                        label: const Text('清空'),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -343,6 +330,11 @@ class _ParsePageState extends State<ParsePage> {
                   ),
                   const SizedBox(height: 16),
                   _StatusCard(logs: widget.logs),
+                  const SizedBox(height: 12),
+                  _LoginPromptBanner(
+                    loggedIn: widget.loggedIn,
+                    onTapLogin: widget.onTapAccount,
+                  ),
                   const SizedBox(height: 16),
                 ],
               );
@@ -403,6 +395,145 @@ class _StatusCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodySmall?.copyWith(height: 1.5),
                 ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 未登录时展示的提示浮窗：跟随日志栏上下滚动，提示登录以获取更高画质
+class _LoginPromptBanner extends StatefulWidget {
+  const _LoginPromptBanner({
+    required this.loggedIn,
+    this.onTapLogin,
+  });
+
+  final ValueNotifier<bool> loggedIn;
+  final VoidCallback? onTapLogin;
+
+  @override
+  State<_LoginPromptBanner> createState() => _LoginPromptBannerState();
+}
+
+class _LoginPromptBannerState extends State<_LoginPromptBanner> {
+  bool _sessionDismissed = false;
+  bool _permanentlyDismissed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    LoginStateStore.isLoginPromptDismissed().then((dismissed) {
+      if (mounted && dismissed) {
+        setState(() => _permanentlyDismissed = true);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: widget.loggedIn,
+      builder: (context, loggedIn, _) {
+        if (loggedIn || _sessionDismissed || _permanentlyDismissed) {
+          return const SizedBox.shrink();
+        }
+
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+
+        // 亮/暗双模式精细化卡片配色
+        final backgroundColor = isDark
+            ? const Color(0xFF261F22)
+            : theme.colorScheme.primaryContainer.withValues(alpha: 0.28);
+        final borderColor = isDark
+            ? const Color(0xFF7B2949).withValues(alpha: 0.6)
+            : theme.colorScheme.primary.withValues(alpha: 0.25);
+        final iconColor =
+            isDark ? const Color(0xFFFFB0C8) : theme.colorScheme.primary;
+        final textColor =
+            isDark ? const Color(0xFFECE0E2) : theme.colorScheme.onSurface;
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor, width: 1.0),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              InkWell(
+                onTap: widget.onTapLogin,
+                borderRadius: BorderRadius.circular(8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Icon(
+                        Icons.tips_and_updates_outlined,
+                        size: 20,
+                        color: iconColor,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '建议登录抖音，可以解析到更高画质',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: textColor,
+                          fontWeight: FontWeight.w500,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      setState(() => _sessionDismissed = true);
+                    },
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      foregroundColor: isDark
+                          ? const Color(0xFFD4C2C6)
+                          : theme.colorScheme.onSurfaceVariant,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                    ),
+                    child: const Text('关闭'),
+                  ),
+                  const SizedBox(width: 4),
+                  TextButton(
+                    onPressed: () async {
+                      setState(() => _permanentlyDismissed = true);
+                      await LoginStateStore.setLoginPromptDismissed(true);
+                    },
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      foregroundColor: isDark
+                          ? const Color(0xFFFFB0C8)
+                          : theme.colorScheme.primary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                    ),
+                    child: const Text('不再显示'),
+                  ),
+                ],
               ),
             ],
           ),
