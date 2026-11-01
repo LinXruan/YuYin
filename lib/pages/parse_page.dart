@@ -140,14 +140,6 @@ class _ParsePageState extends State<ParsePage> {
         return;
       }
 
-      // 顺带动态校验登录状态：若显示已登录，但解析 Cookie 缺失 session，说明已被平台注销或失效
-      if (widget.loggedIn.value &&
-          !LoginStateStore.hasLoginSession(result.cookie)) {
-        widget.loggedIn.value = false;
-        await LoginStateStore.clearLogin();
-        widget.logs.add('提示：检测到抖音登录态已失效，已自动恢复为未登录状态');
-      }
-
       // 用户可能已切到其他 Tab，先切回解析页再弹选择面板
       widget.onRequestParseTab();
       final selected = await _chooseItems(result);

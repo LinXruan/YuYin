@@ -33,7 +33,10 @@ class LoginStateStore {
     return lower.contains('sessionid=') ||
         lower.contains('sessionid_ss=') ||
         lower.contains('sid_guard=') ||
-        lower.contains('uid_tt=');
+        lower.contains('sid_tt=') ||
+        lower.contains('uid_tt=') ||
+        lower.contains('passport_authid=') ||
+        lower.contains('passport_authid_ss=');
   }
 
   /// 查询系统 WebView 本地 Cookie 库中是否依然存有抖音登录会话（微秒级本地查询，0 网络开销）
@@ -48,7 +51,10 @@ class LoginStateStore {
         return (name == 'sessionid' ||
                 name == 'sessionid_ss' ||
                 name == 'sid_guard' ||
-                name == 'uid_tt') &&
+                name == 'sid_tt' ||
+                name == 'uid_tt' ||
+                name == 'passport_authid' ||
+                name == 'passport_authid_ss') &&
             c.value.isNotEmpty;
       });
     } catch (_) {
