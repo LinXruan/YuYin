@@ -113,12 +113,14 @@ class MediaItem {
   }
 }
 
-/// 嗅探结果：多媒体资源列表与 WebView 当前 Cookie
+/// 嗅探结果：多媒体资源列表、标题/文案与 WebView 当前 Cookie
 class SniffResult {
   const SniffResult({
     required this.items,
     required this.cookie,
     required this.isImagePost,
+    this.title,
+    this.desc,
   });
 
   final List<MediaItem> items;
@@ -126,6 +128,12 @@ class SniffResult {
 
   /// true 表示图文/实况图集；false 表示普通视频的多清晰度档位
   final bool isImagePost;
+
+  /// 作品标题（若抖音未提供则为空）
+  final String? title;
+
+  /// 作品文案描述（若为空则为 null）
+  final String? desc;
 
   /// 视频数量（含实况图视频）
   int get videoCount =>

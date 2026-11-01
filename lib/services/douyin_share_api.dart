@@ -23,10 +23,17 @@ class DouyinShareCancelledException implements Exception {
 
 /// 分享页解析结果；Cookie 由 WebView 侧补充
 class DouyinShareResult {
-  const DouyinShareResult({required this.items, required this.isImagePost});
+  const DouyinShareResult({
+    required this.items,
+    required this.isImagePost,
+    this.title,
+    this.desc,
+  });
 
   final List<MediaItem> items;
   final bool isImagePost;
+  final String? title;
+  final String? desc;
 }
 
 /// 通过 iesdouyin 分享页兜底获取作品资源
@@ -294,6 +301,16 @@ class DouyinShareApi {
   /// 解析单个作品：图文/实况图集或普通视频档位
   static DouyinShareResult? parseItem(Map<String, dynamic> item) {
     final wrapped = _unwrapItem(item);
+    final rawTitle = wrapped['item_title'] ??
+        wrapped['title'] ??
+        item['item_title'] ??
+        item['title'];
+    final rawDesc = wrapped['desc'] ?? item['desc'];
+    final title = rawTitle is String && rawTitle.trim().isNotEmpty
+        ? rawTitle.trim()
+        : null;
+    final desc =
+        rawDesc is String && rawDesc.trim().isNotEmpty ? rawDesc.trim() : null;
 
     final images = _imagesOf(wrapped);
     if (images != null && images.isNotEmpty) {
@@ -321,7 +338,12 @@ class DouyinShareApi {
         }
       }
       if (items.isNotEmpty) {
-        return DouyinShareResult(items: items, isImagePost: true);
+        return DouyinShareResult(
+          items: items,
+          isImagePost: true,
+          title: title,
+          desc: desc,
+        );
       }
     }
 
@@ -329,7 +351,12 @@ class DouyinShareApi {
     if (video is Map) {
       final tiers = parseVideoTiers(_asStringMap(video) ?? const {});
       if (tiers.isNotEmpty) {
-        return DouyinShareResult(items: tiers, isImagePost: false);
+        return DouyinShareResult(
+          items: tiers,
+          isImagePost: false,
+          title: title,
+          desc: desc,
+        );
       }
     }
     return null;

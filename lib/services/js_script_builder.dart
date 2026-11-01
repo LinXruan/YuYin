@@ -5,7 +5,7 @@ const String kDouyinSniffJs = r'''
   var S = window.__dyState || (window.__dyState = {
     sent: false, lastUrl: '', logs: {}, videoHintSent: false, degraded: false,
     staticHref: '', staticReady: false, staticComplete: false,
-    paceHref: '', paceDone: false
+    paceHref: '', paceDone: false, title: '', desc: ''
   });
   // 记录本次嗅探的起始时间；页面地址变化时重新计时
   if (!window.__dyStartTime || window.__dyStartHref !== location.href) {
@@ -237,12 +237,25 @@ const String kDouyinSniffJs = r'''
     }
     if (!unique.length || !window.DouyinChannel) return false;
     try {
+      var title = S.title || '';
+      var desc = S.desc || '';
+      if (!title && !desc) {
+        try {
+          var og = document.querySelector('meta[property="og:title"]');
+          if (og && og.content) title = og.content;
+          else if (document.title) {
+            title = document.title.replace(/\s*[-|_]\s*抖音.*$/, '').trim();
+          }
+        } catch (e) {}
+      }
       // 先发日志再发结果，确保 Dart 在关闭日志接收前能看到收尾信息
       log('解析完成: 共 ' + unique.length + ' 个资源');
       window.DouyinChannel.postMessage(JSON.stringify({
         type: 'result',
         isImagePost: !!isImagePost,
-        items: unique
+        items: unique,
+        title: title || '',
+        desc: desc || ''
       }));
       S.sent = true;
       return true;
@@ -377,6 +390,10 @@ const String kDouyinSniffJs = r'''
       var nodeId = getNodeAwemeId(node);
       // 有 ID 且与目标不一致：整棵子树跳过，避免推荐作品的 video/images 抢跑
       if (filterId && nodeId && nodeId !== filterId) continue;
+      var nodeTitle = node.item_title || node.title || (node.share_info && node.share_info.share_title) || '';
+      var nodeDesc = node.desc || '';
+      if (!S.title && nodeTitle) S.title = String(nodeTitle);
+      if (!S.desc && nodeDesc) S.desc = String(nodeDesc);
       var hasImages = Array.isArray(node.images) && node.images.length > 0;
       if (hasImages) {
         var items = collectImages(node.images);
@@ -401,6 +418,10 @@ const String kDouyinSniffJs = r'''
       if (!v) return false;
       var pid = info.aweme_id || info.awemeId;
       if (S.targetId && pid !== null && pid !== undefined && String(pid) !== S.targetId) return false;
+      if (info) {
+        if (!S.title && (info.item_title || info.title)) S.title = String(info.item_title || info.title);
+        if (!S.desc && info.desc) S.desc = String(info.desc);
+      }
       var tiers = collectVideos(v);
       return tiers.length ? sendVideoItems(tiers) : false;
     } catch (e) { return false; }

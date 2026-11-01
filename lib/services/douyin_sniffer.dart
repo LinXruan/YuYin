@@ -180,7 +180,15 @@ class DouyinSniffer {
       final cached = _shareVideoFallback;
       if (cached != null && cached.items.isNotEmpty) {
         _log('主流程超时，使用分享页视频结果兜底');
-        unawaited(_finishWithItems(cached.items, false, taskId));
+        unawaited(
+          _finishWithItems(
+            cached.items,
+            false,
+            taskId,
+            title: cached.title,
+            desc: cached.desc,
+          ),
+        );
       } else {
         _finishWithError(
           TimeoutException('30 秒内未捕获到无水印资源，请检查链接是否有效或稍后重试'),
@@ -365,7 +373,15 @@ class DouyinSniffer {
       _pendingImageResult = null;
       _imageGraceTimer = null;
       if (pending == null || pending.items.isEmpty) return;
-      unawaited(_finishWithItems(pending.items, true, taskId));
+      unawaited(
+        _finishWithItems(
+          pending.items,
+          true,
+          taskId,
+          title: pending.title,
+          desc: pending.desc,
+        ),
+      );
     });
   }
 
@@ -585,7 +601,15 @@ class DouyinSniffer {
       if (data['type'] != 'result') return;
       final items = parseChannelItems(data['items']);
       if (items.isNotEmpty) {
-        _finishWithItems(items, data['isImagePost'] == true, _taskId);
+        final title = data['title']?.toString();
+        final desc = data['desc']?.toString();
+        _finishWithItems(
+          items,
+          data['isImagePost'] == true,
+          _taskId,
+          title: title?.trim().isNotEmpty == true ? title!.trim() : null,
+          desc: desc?.trim().isNotEmpty == true ? desc!.trim() : null,
+        );
       }
     } catch (e) {
       _log('解析 Channel 消息失败: $e');
@@ -611,8 +635,10 @@ class DouyinSniffer {
   Future<void> _finishWithItems(
     List<MediaItem> items,
     bool isImagePost,
-    int taskId,
-  ) async {
+    int taskId, {
+    String? title,
+    String? desc,
+  }) async {
     if (taskId != _taskId) return;
     final completer = _completer;
     if (completer == null || completer.isCompleted) return;
@@ -644,6 +670,8 @@ class DouyinSniffer {
       items: items,
       cookie: cookie,
       isImagePost: isImagePost,
+      title: title,
+      desc: desc,
     );
     final summary = isImagePost
         ? '解析成功：共发现 ${result.imageCount} 张图片、${result.videoCount} 个视频'

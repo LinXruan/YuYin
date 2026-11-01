@@ -5,6 +5,7 @@ import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/media_item.dart';
+import '../utils/file_name_formatter.dart';
 import '../utils/save_location_store.dart';
 import 'douyin_sniffer.dart';
 import 'media_saver.dart';
@@ -44,6 +45,7 @@ class VideoDownloader {
   Future<Set<MediaType>> downloadItems(
     List<MediaItem> items, {
     String? cookie,
+    String? baseTitle,
     CancelToken? cancelToken,
     required void Function(int current, int total, double itemProgress)
         onProgress,
@@ -65,7 +67,14 @@ class VideoDownloader {
       }
       final item = items[i];
       final ext = _extensionFor(item);
-      final fileName = 'YuYin_${batchTag}_${i + 1}.$ext';
+      final fileName = FileNameFormatter.formatFileName(
+        item: item,
+        allItems: items,
+        currentIndex: i,
+        rawTitleOrDesc: baseTitle,
+        fallbackTimestamp: batchTag,
+        extension: ext,
+      );
       final tempPath =
           '${tempDir.path}${Platform.pathSeparator}temp_${batchTag}_$i.$ext';
 
