@@ -119,7 +119,13 @@ class VideoDownloader {
   /// 按资源类型和 URL 特征决定临时文件后缀
   String _extensionFor(MediaItem item) {
     if (item.type == MediaType.video) return 'mp4';
-    if (item.type == MediaType.audio) return 'mp3';
+    if (item.type == MediaType.audio) {
+      final url = item.url.toLowerCase();
+      if (url.contains('.wav')) return 'wav';
+      if (url.contains('.mp3')) return 'mp3';
+      // 抖音图文背景音乐通常为 M4A (audio/mp4, tos-cn-ve/tos-cn-av)
+      return 'm4a';
+    }
     final url = item.url.toLowerCase();
     if (url.contains('.webp') || url.contains('format=webp')) return 'webp';
     if (url.contains('.png')) return 'png';

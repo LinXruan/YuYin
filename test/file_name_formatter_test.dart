@@ -180,6 +180,30 @@ void main() {
       expect(audName, '故宫初雪留念.mp3');
     });
 
+    test('图文配乐（1 图 + 1 音频）：自适应推断 m4a，且两者均不加序号后缀', () {
+      const bgmAudio = MediaItem(
+        url: 'https://sf1-cdn-tos.douyinstatic.com/obj/tos-cn-ve-2774/music',
+        type: MediaType.audio,
+      );
+      final all = [imageItem1, bgmAudio];
+
+      final imgName = FileNameFormatter.formatFileName(
+        item: imageItem1,
+        allItems: all,
+        currentIndex: 0,
+        rawTitleOrDesc: 'donk就是会刷数据的niko# niko',
+      );
+      final audName = FileNameFormatter.formatFileName(
+        item: bgmAudio,
+        allItems: all,
+        currentIndex: 1,
+        rawTitleOrDesc: 'donk就是会刷数据的niko# niko',
+      );
+
+      expect(imgName, 'donk就是会刷数据的ni....jpg');
+      expect(audName, 'donk就是会刷数据的ni....m4a');
+    });
+
     test('多个多种资源（例如 2 套实况图：2 图 + 2 视频）：图片与视频各自按同类序号 _1, _2 编号', () {
       const liveVideo1 = MediaItem(url: 'https://v1.mp4', type: MediaType.video);
       const liveVideo2 = MediaItem(url: 'https://v2.mp4', type: MediaType.video);

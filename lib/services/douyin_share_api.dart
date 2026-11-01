@@ -34,6 +34,18 @@ class DouyinShareResult {
   final bool isImagePost;
   final String? title;
   final String? desc;
+
+  /// 视频数量（含实况图视频）
+  int get videoCount =>
+      items.where((item) => item.type == MediaType.video).length;
+
+  /// 图片数量
+  int get imageCount =>
+      items.where((item) => item.type == MediaType.image).length;
+
+  /// 音频数量
+  int get audioCount =>
+      items.where((item) => item.type == MediaType.audio).length;
 }
 
 /// 通过 iesdouyin 分享页兜底获取作品资源
@@ -330,6 +342,19 @@ class DouyinShareApi {
           if (best != null) items.add(best);
         }
       }
+
+      // 提取图文作品配乐音频（BGM）
+      final audioUrl = pickAudioUrl(wrapped, item);
+      if (audioUrl.isNotEmpty) {
+        items.add(
+          MediaItem(
+            url: audioUrl,
+            type: MediaType.audio,
+            gearName: '配乐',
+          ),
+        );
+      }
+
       if (items.isNotEmpty) {
         return DouyinShareResult(
           items: items,
@@ -450,6 +475,47 @@ class DouyinShareApi {
       }
     }
     return cleanUrl(list.last);
+  }
+
+  /// 从图文作品节点提取配乐音频直链（优先 music 节点，其次顶层伪装 video 节点）
+  static String pickAudioUrl(Map<String, dynamic> wrapped, Map<String, dynamic> item) {
+    // 1. 优先从 music 对象提取
+    final rawMusic = wrapped['music'] ?? item['music'];
+    if (rawMusic is Map) {
+      final music = _asStringMap(rawMusic) ?? const {};
+      final playUrl = music['play_url'] ?? music['playUrl'] ?? music['play_addr'];
+      if (playUrl is Map) {
+        final urlList = playUrl['url_list'] ?? playUrl['urlList'];
+        if (urlList is List && urlList.isNotEmpty) {
+          final u = cleanUrl(urlList.first);
+          if (u.isNotEmpty) return u;
+        }
+        final uri = playUrl['uri']?.toString();
+        if (uri != null && uri.startsWith('http')) return cleanUrl(uri);
+      } else if (playUrl is String && playUrl.isNotEmpty) {
+        return cleanUrl(playUrl);
+      }
+    }
+
+    // 2. 从图文作品顶层 video 对象提取（抖音常将图文背景音乐伪装挂载为 video.play_addr）
+    final rawVideo = wrapped['video'] ?? item['video'];
+    if (rawVideo is Map) {
+      final video = _asStringMap(rawVideo) ?? const {};
+      final playAddr = video['play_addr'] ?? video['playAddr'];
+      if (playAddr is Map) {
+        final urlList = playAddr['url_list'] ?? playAddr['urlList'];
+        if (urlList is List && urlList.isNotEmpty) {
+          final u = cleanUrl(urlList.first);
+          if (u.isNotEmpty) return u;
+        }
+        final uri = playAddr['uri']?.toString();
+        if (uri != null && uri.startsWith('http')) return cleanUrl(uri);
+      }
+      final playApi = video['playApi']?.toString();
+      if (playApi != null && playApi.isNotEmpty) return cleanUrl(playApi);
+    }
+
+    return '';
   }
 
   /// 清洗 URL：实体解码、协议补全、去水印、过滤非法协议

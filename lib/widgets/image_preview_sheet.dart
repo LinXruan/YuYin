@@ -181,11 +181,36 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
     );
   }
 
-  /// 单个网格：图片显示缩略图，实况视频显示 LIVE 占位图
+  /// 单个网格：图片显示缩略图，实况视频显示 LIVE 占位图，音频显示音符卡片
   Widget _buildTile(int index) {
     final item = widget.items[index];
     final selected = _selectedIndices.contains(index);
     final isImage = item.type == MediaType.image;
+    final isAudio = item.type == MediaType.audio;
+
+    final Widget content;
+    if (isImage) {
+      content = Image.network(
+        item.url,
+        headers: widget.headers,
+        cacheWidth: 360,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return const Center(
+            child: CircularProgressIndicator(strokeWidth: 2),
+          );
+        },
+        errorBuilder: (_, _, _) => const Center(
+          child: Icon(Icons.broken_image_outlined),
+        ),
+      );
+    } else if (isAudio) {
+      content = _AudioTile(item: item);
+    } else {
+      content = _LiveVideoTile(item: item);
+    }
+
     return GestureDetector(
       onTap: isImage ? () => _showPreview(item) : () => _toggleSelected(index),
       child: ClipRRect(
@@ -193,24 +218,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (isImage)
-              Image.network(
-                item.url,
-                headers: widget.headers,
-                cacheWidth: 360,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) return child;
-                  return const Center(
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  );
-                },
-                errorBuilder: (_, _, _) => const Center(
-                  child: Icon(Icons.broken_image_outlined),
-                ),
-              )
-            else
-              _LiveVideoTile(item: item),
+            content,
             Positioned(
               top: 6,
               right: 6,
@@ -267,6 +275,50 @@ class _LiveVideoTile extends StatelessWidget {
               item.resolution!,
               style: const TextStyle(color: Colors.white70, fontSize: 11),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 图文配乐音频占位卡片
+class _AudioTile extends StatelessWidget {
+  const _AudioTile({required this.item});
+
+  final MediaItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      color: theme.colorScheme.surfaceContainerHighest,
+      padding: const EdgeInsets.all(6),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.music_note_rounded,
+            color: theme.colorScheme.primary,
+            size: 32,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            item.gearName ?? '配乐音频',
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'BGM 音频',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
         ],
       ),
     );

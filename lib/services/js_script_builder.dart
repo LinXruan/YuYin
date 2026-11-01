@@ -79,6 +79,7 @@ const String kDouyinSniffJs = r'''
     return url.indexOf('blob:') !== 0 && url.indexOf('data:') !== 0 &&
       (url.indexOf('.mp4') !== -1 || url.indexOf('.m3u8') !== -1 || url.indexOf('douyinvod') !== -1 ||
        url.indexOf('video/tos') !== -1 || url.indexOf('/aweme/v1/play') !== -1 ||
+       url.indexOf('.mp3') !== -1 || url.indexOf('.m4a') !== -1 || url.indexOf('tos-cn-ve') !== -1 ||
        (url.indexOf('amemv.com') !== -1 && url.indexOf('play') !== -1));
   }
   function pickUrl(list) {
@@ -218,6 +219,26 @@ const String kDouyinSniffJs = r'''
     }
     if (items.length) log('图集解析: ' + images.length + ' 项, 产出 ' + items.length + ' 个资源');
     return items;
+  }
+  // 提取图文配乐音频：优先从 music 对象，其次从顶层伪装 video.play_addr 提取
+  function pickAudioUrl(node) {
+    if (!node) return '';
+    var m = node.music || node.music_info;
+    if (m) {
+      var mPlay = m.play_url || m.playUrl || m.play_addr;
+      if (mPlay) {
+        var u1 = pickUrl(mPlay.url_list || mPlay.urlList) || mPlay.uri || mPlay.src;
+        if (u1) return clean(u1);
+      }
+      if (typeof m.play_url === 'string') return clean(m.play_url);
+    }
+    var v = node.video;
+    if (v) {
+      var addr = v.play_addr || v.playAddr || {};
+      var u2 = pickUrl(addr.url_list || addr.urlList) || addr.uri || v.playApi;
+      if (u2) return clean(u2);
+    }
+    return '';
   }
   // 按 url 去重后一次性回传（彻底废除 title 逻辑，专攻真实作品 desc）
   function sendItems(items, isImagePost, customDesc) {
@@ -394,6 +415,11 @@ const String kDouyinSniffJs = r'''
 
       if (hasImages) {
         var items = collectImages(node.images);
+        var audioUrl = pickAudioUrl(node);
+        if (audioUrl) {
+          items.push({ url: audioUrl, mediaType: 'audio', gearName: '配乐' });
+          log('捕获图文配乐音频');
+        }
         var postDesc = node.desc || (node.share_info && node.share_info.share_desc) || S.desc || '';
         if (items.length && sendItems(items, true, postDesc)) return;
       } else if (video) {

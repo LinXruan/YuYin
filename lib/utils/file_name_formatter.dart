@@ -116,9 +116,9 @@ class FileNameFormatter {
     }
     if (item.type == MediaType.audio) {
       final lower = item.url.toLowerCase();
-      if (lower.contains('.m4a')) return 'm4a';
       if (lower.contains('.wav')) return 'wav';
-      return 'mp3';
+      if (lower.contains('.mp3')) return 'mp3';
+      return 'm4a';
     }
     return 'mp4';
   }

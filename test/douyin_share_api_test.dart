@@ -64,6 +64,78 @@ void main() {
       expect(result.items[2].dataSize, 12345);
     });
 
+    test('图文作品提取配乐音频 (music 与顶层 video.play_addr)', () {
+      final rootWithMusic = {
+        'loaderData': {
+          'note_(id)/page': {
+            'videoInfoRes': {
+              'item_list': [
+                {
+                  'aweme_id': '789',
+                  'images': [
+                    {
+                      'url_list': ['https://p3.douyinpic.com/img1.jpeg'],
+                      'width': 1080,
+                      'height': 1440,
+                    },
+                  ],
+                  'music': {
+                    'title': '测试配乐',
+                    'play_url': {
+                      'url_list': ['https://sf1-cdn-tos.douyinstatic.com/obj/tos-cn-ve-2774/bgm.m4a'],
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      final result1 =
+          DouyinShareApi.parseShareHtml(_htmlFor(rootWithMusic), '789');
+      expect(result1, isNotNull);
+      expect(result1!.isImagePost, isTrue);
+      expect(result1.imageCount, 1);
+      expect(result1.audioCount, 1);
+      expect(result1.items.last.type, MediaType.audio);
+      expect(result1.items.last.url, contains('bgm.m4a'));
+      expect(result1.items.last.gearName, '配乐');
+
+      final rootWithVideoBgm = {
+        'loaderData': {
+          'note_(id)/page': {
+            'videoInfoRes': {
+              'item_list': [
+                {
+                  'aweme_id': '790',
+                  'images': [
+                    {
+                      'url_list': ['https://p3.douyinpic.com/img2.jpeg'],
+                    },
+                  ],
+                  'video': {
+                    'play_addr': {
+                      'url_list': ['https://www.iesdouyin.com/aweme/v1/play/?video_id=v0300fg10000ctn'],
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      final result2 =
+          DouyinShareApi.parseShareHtml(_htmlFor(rootWithVideoBgm), '790');
+      expect(result2, isNotNull);
+      expect(result2!.isImagePost, isTrue);
+      expect(result2.imageCount, 1);
+      expect(result2.audioCount, 1);
+      expect(result2.items.last.type, MediaType.audio);
+      expect(result2.items.last.url, contains('aweme/v1/play'));
+    });
+
     test('视频多档位排序、跳过 dash、按档位名去重', () {
       final result =
           DouyinShareApi.parseShareHtml(_htmlFor(_videoRoot()), '456');

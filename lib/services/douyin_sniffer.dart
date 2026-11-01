@@ -671,8 +671,10 @@ class DouyinSniffer {
       title: title,
       desc: desc,
     );
+    final audioPart =
+        result.audioCount > 0 ? '、${result.audioCount} 首配乐音频' : '';
     final summary = isImagePost
-        ? '解析成功：共发现 ${result.imageCount} 张图片、${result.videoCount} 个视频'
+        ? '解析成功：共发现 ${result.imageCount} 张图片、${result.videoCount} 个视频$audioPart'
         : '解析成功：共发现 ${result.items.length} 个清晰度档位';
     _log(summary);
     if (desc != null && desc.isNotEmpty) {
