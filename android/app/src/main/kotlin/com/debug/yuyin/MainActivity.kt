@@ -5,6 +5,8 @@ import android.app.UiModeManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.MediaPlayer
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
@@ -22,6 +24,10 @@ import java.io.IOException
 
 class MainActivity : FlutterActivity() {
     private val themeChannel = "com.debug.yuyin/theme"
+    private val audioChannel = "com.debug.yuyin/audio_player"
+    private var mediaPlayer: MediaPlayer? = null
+    private var currentPlayingUrl: String? = null
+    private var audioMethodChannel: MethodChannel? = null
     private val appChannel = "com.debug.yuyin/app"
     private val storageChannel = "com.debug.yuyin/storage"
 
@@ -147,6 +153,139 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        // 4. 原生音频试听播放器通道
+        audioMethodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, audioChannel).apply {
+            setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "play" -> {
+                        val url = call.argument<String>("url")
+                        if (url.isNullOrBlank()) {
+                            result.error("INVALID_URL", "Audio URL is empty", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            if (currentPlayingUrl == url && mediaPlayer != null) {
+                                if (mediaPlayer?.isPlaying == false) {
+                                    mediaPlayer?.start()
+                                    invokeMethod("onPlayerStateChanged", mapOf("state" to "playing"))
+                                }
+                                result.success(true)
+                                return@setMethodCallHandler
+                            }
+
+                            // 停止并清理前一个播放器实例
+                            mediaPlayer?.let {
+                                try {
+                                    if (it.isPlaying) it.stop()
+                                    it.release()
+                                } catch (_: Exception) {}
+                            }
+                            mediaPlayer = null
+                            currentPlayingUrl = url
+
+                            invokeMethod("onPlayerStateChanged", mapOf("state" to "buffering"))
+
+                            val mp = MediaPlayer().apply {
+                                setAudioAttributes(
+                                    AudioAttributes.Builder()
+                                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                                        .build()
+                                )
+                                val rawHeaders = call.argument<Map<String, String>>("headers")
+                                val headers = HashMap<String, String>()
+                                headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+                                rawHeaders?.let { headers.putAll(it) }
+
+                                setDataSource(context, Uri.parse(url), headers)
+                                setOnPreparedListener { preparedMp ->
+                                    preparedMp.start()
+                                    invokeMethod(
+                                        "onPlayerStateChanged",
+                                        mapOf(
+                                            "state" to "playing",
+                                            "duration" to preparedMp.duration
+                                        )
+                                    )
+                                }
+                                setOnCompletionListener {
+                                    invokeMethod("onPlayerStateChanged", mapOf("state" to "completed"))
+                                }
+                                setOnErrorListener { _, what, extra ->
+                                    invokeMethod(
+                                        "onPlayerStateChanged",
+                                        mapOf("state" to "error", "message" to "what=$what, extra=$extra")
+                                    )
+                                    true
+                                }
+                                prepareAsync()
+                            }
+                            mediaPlayer = mp
+                            result.success(true)
+                        } catch (e: Exception) {
+                            invokeMethod("onPlayerStateChanged", mapOf("state" to "error", "message" to e.message))
+                            result.error("PLAY_ERROR", e.message, null)
+                        }
+                    }
+                    "pause" -> {
+                        try {
+                            if (mediaPlayer?.isPlaying == true) {
+                                mediaPlayer?.pause()
+                                invokeMethod("onPlayerStateChanged", mapOf("state" to "paused"))
+                            }
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("PAUSE_ERROR", e.message, null)
+                        }
+                    }
+                    "stop" -> {
+                        try {
+                            mediaPlayer?.let {
+                                if (it.isPlaying) it.stop()
+                                it.release()
+                            }
+                            mediaPlayer = null
+                            currentPlayingUrl = null
+                            invokeMethod("onPlayerStateChanged", mapOf("state" to "idle"))
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("STOP_ERROR", e.message, null)
+                        }
+                    }
+                    "seek" -> {
+                        val pos = call.argument<Int>("position") ?: 0
+                        try {
+                            mediaPlayer?.seekTo(pos)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("SEEK_ERROR", e.message, null)
+                        }
+                    }
+                    "getPosition" -> {
+                        try {
+                            val pos = mediaPlayer?.currentPosition ?: 0
+                            val dur = mediaPlayer?.duration ?: 0
+                            result.success(mapOf("position" to pos, "duration" to dur))
+                        } catch (e: Exception) {
+                            result.success(mapOf("position" to 0, "duration" to 0))
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        try {
+            mediaPlayer?.let {
+                if (it.isPlaying) it.stop()
+                it.release()
+            }
+            mediaPlayer = null
+        } catch (_: Exception) {}
+        super.onDestroy()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
