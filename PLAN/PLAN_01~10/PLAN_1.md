@@ -5,7 +5,7 @@
 ## ⚠️ 给 AI (Claude Code) 的最高执行铁律
 1. **单步执行锁**：本项目共分为 7 个 Step。你**每次只能执行 1 个 Step**！完成当前 Step 并运行验证命令通过后，立即停止并向用户汇报结果，等待用户输入“继续”后，才允许执行下一个 Step。严禁一次性写完多个 Step！
 2. **文件行数红线**：严格遵守 `CLAUDE.md`，写上清晰的中文注释，仅使用 `StatefulWidget` + `setState` 管理状态。
-3. **静态检查必跑**：只要修改或新增了 `.dart` 文件，当前 Step 结束前必须运行 `flutter analyze`，确保 `No issues found!`。
+3. **静态检查必跑**：只要修改或新增了 `.dart` 文件，当前 Step 结束前必须运行 `flutter analyze`，确保 `No issues found!`。 
 
 ## 目标文件结构（预先固定，禁止随意更改路径）
 - `lib/main.dart`：App 入口与主题配置（小于 50 行）
