@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/media_item.dart';
 import '../services/audio_preview_service.dart';
+import '../utils/selection_mode_store.dart';
 
 /// 图片/实况图/配乐音频预览面板：网格展示所有资源，支持分类快速筛选、音频试听、放大预览与批量保存。
 class ImagePreviewSheet extends StatefulWidget {
@@ -47,6 +48,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
   late final Set<int> _selectedIndices;
   late final AudioPreviewService _audioService;
   bool _createdOwnAudioService = false;
+  bool _hasRecordedSelection = false;
 
   bool _showAudioPlayerBar = false;
   MediaItem? _currentPlayingItem;
@@ -54,10 +56,15 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
   @override
   void initState() {
     super.initState();
-    // 默认所有资源都处于选中状态
-    _selectedIndices = {
-      for (var i = 0; i < widget.items.length; i++) i,
-    };
+    // 根据每种标签（图片、实况、音频）各自用于下次解析的判断值 a 决定初始选择状态：
+    // 若对应标签的 a == 2（全不选），则默认不勾选；默认 (a == 1) 勾选。
+    _selectedIndices = <int>{};
+    for (var i = 0; i < widget.items.length; i++) {
+      final type = widget.items[i].type;
+      if (SelectionModeStore.getMode(type) != 2) {
+        _selectedIndices.add(i);
+      }
+    }
 
     if (widget.audioService != null) {
       _audioService = widget.audioService!;
@@ -69,12 +76,23 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
 
   @override
   void dispose() {
+    _recordSelectionMode();
     if (_createdOwnAudioService) {
       _audioService.dispose();
     } else {
       _audioService.stop();
     }
     super.dispose();
+  }
+
+  /// 根据当前选择情况，按标签分别计算判断值 b 并驱动各标签 a 状态转移
+  void _recordSelectionMode() {
+    if (_hasRecordedSelection) return;
+    _hasRecordedSelection = true;
+    SelectionModeStore.updateFromSheetItems(
+      allItems: widget.items,
+      selectedIndices: _selectedIndices,
+    );
   }
 
   // --- 分类资源索引 ---
@@ -150,6 +168,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
 
   /// 返回按原始顺序排列的选中资源
   void _confirm() {
+    _recordSelectionMode();
     _audioService.stop();
     final selected = _selectedIndices.toList()..sort();
     Navigator.pop(context, [

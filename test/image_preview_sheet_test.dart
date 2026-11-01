@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
 import 'package:yuyin/services/audio_preview_service.dart';
+import 'package:yuyin/utils/selection_mode_store.dart';
 import 'package:yuyin/widgets/image_preview_sheet.dart';
 
 // 1x1 像素透明 PNG 二进制数据，避免测试环境下的真实网络请求
@@ -139,6 +140,10 @@ void main() {
       ),
     );
   }
+
+  setUp(() {
+    SelectionModeStore.reset();
+  });
 
   group('ImagePreviewSheet 交互与视觉测试', () {
     testWidgets('默认全部勾选，分类筛选按钮正确展示边框与状态', (tester) async {
@@ -363,6 +368,100 @@ void main() {
       );
       await tester.pump();
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('当标签 a = 2 时，对应标签资源默认初始全不选，保存按钮与分类状态正确联动', (tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      // 设所有标签均为 a = 2 (全不选)
+      SelectionModeStore.setMode(MediaType.image, 2);
+      SelectionModeStore.setMode(MediaType.video, 2);
+      SelectionModeStore.setMode(MediaType.audio, 2);
+
+      await tester.pumpWidget(buildTestWidget(items: testItems));
+      await tester.pump();
+
+      // 验证数量文本显示 0
+      expect(find.text('已选 0 / 4 项'), findsOneWidget);
+
+      // 验证保存按钮存在但禁用 (onPressed == null)
+      final filledButton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, '保存选中项 (0)'),
+      );
+      expect(filledButton.onPressed, isNull);
+
+      // 分类筛选按钮均存在且为未全选状态
+      expect(find.byKey(const ValueKey('category_btn_image')), findsOneWidget);
+      expect(find.byKey(const ValueKey('category_btn_live')), findsOneWidget);
+      expect(find.byKey(const ValueKey('category_btn_audio')), findsOneWidget);
+    });
+
+    testWidgets('标签级生命周期与状态记忆流转演练：全选图片/取消音频后，下次图片默认勾选而音频默认不勾选', (tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      // 第一轮：初值全标签 a = 1，打开保存页
+      SelectionModeStore.reset();
+      await tester.pumpWidget(buildTestWidget(items: testItems));
+      await tester.pump();
+      expect(find.text('已选 4 / 4 项'), findsOneWidget);
+
+      // 用户仅取消勾选音频（点击音频分类按钮或点击音频方块）
+      await tester.tap(find.byKey(const ValueKey('category_btn_audio')));
+      await tester.pump();
+      expect(find.text('已选 3 / 4 项'), findsOneWidget);
+
+      // 模拟弹窗退出（保存并 dispose）
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+
+      // 校验此时标签独立状态：图片=1, 实况=1, 音频=2 (全不选)
+      expect(SelectionModeStore.getMode(MediaType.image), 1);
+      expect(SelectionModeStore.getMode(MediaType.video), 1);
+      expect(SelectionModeStore.getMode(MediaType.audio), 2);
+
+      // 第二轮：重新打开保存页，依据记忆状态：图片(2)与实况(1)被勾选，音频(0)未勾选
+      await tester.pumpWidget(buildTestWidget(items: testItems));
+      await tester.pump();
+      expect(find.text('已选 3 / 4 项'), findsOneWidget);
+
+      // 用户对图片进行半选：取消第一张图 (index 0)
+      await tester.tap(find.byKey(const ValueKey('media_tile_0')));
+      await tester.pump();
+      expect(find.text('已选 2 / 4 项'), findsOneWidget);
+
+      // 模拟弹窗退出 (图片半选 b=3, 实况全选 b=1, 音频全不选 b=2)
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+
+      // 校验状态转移：图片 a 保持 1，实况保持 1，音频保持 2
+      expect(SelectionModeStore.getMode(MediaType.image), 1);
+      expect(SelectionModeStore.getMode(MediaType.video), 1);
+      expect(SelectionModeStore.getMode(MediaType.audio), 2);
+
+      // 第三轮：再次打开保存页，图片与实况依然默认勾选，音频未勾选
+      await tester.pumpWidget(buildTestWidget(items: testItems));
+      await tester.pump();
+      expect(find.text('已选 3 / 4 项'), findsOneWidget);
+
+      // 用户重新勾选音频
+      await tester.tap(find.byKey(const ValueKey('category_btn_audio')));
+      await tester.pump();
+      expect(find.text('已选 4 / 4 项'), findsOneWidget);
+
+      // 模拟点击保存按钮退出
+      await tester.tap(find.text('保存选中项 (4)'));
+      await tester.pump();
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+
+      // 校验状态转移：音频重新恢复为 a = 1 (全选)
+      expect(SelectionModeStore.getMode(MediaType.audio), 1);
+      expect(SelectionModeStore.getMode(MediaType.image), 1);
+      expect(SelectionModeStore.getMode(MediaType.video), 1);
     });
   });
 }
