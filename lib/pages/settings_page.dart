@@ -1,21 +1,49 @@
 import 'package:flutter/material.dart';
 
+import '../app_info.dart';
 import '../services/douyin_sniffer.dart';
+import '../services/update_checker.dart';
 import '../utils/log_controller.dart';
+import '../utils/network_detector.dart';
 import '../utils/theme_store.dart';
+import '../widgets/update_dialog.dart';
 import 'about_page.dart';
 import 'debug_page.dart';
 
-/// 设置页：提供“外观设置”、“调试”和“关于”
-class SettingsPage extends StatelessWidget {
+/// 设置页：提供“外观设置”、“检查更新”、“调试”和“关于”
+class SettingsPage extends StatefulWidget {
   const SettingsPage({
     super.key,
     required this.logs,
     required this.sniffer,
+    this.updateChecker,
   });
 
   final LogController logs;
   final DouyinSniffer sniffer;
+  final UpdateChecker? updateChecker;
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  late final UpdateChecker _checker;
+  bool _isChecking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checker = widget.updateChecker ?? UpdateChecker();
+  }
+
+  @override
+  void dispose() {
+    if (widget.updateChecker == null) {
+      _checker.dispose();
+    }
+    super.dispose();
+  }
 
   void _showThemeDialog(BuildContext context, ThemeMode currentMode) {
     showDialog<void>(
@@ -51,6 +79,46 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
+  /// 点击检查更新：允许重复点击（每次打断旧请求），先检测网络状态
+  Future<void> _onCheckUpdate() async {
+    // 1. 网络连接前置检测：离线时直接拦截并弹出提示
+    final hasNet = await NetworkDetector.hasInternetConnection();
+    if (!mounted) return;
+    if (!hasNet) {
+      NetworkDetector.showOfflineSnackbar(context);
+      return;
+    }
+
+    // 2. 状态切换为正在检查（按钮不锁定，保持可点击）
+    setState(() => _isChecking = true);
+
+    // 3. 执行检查（内部会自动 cancel 之前的请求）
+    final result = await _checker.checkUpdate(currentVersion: appVersion);
+    if (!mounted) return;
+
+    // 若被新点击打断取消，不更新 UI，交由最新一次请求处理
+    if (result.isCancelled) {
+      return;
+    }
+
+    setState(() => _isChecking = false);
+
+    if (result.errorMessage != null) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(result.errorMessage!),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    if (result.info != null) {
+      UpdateDialog.show(context, result.info!);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -70,13 +138,27 @@ class SettingsPage extends StatelessWidget {
         ),
         const Divider(height: 1),
         ListTile(
+          leading: const Icon(Icons.system_update_alt_outlined),
+          title: const Text('检查更新'),
+          subtitle: Text(_isChecking ? '正在连接 GitHub 检查最新版本...' : '当前版本 $appVersion'),
+          trailing: _isChecking
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.chevron_right),
+          onTap: _onCheckUpdate,
+        ),
+        const Divider(height: 1),
+        ListTile(
           leading: const Icon(Icons.bug_report_outlined),
           title: const Text('调试'),
           subtitle: const Text('运行日志、日志复制与网页地址'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => DebugPage(logs: logs, sniffer: sniffer),
+              builder: (_) => DebugPage(logs: widget.logs, sniffer: widget.sniffer),
             ),
           ),
         ),

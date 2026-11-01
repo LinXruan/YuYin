@@ -6,6 +6,7 @@ import '../services/douyin_sniffer.dart';
 import '../services/video_downloader.dart';
 import '../utils/log_controller.dart';
 import '../utils/login_state_store.dart';
+import '../utils/network_detector.dart';
 import 'history_page.dart';
 import 'login_webview_page.dart';
 import 'parse_page.dart';
@@ -87,6 +88,13 @@ class _AppShellState extends State<AppShell> {
 
   /// 未登录时先说明登录用途；已登录（我的主页）直接进入登录页
   Future<void> _onAccountTap(bool loggedIn) async {
+    final hasNet = await NetworkDetector.hasInternetConnection();
+    if (!mounted) return;
+    if (!hasNet) {
+      NetworkDetector.showOfflineSnackbar(context);
+      return;
+    }
+
     if (!loggedIn) {
       final confirmed = await showDialog<bool>(
         context: context,

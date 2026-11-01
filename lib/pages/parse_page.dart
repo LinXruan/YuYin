@@ -6,9 +6,10 @@ import 'package:flutter/services.dart';
 
 import '../models/media_item.dart';
 import '../services/douyin_sniffer.dart';
-import '../utils/login_state_store.dart';
 import '../services/video_downloader.dart';
 import '../utils/log_controller.dart';
+import '../utils/login_state_store.dart';
+import '../utils/network_detector.dart';
 import '../utils/url_parser.dart';
 import '../widgets/image_preview_sheet.dart';
 import '../widgets/video_quality_sheet.dart';
@@ -118,6 +119,15 @@ class _ParsePageState extends State<ParsePage> {
   Future<void> _startParse() async {
     if (widget.busy.value) return;
     FocusScope.of(context).unfocus();
+
+    // 前置网络状态检测：离线时立即拦截并提示
+    final hasNet = await NetworkDetector.hasInternetConnection();
+    if (!mounted) return;
+    if (!hasNet) {
+      widget.logs.reset('网络未连接，无法解析');
+      NetworkDetector.showOfflineSnackbar(context);
+      return;
+    }
 
     widget.logs.reset('正在提取短链...');
     _downloadProgress.value = null;
