@@ -36,6 +36,15 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // 当构建参数指定单架构 android-arm64 时，精准过滤仅打包 arm64-v8a 原生库（剔除第三方库的 v7a/x86 冗余）
+        val targetPlatform = project.findProperty("target-platform") as? String
+        if (targetPlatform == "android-arm64") {
+            ndk {
+                abiFilters.clear()
+                abiFilters.add("arm64-v8a")
+            }
+        }
     }
 
     signingConfigs {
@@ -77,4 +86,33 @@ flutter {
 
 dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
+}
+
+// 自动生成规范命名的 APK 文件副本 (YuYin_<version>_v8a.apk / Universal / debug)
+val cleanVersionName = (flutter.versionName ?: "1.0.0").substringBefore('+')
+
+tasks.matching { it.name.startsWith("assemble") }.configureEach {
+    doLast {
+        val targetPlatform = project.findProperty("target-platform") as? String
+        val isArm64Only = targetPlatform == "android-arm64"
+        val apkOutputDir = layout.buildDirectory.dir("outputs/apk").get().asFile
+
+        if (name.contains("Release", ignoreCase = true)) {
+            val releaseDir = File(apkOutputDir, "release")
+            val rawReleaseApk = File(releaseDir, "app-release.apk")
+            if (rawReleaseApk.exists()) {
+                val customName = if (isArm64Only) "YuYin_${cleanVersionName}_v8a.apk" else "YuYin_${cleanVersionName}_Universal.apk"
+                rawReleaseApk.copyTo(File(releaseDir, customName), overwrite = true)
+            }
+        }
+
+        if (name.contains("Debug", ignoreCase = true)) {
+            val debugDir = File(apkOutputDir, "debug")
+            val rawDebugApk = File(debugDir, "app-debug.apk")
+            if (rawDebugApk.exists()) {
+                val customName = "YuYin_${cleanVersionName}_debug.apk"
+                rawDebugApk.copyTo(File(debugDir, customName), overwrite = true)
+            }
+        }
+    }
 }

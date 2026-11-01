@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 chcp 65001 >nul
 setlocal enabledelayedexpansion
 
@@ -57,3 +57,4 @@ if errorlevel 1 (
 )
 echo [完成] debug 版已安装到 %SERIAL%。
 exit /b 0
+

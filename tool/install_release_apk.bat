@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 chcp 65001 >nul
 setlocal enabledelayedexpansion
 
@@ -15,15 +15,30 @@ if not exist "%ADB%" (
   set "ADB=adb"
 )
 
-rem 优先使用 apk 目录，兼容 flutter-apk 目录
-set "APK=%~dp0..\build\app\outputs\apk\release\app-release.apk"
-if not exist "%APK%" set "APK=%~dp0..\build\app\outputs\flutter-apk\app-release.apk"
-if not exist "%APK%" (
-  echo [错误] 未找到 release APK，请先执行 flutter build apk --release
+rem 优先寻找 v8a 极速轻量版，其次 Universal 通用版，最后原 app-release.apk
+set "APK="
+for /f "delims=" %%i in ('dir /b /s "%~dp0..\build\app\outputs\flutter-apk\YuYin_*_v8a.apk" 2^>nul') do set "APK=%%i"
+if not defined APK (
+  for /f "delims=" %%i in ('dir /b /s "%~dp0..\build\app\outputs\flutter-apk\YuYin_*_Universal.apk" 2^>nul') do set "APK=%%i"
+)
+if not defined APK (
+  if exist "%~dp0..\build\app\outputs\flutter-apk\app-release.apk" set "APK=%~dp0..\build\app\outputs\flutter-apk\app-release.apk"
+)
+if not defined APK (
+  if exist "%~dp0..\build\app\outputs\apk\release\app-release.apk" set "APK=%~dp0..\build\app\outputs\apk\release\app-release.apk"
+)
+
+if not defined APK (
+  echo [错误] 未找到 release APK，请先执行 tool\build_release_apk.bat 或 flutter build apk --release
   exit /b 1
 )
-rem 规范化路径中的 ..
-for %%i in ("%APK%") do set "APK=%%~fi"
+
+for %%i in ("%APK%") do (
+  set "APK=%%~fi"
+  set /a "SIZE_MB=%%~zi / 1048576"
+  set "FILE_NAME=%%~nxi"
+  set "FILE_SIZE=%%~zi"
+)
 
 rem 未指定序列号时自动选择唯一真机（排除 emulator- 开头的模拟器）
 set "SERIAL=%~1"
@@ -49,11 +64,14 @@ if not defined SERIAL (
   )
 )
 
-for %%i in ("%APK%") do echo 正在安装 %%~nxi  ^(%%~zi 字节，%%~ti^)  到设备 %SERIAL%
+echo 目标设备：%SERIAL%
+echo 正在安装 Release 版: %FILE_NAME% (!SIZE_MB! MB)...
 "%ADB%" -s "%SERIAL%" install -r "%APK%"
-if errorlevel 1 (
-  echo [失败] 安装失败，请检查设备连接状态。
-  exit /b 1
+set "RC=%errorlevel%"
+if "%RC%"=="0" (
+  echo [成功] 安装完成！
+) else (
+  echo [失败] 安装失败，退出码 %RC%。
 )
-echo [完成] release 版已安装到 %SERIAL%。
-exit /b 0
+exit /b %RC%
+

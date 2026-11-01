@@ -37,8 +37,10 @@ Android 端抖音无水印资源下载工具，支持视频、图集和实况图
 flutter pub get
 flutter analyze
 flutter test
-flutter build apk --debug
-flutter build apk --release
+# 构建 Release 双版本（v8a 轻量版约 18MB 与 Universal 全架构版约 51MB）
+.\tool\build_release_apk.bat
+# 或单架构编译
+flutter build apk --release --target-platform android-arm64
 ```
 
 release 签名读取 `android/key.properties` 与 `android/app/yuyin-release.jks`（不提交仓库，请自行备份）。

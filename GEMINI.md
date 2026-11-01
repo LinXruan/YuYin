@@ -18,11 +18,11 @@
 - `flutter pub get`
 - `flutter analyze`（修改 Dart 后必跑）
 - `flutter test`
-- `flutter build apk --debug`（需要完整构建时再跑）
-- `flutter build apk --release`（release 使用独立私钥签名，包名为 `com.release.yuyin`）
-- 安装到真机（`adb` 不在 PATH 时用完整路径）：
-  `%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe install -r build\app\outputs\flutter-apk\app-debug.apk`
-- 安装 release 版：将上面的 APK 路径换成 `build\app\outputs\flutter-apk\app-release.apk`
+- `.\tool\build_release_apk.bat [all|v8a|universal]`（推荐：一键编译发布包，产出 `YuYin_<version>_v8a.apk` 与 `Universal` 双版本）
+- `flutter build apk --release --target-platform android-arm64`（编译 v8a 单架构轻量版，约 18~20MB）
+- `flutter build apk --release`（编译 Universal 全架构通用版，约 51MB）
+- `.\tool\build_debug_apk.bat`（编译 debug 版，产出 `YuYin_<version>_debug.apk`）
+- `.\tool\install_release_apk.bat`（优先自动安装轻量 v8a 版到已连接真机）
 - 重新生成应用图标：
   `D:\Install\anaconda3\envs\deepseek\python.exe tool\generate_app_icon.py`
 
