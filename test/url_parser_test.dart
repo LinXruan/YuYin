@@ -240,4 +240,36 @@ void main() {
       expect(UrlParser.classifyWorkPage(null), DouyinWorkPage.unknown);
     });
   });
+
+  group('UrlParser.extractShareText', () {
+    test('从典型抖音分享口令中准确剔除套话与昵称框，提取作者纯文案', () {
+      const raw =
+          '3.07 复制打开抖音，看看【Winhao学AI的图文作品】Gemini 4 Carbon来了。北京时间10月29日凌晨，谷歌发布... https://v.douyin.com/ZJFzYtfrvcE/ o@q.Eu :4pm 08/05 Cus:/';
+      expect(
+        UrlParser.extractShareText(raw),
+        'Gemini 4 Carbon来了。北京时间10月29日凌晨，谷歌发布...',
+      );
+    });
+
+    test('单图口令提取文案并剔除尾部乱码', () {
+      const raw =
+          '5.17 复制打开抖音，看看【ilya的图文作品】CS2现役狙击手你不得不承认的事实 # zywoo... https://v.douyin.com/NiPbsvVv3O4/ 08/19 anq:/ Y@M.wf :4pm';
+      expect(
+        UrlParser.extractShareText(raw),
+        'CS2现役狙击手你不得不承认的事实 # zywoo...',
+      );
+    });
+
+    test('纯 URL 输入返回 null', () {
+      expect(UrlParser.extractShareText('https://v.douyin.com/ZJFzYtfrvcE/'), isNull);
+      expect(UrlParser.extractShareText('   '), isNull);
+    });
+
+    test('普通无 URL 的用户文本保留并清理多余空白', () {
+      expect(
+        UrlParser.extractShareText('   这是一段 纯文本 内容   '),
+        '这是一段 纯文本 内容',
+      );
+    });
+  });
 }

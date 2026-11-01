@@ -47,6 +47,32 @@ class UrlParser {
     return RegExp('[?&]modal_id=($idPattern)').firstMatch(url)?.group(1);
   }
 
+  /// 从用户粘贴的口令或文本中提取作者分享的真实文案（剔除 URL 与尾部跟踪符、分享套话、昵称框）
+  static String? extractShareText(String rawText) {
+    if (rawText.trim().isEmpty) return null;
+
+    var text = rawText.trim();
+    // 1. 若包含链接，抖音分享口令的真实文案一定位于链接之前，链接及其后面的跟踪参数全部丢弃
+    final urlMatch = RegExp(r'https?://').firstMatch(text);
+    if (urlMatch != null) {
+      text = text.substring(0, urlMatch.start);
+    }
+
+    // 2. 剔除常见的抖音分享套话
+    text = text.replaceAll(RegExp(r'^[0-9]+(\.[0-9]+)?\s*'), '');
+    text = text.replaceAll('复制打开抖音，看看', ' ');
+    text = text.replaceAll('复制打开抖音', ' ');
+    text = text.replaceAll('长按复制此条消息', ' ');
+    text = text.replaceAll('打开抖音搜索', ' ');
+
+    // 3. 剔除作者昵称框（如【Winhao学AI的图文作品】或【ilya的作品】）
+    text = text.replaceAll(RegExp(r'【.*?】'), ' ');
+
+    // 4. 折叠多余空白并收尾
+    text = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return text.isNotEmpty ? text : null;
+  }
+
   /// 是否允许 WebView 导航到该 URL（只允许网页协议）
   static bool isAllowedNavigationUrl(String url) {
     final lower = url.trim().toLowerCase();

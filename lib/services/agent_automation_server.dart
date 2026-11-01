@@ -254,11 +254,9 @@ class AgentAutomationServer {
     final token = CancelToken();
     _activeDownloadToken = token;
 
-    final candidateTitle = (result.title?.trim().isNotEmpty ?? false)
-        ? result.title!.trim()
-        : (result.desc?.trim().isNotEmpty ?? false)
-            ? result.desc!.trim()
-            : _extractFallbackTextFromInput(_lastRawInput ?? '');
+    final candidateDesc = (result.desc?.trim().isNotEmpty ?? false)
+        ? result.desc!.trim()
+        : UrlParser.extractShareText(_lastRawInput ?? '');
 
     try {
       final currentDownloader = downloader;
@@ -269,7 +267,7 @@ class AgentAutomationServer {
       final savedTypes = await currentDownloader.downloadItems(
         selected,
         cookie: result.cookie,
-        baseTitle: candidateTitle,
+        baseTitle: candidateDesc,
         cancelToken: token,
         onProgress: (current, total, progress) {
           // 下载进度内部更新
@@ -292,7 +290,7 @@ class AgentAutomationServer {
             item: selected[i],
             allItems: selected,
             currentIndex: i,
-            rawTitleOrDesc: candidateTitle,
+            rawTitleOrDesc: candidateDesc,
           ),
         );
       }
@@ -357,17 +355,6 @@ class AgentAutomationServer {
         'gearName': item.gearName,
       };
     }).toList();
-  }
-
-  String? _extractFallbackTextFromInput(String raw) {
-    if (raw.trim().isEmpty) return null;
-    var text = raw.replaceAll(RegExp(r'https?://[^\s]+'), ' ');
-    text = text.replaceAll(RegExp(r'[0-9]+\.[0-9]+\s*[a-zA-Z0-9@_./]*'), ' ');
-    text = text.replaceAll('复制打开抖音，看看', ' ');
-    text = text.replaceAll('长按复制此条消息', ' ');
-    text = text.replaceAll('打开抖音搜索', ' ');
-    text = text.trim();
-    return text.isNotEmpty ? text : null;
   }
 
   Future<Map<String, dynamic>> _readJsonBody(HttpRequest request) async {

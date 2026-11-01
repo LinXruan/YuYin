@@ -298,17 +298,10 @@ class DouyinShareApi {
     return null;
   }
 
-  /// 解析单个作品：图文/实况图集或普通视频档位
+  /// 解析单个作品：图文/实况图集或普通视频档位（聚焦作品文案 desc）
   static DouyinShareResult? parseItem(Map<String, dynamic> item) {
     final wrapped = _unwrapItem(item);
-    final rawTitle = wrapped['item_title'] ??
-        wrapped['title'] ??
-        item['item_title'] ??
-        item['title'];
     final rawDesc = wrapped['desc'] ?? item['desc'];
-    final title = rawTitle is String && rawTitle.trim().isNotEmpty
-        ? rawTitle.trim()
-        : null;
     final desc =
         rawDesc is String && rawDesc.trim().isNotEmpty ? rawDesc.trim() : null;
 
@@ -341,7 +334,6 @@ class DouyinShareApi {
         return DouyinShareResult(
           items: items,
           isImagePost: true,
-          title: title,
           desc: desc,
         );
       }
@@ -354,7 +346,6 @@ class DouyinShareApi {
         return DouyinShareResult(
           items: tiers,
           isImagePost: false,
-          title: title,
           desc: desc,
         );
       }

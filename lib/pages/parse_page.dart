@@ -162,19 +162,17 @@ class _ParsePageState extends State<ParsePage> {
         return;
       }
 
-      // 命名基准：优先作品标题，其次文案描述，最后尝试从输入框文本中兜底提取
-      final candidateTitle = (result.title?.trim().isNotEmpty ?? false)
-          ? result.title!.trim()
-          : (result.desc?.trim().isNotEmpty ?? false)
-              ? result.desc!.trim()
-              : _extractFallbackTextFromInput(_inputController.text);
+      // 命名基准：专攻作品文案（desc），若未捕获则从用户粘贴文本/口令中提取纯文案兜底
+      final candidateDesc = (result.desc?.trim().isNotEmpty ?? false)
+          ? result.desc!.trim()
+          : UrlParser.extractShareText(_inputController.text);
 
       widget.logs.add('开始下载 ${selected.length} 个选中资源...');
       _downloadCancelToken = CancelToken();
       final savedTypes = await widget.downloader.downloadItems(
         selected,
         cookie: result.cookie,
-        baseTitle: candidateTitle,
+        baseTitle: candidateDesc,
         cancelToken: _downloadCancelToken,
         onProgress: _updateBatchProgress,
       );
@@ -222,18 +220,6 @@ class _ParsePageState extends State<ParsePage> {
         : (picked.resolution ?? picked.gearName ?? '默认画质');
     widget.logs.add('已选择 $quality（${picked.formattedSize}）');
     return [picked];
-  }
-
-  /// 从用户粘贴的输入文本中剔除 URL 与抖音分享模板套话，提取作为兜底名称
-  String? _extractFallbackTextFromInput(String raw) {
-    if (raw.trim().isEmpty) return null;
-    var text = raw.replaceAll(RegExp(r'https?://[^\s]+'), ' ');
-    text = text.replaceAll(RegExp(r'[0-9]+\.[0-9]+\s*[a-zA-Z0-9@_./]*'), ' ');
-    text = text.replaceAll('复制打开抖音，看看', ' ');
-    text = text.replaceAll('长按复制此条消息', ' ');
-    text = text.replaceAll('打开抖音搜索', ' ');
-    text = text.trim();
-    return text.isNotEmpty ? text : null;
   }
 
   /// 刷新批量下载进度（仅驱动局部进度条更新，避免触发整体界面重绘）

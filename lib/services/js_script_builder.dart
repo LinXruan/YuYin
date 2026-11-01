@@ -5,7 +5,7 @@ const String kDouyinSniffJs = r'''
   var S = window.__dyState || (window.__dyState = {
     sent: false, lastUrl: '', logs: {}, videoHintSent: false, degraded: false,
     staticHref: '', staticReady: false, staticComplete: false,
-    paceHref: '', paceDone: false, title: '', desc: ''
+    paceHref: '', paceDone: false, desc: ''
   });
   // 记录本次嗅探的起始时间；页面地址变化时重新计时
   if (!window.__dyStartTime || window.__dyStartHref !== location.href) {
@@ -219,8 +219,8 @@ const String kDouyinSniffJs = r'''
     if (items.length) log('图集解析: ' + images.length + ' 项, 产出 ' + items.length + ' 个资源');
     return items;
   }
-  // 按 url 去重后一次性回传
-  function sendItems(items, isImagePost) {
+  // 按 url 去重后一次性回传（彻底废除 title 逻辑，专攻真实作品 desc）
+  function sendItems(items, isImagePost, customDesc) {
     if (S.sent || !items || !items.length) return false;
     var unique = [], seen = {};
     for (var i = 0; i < items.length; i++) {
@@ -237,16 +237,9 @@ const String kDouyinSniffJs = r'''
     }
     if (!unique.length || !window.DouyinChannel) return false;
     try {
-      var title = S.title || '';
-      var desc = S.desc || '';
-      if (!title && !desc) {
-        try {
-          var og = document.querySelector('meta[property="og:title"]');
-          if (og && og.content) title = og.content;
-          else if (document.title) {
-            title = document.title.replace(/\s*[-|_]\s*抖音.*$/, '').trim();
-          }
-        } catch (e) {}
+      var finalDesc = customDesc || S.desc || '';
+      if (finalDesc) {
+        log('捕获作品文案: ' + (finalDesc.length > 25 ? finalDesc.substring(0, 25) + '...' : finalDesc));
       }
       // 先发日志再发结果，确保 Dart 在关闭日志接收前能看到收尾信息
       log('解析完成: 共 ' + unique.length + ' 个资源');
@@ -254,8 +247,7 @@ const String kDouyinSniffJs = r'''
         type: 'result',
         isImagePost: !!isImagePost,
         items: unique,
-        title: title || '',
-        desc: desc || ''
+        desc: finalDesc
       }));
       S.sent = true;
       return true;
@@ -270,9 +262,9 @@ const String kDouyinSniffJs = r'''
   }
   // 普通视频发送策略：完整档位立即发；
   // 主页面降级结果等待 12 秒，分享页发现基础流立即发
-  function sendVideoItems(items) {
+  function sendVideoItems(items, customDesc) {
     if (!items || !items.length) return false;
-    if (hasCompleteQuality(items)) return sendItems(items, false);
+    if (hasCompleteQuality(items)) return sendItems(items, false, customDesc);
 
     S.degraded = true;
     var sharePage = isSharePage();
@@ -297,7 +289,7 @@ const String kDouyinSniffJs = r'''
       return false;
     }
     if (sharePage) log('分享页发现基础视频流，立即回传');
-    return sendItems(items, false);
+    return sendItems(items, false, customDesc);
   }
   // 单地址兜底：图文页不启用，避免误抓实况视频或背景音乐
   function reportSingle(raw, trusted, w, h) {
@@ -306,7 +298,7 @@ const String kDouyinSniffJs = r'''
     if (S.targetId && pid && pid !== S.targetId) return;
     var url = clean(raw);
     if (!url || url === S.lastUrl || (!trusted && !isMediaUrl(url))) return;
-    if (sendVideoItems([{ url: url, mediaType: 'video', resolution: resText(w, h) }])) S.lastUrl = url;
+    if (sendVideoItems([{ url: url, mediaType: 'video', resolution: resText(w, h) }], S.desc || '')) S.lastUrl = url;
   }
   // 网络钩子只挂载一次；每次重复注入只执行提取
   function hookNetwork() {
@@ -390,18 +382,24 @@ const String kDouyinSniffJs = r'''
       var nodeId = getNodeAwemeId(node);
       // 有 ID 且与目标不一致：整棵子树跳过，避免推荐作品的 video/images 抢跑
       if (filterId && nodeId && nodeId !== filterId) continue;
-      var nodeTitle = node.item_title || node.title || (node.share_info && node.share_info.share_title) || '';
-      var nodeDesc = node.desc || '';
-      if (!S.title && nodeTitle) S.title = String(nodeTitle);
-      if (!S.desc && nodeDesc) S.desc = String(nodeDesc);
+
       var hasImages = Array.isArray(node.images) && node.images.length > 0;
+      var video = !hasImages ? (node.video || ((node.play_addr || node.playAddr || node.bit_rate) ? node : null)) : null;
+
+      // 仅在当前节点是目标作品或包含核心媒体资源（images/video）时提取文案，彻底防止顶层无关组件污染
+      if (hasImages || video || (filterId && nodeId === filterId)) {
+        var candDesc = node.desc || (node.share_info && node.share_info.share_desc) || (node.share_info && node.share_info.share_title) || '';
+        if (candDesc && !S.desc) S.desc = String(candDesc);
+      }
+
       if (hasImages) {
         var items = collectImages(node.images);
-        if (items.length && sendItems(items, true)) return;
-      } else {
-        var video = node.video || ((node.play_addr || node.playAddr || node.bit_rate) ? node : null);
+        var postDesc = node.desc || (node.share_info && node.share_info.share_desc) || S.desc || '';
+        if (items.length && sendItems(items, true, postDesc)) return;
+      } else if (video) {
         var tiers = collectVideos(video);
-        if (tiers.length && sendVideoItems(tiers)) return;
+        var postDesc = node.desc || (node.share_info && node.share_info.share_desc) || S.desc || '';
+        if (tiers.length && sendVideoItems(tiers, postDesc)) return;
       }
       for (var key in node) {
         if (hasImages && key === 'video') continue;
@@ -418,12 +416,10 @@ const String kDouyinSniffJs = r'''
       if (!v) return false;
       var pid = info.aweme_id || info.awemeId;
       if (S.targetId && pid !== null && pid !== undefined && String(pid) !== S.targetId) return false;
-      if (info) {
-        if (!S.title && (info.item_title || info.title)) S.title = String(info.item_title || info.title);
-        if (!S.desc && info.desc) S.desc = String(info.desc);
-      }
+      var postDesc = (info && info.desc) || S.desc || '';
+      if (postDesc && !S.desc) S.desc = String(postDesc);
       var tiers = collectVideos(v);
-      return tiers.length ? sendVideoItems(tiers) : false;
+      return tiers.length ? sendVideoItems(tiers, postDesc) : false;
     } catch (e) { return false; }
   }
   // #RENDER_DATA 缺失或解析失败时静默跳过，继续扫描其它数据源

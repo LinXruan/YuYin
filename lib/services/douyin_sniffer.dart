@@ -601,13 +601,11 @@ class DouyinSniffer {
       if (data['type'] != 'result') return;
       final items = parseChannelItems(data['items']);
       if (items.isNotEmpty) {
-        final title = data['title']?.toString();
         final desc = data['desc']?.toString();
         _finishWithItems(
           items,
           data['isImagePost'] == true,
           _taskId,
-          title: title?.trim().isNotEmpty == true ? title!.trim() : null,
           desc: desc?.trim().isNotEmpty == true ? desc!.trim() : null,
         );
       }
@@ -677,6 +675,10 @@ class DouyinSniffer {
         ? '解析成功：共发现 ${result.imageCount} 张图片、${result.videoCount} 个视频'
         : '解析成功：共发现 ${result.items.length} 个清晰度档位';
     _log(summary);
+    if (desc != null && desc.isNotEmpty) {
+      final shortDesc = desc.length > 30 ? '${desc.substring(0, 30)}...' : desc;
+      _log('作品文案: $shortDesc');
+    }
     completer.complete(result);
     if (identical(_completer, completer)) _completer = null;
 

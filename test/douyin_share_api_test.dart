@@ -107,7 +107,7 @@ void main() {
       expect(result.items.single.url, contains('a.jpeg'));
     });
 
-    test('正确提取作品标题与文案描述', () {
+    test('正确提取作品文案描述（无需独立标题）', () {
       final root = {
         'loaderData': {
           'video_(id)/page': {
@@ -115,7 +115,6 @@ void main() {
               'item_list': [
                 {
                   'aweme_id': '789',
-                  'item_title': '测试标题',
                   'desc': '这是作品文案内容',
                   'video': {
                     'play_addr': {
@@ -130,8 +129,7 @@ void main() {
       };
       final result = DouyinShareApi.parseShareHtml(_htmlFor(root), '789');
       expect(result, isNotNull);
-      expect(result!.title, '测试标题');
-      expect(result.desc, '这是作品文案内容');
+      expect(result!.desc, '这是作品文案内容');
     });
 
     test('目标作品不是第一项时优先匹配 aweme_id', () {
