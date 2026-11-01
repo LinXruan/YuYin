@@ -7,6 +7,7 @@ import '../utils/log_controller.dart';
 import '../utils/network_detector.dart';
 import '../utils/theme_store.dart';
 import '../widgets/update_dialog.dart';
+import '../widgets/save_location_dialog.dart';
 import 'about_page.dart';
 import 'debug_page.dart';
 
@@ -135,6 +136,14 @@ class _SettingsPageState extends State<SettingsPage> {
               onTap: () => _showThemeDialog(context, currentMode),
             );
           },
+        ),
+        const Divider(height: 1),
+        ListTile(
+          leading: const Icon(Icons.folder_open_outlined),
+          title: const Text('自定义保存位置'),
+          subtitle: const Text('视频、图片与音频分类保存'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => SaveLocationDialog.show(context),
         ),
         const Divider(height: 1),
         ListTile(

@@ -1,19 +1,32 @@
 package com.debug.yuyin
 
+import android.app.Activity
 import android.app.UiModeManager
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.DocumentsContract
+import android.provider.MediaStore
+import androidx.documentfile.provider.DocumentFile
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.io.FileInputStream
+import java.io.IOException
 
 class MainActivity : FlutterActivity() {
     private val themeChannel = "com.debug.yuyin/theme"
     private val appChannel = "com.debug.yuyin/app"
+    private val storageChannel = "com.debug.yuyin/storage"
+
+    private val requestCodePickDirectory = 2001
+    private var pendingDirPickerResult: MethodChannel.Result? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // 在最早期读取并设置启动背景与应用夜间模式，确保 cold start 启动画面无缝匹配用户选择
@@ -23,6 +36,8 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // 1. 主题切换通道
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, themeChannel)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -35,6 +50,7 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
+        // 2. 应用通用能力通道（外部跳转等）
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, appChannel)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -56,6 +72,242 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        // 3. 存储与 SAF 目录选择器通道
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, storageChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "pickDirectory" -> {
+                        if (pendingDirPickerResult != null) {
+                            result.error("BUSY", "Another directory picker is active", null)
+                            return@setMethodCallHandler
+                        }
+                        pendingDirPickerResult = result
+                        try {
+                            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                                addFlags(
+                                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or
+                                    Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
+                                )
+                            }
+                            startActivityForResult(intent, requestCodePickDirectory)
+                        } catch (e: Exception) {
+                            pendingDirPickerResult = null
+                            result.error("PICK_FAILED", e.message, null)
+                        }
+                    }
+                    "saveMedia" -> {
+                        val filePath = call.argument<String>("filePath")
+                        val mediaType = call.argument<String>("mediaType") ?: "video"
+                        val treeUri = call.argument<String>("treeUri")
+                        val fileName = call.argument<String>("fileName") ?: "file_${System.currentTimeMillis()}"
+
+                        if (filePath.isNullOrBlank()) {
+                            result.error("INVALID_ARGS", "filePath is required", null)
+                            return@setMethodCallHandler
+                        }
+
+                        Thread {
+                            try {
+                                val srcFile = File(filePath)
+                                if (!srcFile.exists()) {
+                                    runOnUiThread { result.error("FILE_NOT_FOUND", "Source file does not exist", null) }
+                                    return@Thread
+                                }
+
+                                if (!treeUri.isNullOrBlank()) {
+                                    // 自定义 SAF 目录保存
+                                    val targetDir = DocumentFile.fromTreeUri(this, Uri.parse(treeUri))
+                                        ?: throw IOException("无法访问目标自定义文件夹")
+                                    val mimeType = getMimeType(fileName, mediaType)
+                                    val targetDoc = targetDir.createFile(mimeType, fileName)
+                                        ?: throw IOException("无法在目标文件夹创建文件: $fileName")
+
+                                    contentResolver.openOutputStream(targetDoc.uri)?.use { out ->
+                                        FileInputStream(srcFile).use { inStream ->
+                                            inStream.copyTo(out)
+                                        }
+                                    } ?: throw IOException("无法写入自定义文件数据")
+
+                                    try {
+                                        MediaScannerConnection.scanFile(this, arrayOf(targetDoc.uri.path), arrayOf(mimeType), null)
+                                    } catch (_: Exception) {}
+                                } else {
+                                    // 默认分类目录保存 (Movies/YuYin/, Pictures/YuYin/, Music/YuYin/)
+                                    saveToDefaultDirectory(srcFile, mediaType, fileName)
+                                }
+                                runOnUiThread { result.success(true) }
+                            } catch (e: Exception) {
+                                runOnUiThread { result.error("SAVE_FAILED", e.message, null) }
+                            }
+                        }.start()
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == requestCodePickDirectory) {
+            val cb = pendingDirPickerResult
+            pendingDirPickerResult = null
+            if (resultCode == Activity.RESULT_OK && data?.data != null) {
+                val uri = data.data!!
+                try {
+                    val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    contentResolver.takePersistableUriPermission(uri, flags)
+                } catch (_: Exception) {}
+                val displayPath = getDisplayPathFromTreeUri(uri)
+                cb?.success(
+                    mapOf(
+                        "uri" to uri.toString(),
+                        "displayPath" to displayPath
+                    )
+                )
+            } else {
+                cb?.success(null)
+            }
+        }
+    }
+
+    private fun getDisplayPathFromTreeUri(uri: Uri): String {
+        try {
+            val docId = DocumentsContract.getTreeDocumentId(uri)
+            if (docId != null) {
+                if (docId.startsWith("primary:")) {
+                    val sub = docId.substringAfter("primary:").trim('/')
+                    return if (sub.isEmpty()) "/" else "/$sub/"
+                }
+                val parts = docId.split(":", limit = 2)
+                if (parts.size == 2) {
+                    val sub = parts[1].trim('/')
+                    return if (sub.isEmpty()) "/${parts[0]}/" else "/${parts[0]}/$sub/"
+                }
+                return "/${docId.trim('/')}/"
+            }
+        } catch (_: Exception) {}
+
+        val path = uri.path ?: ""
+        val treeIndex = path.indexOf("/tree/")
+        if (treeIndex != -1) {
+            val rawDocId = Uri.decode(path.substring(treeIndex + 6))
+            if (rawDocId.startsWith("primary:")) {
+                val sub = rawDocId.substringAfter("primary:").trim('/')
+                return if (sub.isEmpty()) "/" else "/$sub/"
+            }
+        }
+        return "/自定义目录/"
+    }
+
+    private fun saveToDefaultDirectory(srcFile: File, mediaType: String, fileName: String) {
+        when (mediaType.lowercase()) {
+            "video" -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
+                        put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                        put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/YuYin/")
+                        put(MediaStore.Video.Media.IS_PENDING, 1)
+                    }
+                    val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+                        ?: throw IOException("无法在系统媒体库创建视频记录")
+                    contentResolver.openOutputStream(uri)?.use { out ->
+                        FileInputStream(srcFile).use { it.copyTo(out) }
+                    } ?: throw IOException("无法写入视频数据")
+                    values.clear()
+                    values.put(MediaStore.Video.Media.IS_PENDING, 0)
+                    contentResolver.update(uri, values, null, null)
+                } else {
+                    val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "YuYin")
+                    if (!dir.exists()) dir.mkdirs()
+                    val destFile = File(dir, fileName)
+                    srcFile.copyTo(destFile, overwrite = true)
+                    MediaScannerConnection.scanFile(this, arrayOf(destFile.absolutePath), arrayOf("video/mp4"), null)
+                }
+            }
+            "image" -> {
+                val mimeType = when {
+                    fileName.endsWith(".png", ignoreCase = true) -> "image/png"
+                    fileName.endsWith(".webp", ignoreCase = true) -> "image/webp"
+                    else -> "image/jpeg"
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+                        put(MediaStore.Images.Media.MIME_TYPE, mimeType)
+                        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/YuYin/")
+                        put(MediaStore.Images.Media.IS_PENDING, 1)
+                    }
+                    val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                        ?: throw IOException("无法在系统媒体库创建图片记录")
+                    contentResolver.openOutputStream(uri)?.use { out ->
+                        FileInputStream(srcFile).use { it.copyTo(out) }
+                    } ?: throw IOException("无法写入图片数据")
+                    values.clear()
+                    values.put(MediaStore.Images.Media.IS_PENDING, 0)
+                    contentResolver.update(uri, values, null, null)
+                } else {
+                    val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "YuYin")
+                    if (!dir.exists()) dir.mkdirs()
+                    val destFile = File(dir, fileName)
+                    srcFile.copyTo(destFile, overwrite = true)
+                    MediaScannerConnection.scanFile(this, arrayOf(destFile.absolutePath), arrayOf(mimeType), null)
+                }
+            }
+            "audio" -> {
+                val mimeType = when {
+                    fileName.endsWith(".m4a", ignoreCase = true) -> "audio/mp4"
+                    fileName.endsWith(".wav", ignoreCase = true) -> "audio/wav"
+                    else -> "audio/mpeg"
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Audio.Media.DISPLAY_NAME, fileName)
+                        put(MediaStore.Audio.Media.MIME_TYPE, mimeType)
+                        put(MediaStore.Audio.Media.RELATIVE_PATH, "Music/YuYin/")
+                        put(MediaStore.Audio.Media.IS_PENDING, 1)
+                    }
+                    val uri = contentResolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
+                        ?: throw IOException("无法在系统媒体库创建音频记录")
+                    contentResolver.openOutputStream(uri)?.use { out ->
+                        FileInputStream(srcFile).use { it.copyTo(out) }
+                    } ?: throw IOException("无法写入音频数据")
+                    values.clear()
+                    values.put(MediaStore.Audio.Media.IS_PENDING, 0)
+                    contentResolver.update(uri, values, null, null)
+                } else {
+                    val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "YuYin")
+                    if (!dir.exists()) dir.mkdirs()
+                    val destFile = File(dir, fileName)
+                    srcFile.copyTo(destFile, overwrite = true)
+                    MediaScannerConnection.scanFile(this, arrayOf(destFile.absolutePath), arrayOf(mimeType), null)
+                }
+            }
+            else -> throw IllegalArgumentException("不支持的媒体类型: $mediaType")
+        }
+    }
+
+    private fun getMimeType(fileName: String, mediaType: String): String {
+        return when (mediaType.lowercase()) {
+            "video" -> "video/mp4"
+            "audio" -> {
+                when {
+                    fileName.endsWith(".m4a", ignoreCase = true) -> "audio/mp4"
+                    fileName.endsWith(".wav", ignoreCase = true) -> "audio/wav"
+                    else -> "audio/mpeg"
+                }
+            }
+            else -> {
+                when {
+                    fileName.endsWith(".png", ignoreCase = true) -> "image/png"
+                    fileName.endsWith(".webp", ignoreCase = true) -> "image/webp"
+                    else -> "image/jpeg"
+                }
+            }
+        }
     }
 
     private fun applySavedThemeMode() {
@@ -65,13 +317,10 @@ class MainActivity : FlutterActivity() {
                 val mode = file.readText().trim()
                 applyThemeMode(mode)
             }
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) {}
     }
 
     private fun applyThemeMode(mode: String) {
-        // 1. Android 12+ (API 31+): 系统级应用夜间模式持久化
-        // Android 系统会自动记住该包名的夜间模式，下次冷启动由系统启动窗口(SplashScreen)精准呈现
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
             uiModeManager?.let {
@@ -84,7 +333,6 @@ class MainActivity : FlutterActivity() {
             }
         }
 
-        // 2. Activity 窗口背景全版本保障：显式指定窗口背景，避免首帧渲染前的短暂闪白/闪黑
         val backgroundRes = when (mode.lowercase()) {
             "dark" -> R.drawable.launch_background_dark
             "light" -> R.drawable.launch_background_light

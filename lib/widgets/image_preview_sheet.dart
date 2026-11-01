@@ -170,7 +170,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
                       _selectedIndices.isEmpty ? null : _confirm,
                   icon: const Icon(Icons.save_alt),
                   label: Text(
-                    '保存选中项 (${_selectedIndices.length}) 到相册',
+                    '保存选中项 (${_selectedIndices.length}) ',
                   ),
                 ),
               ),

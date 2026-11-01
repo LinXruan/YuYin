@@ -72,7 +72,7 @@
    - 主体区域：使用 `GridView.builder`（3 列网格）展示：
      - 若为图片（`MediaType.image`），使用 `Image.network(item.url, headers: headers, fit: BoxFit.cover)` 加载预览图；点击缩略图主体可弹出 `Dialog` + `InteractiveViewer` 查看高清大图，点击右上角复选框切换勾选状态。
      - 若为实况图的动态视频项（`MediaType.video`），显示动图/视频图标与“实况视频 (LIVE)”标识及分辨率，同样带复选框供用户决定是否连同实况视频一起保存。
-   - 底部主按钮：【保存选中项 (X) 到相册】，点击后调用 `Navigator.pop(context, selectedItems)`。
+   - 底部主按钮：【保存选中项 (X) 】，点击后调用 `Navigator.pop(context, selectedItems)`。
 2. 运行 `flutter analyze` 确保零警告。
 3. **完成后立即停下并汇报，等待指令进入 Step 23。**
 

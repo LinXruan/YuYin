@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- 网络访问权限：加载抖音网页与下载视频 -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    <!-- Android 9 及以下保存视频到相册所需；Android 10+ 走 MediaStore 无需该权限 -->
+    <!-- Android 9 及以下保存视频所需；Android 10+ 走 MediaStore 无需该权限 -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29"/>

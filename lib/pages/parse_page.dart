@@ -10,11 +10,12 @@ import '../services/video_downloader.dart';
 import '../utils/log_controller.dart';
 import '../utils/login_state_store.dart';
 import '../utils/network_detector.dart';
+import '../utils/save_location_store.dart';
 import '../utils/url_parser.dart';
 import '../widgets/image_preview_sheet.dart';
 import '../widgets/video_quality_sheet.dart';
 
-/// 解析页：粘贴链接 -> 嗅探 -> 选择画质/图片 -> 下载到相册
+/// 解析页：粘贴链接 -> 嗅探 -> 选择画质/图片 -> 下载
 class ParsePage extends StatefulWidget {
   const ParsePage({
     super.key,
@@ -163,18 +164,22 @@ class _ParsePageState extends State<ParsePage> {
 
       widget.logs.add('开始下载 ${selected.length} 个选中资源...');
       _downloadCancelToken = CancelToken();
-      await widget.downloader.downloadItems(
+      final savedTypes = await widget.downloader.downloadItems(
         selected,
         cookie: result.cookie,
         cancelToken: _downloadCancelToken,
         onProgress: _updateBatchProgress,
       );
       if (!mounted) return;
-      widget.logs.add(
-        selected.length == 1
-            ? '已保存到相册！'
-            : '全部 ${selected.length} 个资源已无水印保存至系统相册！',
-      );
+      if (savedTypes.contains(MediaType.image)) {
+        widget.logs.add('图片已保存到${SaveLocationStore.getDisplayPath(MediaType.image)}');
+      }
+      if (savedTypes.contains(MediaType.video)) {
+        widget.logs.add('视频已保存到${SaveLocationStore.getDisplayPath(MediaType.video)}');
+      }
+      if (savedTypes.contains(MediaType.audio)) {
+        widget.logs.add('音频已保存到${SaveLocationStore.getDisplayPath(MediaType.audio)}');
+      }
     } catch (error) {
       if (!mounted) return;
       widget.logs.add('操作失败：${_friendlyError(error)}');

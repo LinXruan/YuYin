@@ -1,9 +1,34 @@
 import '../utils/parse_utils.dart';
 
-/// 媒体类型：普通视频、实况图视频或静态图片
-enum MediaType { video, image }
+/// 媒体类型：普通视频、实况图视频、静态图片或音频
+enum MediaType { video, image, audio }
 
-/// 单个媒体资源（普通视频档位、静态图片或实况图视频）
+/// 媒体类型扩展方法
+extension MediaTypeX on MediaType {
+  String get label {
+    switch (this) {
+      case MediaType.video:
+        return '视频';
+      case MediaType.image:
+        return '图片';
+      case MediaType.audio:
+        return '音频';
+    }
+  }
+
+  String get defaultDisplayPath {
+    switch (this) {
+      case MediaType.video:
+        return '/Movies/YuYin/';
+      case MediaType.image:
+        return '/Pictures/YuYin/';
+      case MediaType.audio:
+        return '/Music/YuYin/';
+    }
+  }
+}
+
+/// 单个媒体资源（普通视频档位、静态图片、实况图视频或音频）
 class MediaItem {
   const MediaItem({
     required this.url,
@@ -29,12 +54,20 @@ class MediaItem {
   /// 档位名称/描述（如 "1080p"），可能为空
   final String? gearName;
 
-  /// 从 JS 回传的 item JSON 创建，mediaType 非 video 时按图片处理
+  /// 从 JS 回传的 item JSON 创建，根据 mediaType 映射
   factory MediaItem.fromJson(Map<String, dynamic> json) {
-    final isVideo = json['mediaType']?.toString() == 'video';
+    final mediaTypeStr = json['mediaType']?.toString().toLowerCase();
+    final MediaType type;
+    if (mediaTypeStr == 'video') {
+      type = MediaType.video;
+    } else if (mediaTypeStr == 'audio') {
+      type = MediaType.audio;
+    } else {
+      type = MediaType.image;
+    }
     return MediaItem(
       url: json['url']?.toString() ?? '',
-      type: isVideo ? MediaType.video : MediaType.image,
+      type: type,
       resolution: json['resolution']?.toString(),
       bitRate: positiveInt(json['bitRate']),
       dataSize: positiveInt(json['dataSize']),
@@ -101,4 +134,8 @@ class SniffResult {
   /// 图片数量
   int get imageCount =>
       items.where((item) => item.type == MediaType.image).length;
+
+  /// 音频数量
+  int get audioCount =>
+      items.where((item) => item.type == MediaType.audio).length;
 }
