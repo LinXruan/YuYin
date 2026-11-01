@@ -115,25 +115,59 @@ class UpdateChecker {
     return s;
   }
 
-  /// 提取 HTML/XML 内容并转换为干净易读的更新日志
-  static String cleanHtmlContent(String html) {
-    if (html.isEmpty) return '暂无更新说明';
+  /// 提取 HTML/XML/Markdown 内容并转换为干净易读的更新日志
+  static String cleanHtmlContent(String content) {
+    if (content.trim().isEmpty) return '暂无更新说明';
 
-    var text = html;
+    var text = content;
 
-    // 1. 转换常见排版标签为文本换行与符号
-    text = text.replaceAll(RegExp(r'<h[1-6][^>]*>', caseSensitive: false), '\n### ');
-    text = text.replaceAll(RegExp(r'</h[1-6]>', caseSensitive: false), '\n');
+    // 0. 若来自 Atom XML Feed，HTML 标签本身可能被 XML 转义（如 &lt;h3&gt; / &lt;p&gt;）
+    // 识别并还原标签级别的转义，以便进入统一的结构化解析
+    if (text.contains('&lt;') || text.contains('&gt;')) {
+      text = text.replaceAllMapped(
+        RegExp(
+          r'&lt;(/?(?:h[1-6]|p|br|hr|ul|ol|li|a|em|strong|b|i|code|pre|blockquote|div|span|table|thead|tbody|tr|th|td|img)[^&>]*)&gt;',
+          caseSensitive: false,
+        ),
+        (match) => '<${match.group(1)}>',
+      );
+    }
+
+    // 1. 处理 HTML 标题标签：支持 <h1>~<h6>，格式化为带括号的醒目标题，如 【后端】
+    text = text.replaceAllMapped(
+      RegExp(r'<h[1-6][^>]*>([\s\S]*?)</h[1-6]>', caseSensitive: false),
+      (match) {
+        final title = (match.group(1) ?? '')
+            .replaceAll(RegExp(r'<[^>]+>'), '')
+            .trim();
+        return title.isNotEmpty ? '\n\n【$title】\n' : '\n';
+      },
+    );
+
+    // 2. 兼容原生 Markdown 标题（如 ### 后端 / ## 前端 -> 【后端】 / 【前端】）
+    text = text.replaceAllMapped(
+      RegExp(r'(?:^|\n)\s*#{1,6}\s+([^\n]+)'),
+      (match) {
+        final title = (match.group(1) ?? '').trim();
+        return '\n\n【$title】\n';
+      },
+    );
+
+    // 3. 处理段落、换行与列表标签
     text = text.replaceAll(RegExp(r'<p[^>]*>', caseSensitive: false), '\n');
     text = text.replaceAll(RegExp(r'</p>', caseSensitive: false), '\n');
     text = text.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n');
     text = text.replaceAll(RegExp(r'<li[^>]*>', caseSensitive: false), '\n• ');
     text = text.replaceAll(RegExp(r'</li>', caseSensitive: false), '\n');
+    text = text.replaceAll(RegExp(r'<hr\s*/?>', caseSensitive: false), '\n---\n');
 
-    // 2. 剥离所有剩余的真实 HTML 标签
-    text = text.replaceAll(RegExp(r'<[^>]+>'), '');
+    // 4. 剥离所有已知的标准 HTML 标签，避免破坏文本中的类似 <v8a> 的用户普通描述
+    text = text.replaceAll(
+      RegExp(r'</?(?:h[1-6]|p|br|hr|ul|ol|li|a|em|strong|b|i|code|pre|blockquote|div|span|table|thead|tbody|tr|th|td|img)[^>]*>', caseSensitive: false),
+      '',
+    );
 
-    // 3. 标签剥离完成后再解码 HTML 实体字符，避免内容中的 <xxx> 文本被误杀
+    // 5. 标签剥离完成后，全面解码 HTML 实体字符
     text = text
         .replaceAll('&lt;', '<')
         .replaceAll('&gt;', '>')
@@ -142,7 +176,7 @@ class UpdateChecker {
         .replaceAll('&#39;', "'")
         .replaceAll('&nbsp;', ' ');
 
-    // 4. 清理多余空行与两端空白
+    // 6. 清理多余空行与首尾空白
     text = text.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
     return text.isEmpty ? '暂无更新说明' : text;
   }
