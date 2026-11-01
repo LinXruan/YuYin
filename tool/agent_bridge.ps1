@@ -1,0 +1,95 @@
+﻿param (
+    [Parameter(Position = 0)]
+    [string]$Action = "status",
+
+    [Parameter(Position = 1)]
+    [string]$Arg1 = "",
+
+    [string]$Serial = "",
+    [int]$Port = 9527
+)
+
+$ErrorActionPreference = "Stop"
+
+function Get-TargetDevice {
+    if ($Serial) { return $Serial }
+    $devs = @(adb devices | Select-String -Pattern "(\S+)\s+device$" | ForEach-Object { $_.Matches.Groups[1].Value })
+    if ($devs.Count -eq 0) {
+        throw "未检测到已连接的 Android 设备或模拟器"
+    }
+    $emu = $devs | Where-Object { $_ -like "emulator-*" } | Select-Object -First 1
+    if ($emu) { return $emu }
+    return $devs[0]
+}
+
+$device = Get-TargetDevice
+$baseUrl = "http://127.0.0.1:$Port"
+
+switch ($Action.ToLower()) {
+    "setup" {
+        Write-Host "[AgentBridge] 正在为设备 $device 建立端口映射: tcp:$Port -> tcp:$Port..."
+        adb -s $device forward tcp:$Port tcp:$Port
+        Write-Host "[AgentBridge] [成功] 端口映射完成。正在测试连通性..."
+        try {
+            $resp = Invoke-RestMethod -Uri "$baseUrl/api/status" -Method Get -TimeoutSec 3
+            Write-Host "[AgentBridge] [在线] 应用控制台已连接: $($resp.app) v$($resp.version)"
+        } catch {
+            Write-Host "[AgentBridge] [提示] 端口已映射，但尚未收到应用响应。请确保 Debug 版 YuYin 已在设备上启动运行。"
+        }
+    }
+
+    "status" {
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/status" -Method Get
+        $resp | ConvertTo-Json -Depth 5
+    }
+
+    "parse" {
+        if (-not $Arg1) {
+            throw "请提供要解析的抖音作品链接或分享文本，例如: .gent_cmd.bat parse 'https://v.douyin.com/...'"
+        }
+        Write-Host "[AgentBridge] 正在请求解析: $Arg1 ..."
+        $body = @{ text = $Arg1 } | ConvertTo-Json
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/parse" -Method Post -Body $body -ContentType "application/json; charset=utf-8"
+        Write-Host "=== 解析成功 ==="
+        Write-Host "标题: $($resp.title)"
+        Write-Host "文案: $($resp.desc)"
+        $typeLabel = if ($resp.isImagePost) { "图文/实况图集" } else { "普通视频" }
+        Write-Host "类型: $typeLabel"
+        Write-Host "资源总数: $($resp.totalItems)"
+        $resp.items | Format-Table -Property index, type, resolutionLabel, formattedSize, formattedBitRate, gearName -AutoSize
+    }
+
+    "download" {
+        $indices = if (-not $Arg1 -or $Arg1 -eq "all") { "all" } else { ($Arg1 -split "," | ForEach-Object { [int]$_.Trim() }) }
+        Write-Host "[AgentBridge] 正在请求下载资源 (indices=$Arg1)..."
+        $body = @{ indices = $indices } | ConvertTo-Json
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/download" -Method Post -Body $body -ContentType "application/json; charset=utf-8"
+        Write-Host "=== 下载完成 ==="
+        Write-Host "成功保存数量: $($resp.downloadedCount)"
+        $types = $resp.savedTypes -join ', '
+        Write-Host "保存资源类型: $types"
+        Write-Host "生成文件名称:"
+        $resp.expectedFiles | ForEach-Object { Write-Host "  - $_" }
+    }
+
+    "logs" {
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/logs" -Method Get
+        Write-Host "=== 应用运行日志 (共 $($resp.count) 条) ==="
+        $resp.logs | ForEach-Object { Write-Host $_ }
+    }
+
+    "clear-logs" {
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/logs/clear" -Method Post
+        Write-Host "[AgentBridge] [成功] 日志已清空"
+    }
+
+    "cancel" {
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/cancel" -Method Post
+        Write-Host "[AgentBridge] [成功] 已取消当前任务"
+    }
+
+    default {
+        Write-Host "未知指令: $Action"
+        Write-Host "支持的指令: setup, status, parse, download, logs, clear-logs, cancel"
+    }
+}

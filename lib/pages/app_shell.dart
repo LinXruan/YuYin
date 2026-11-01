@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../app_info.dart';
+import '../services/agent_automation_server.dart';
 import '../services/douyin_sniffer.dart';
 import '../services/video_downloader.dart';
 import '../utils/log_controller.dart';
@@ -29,6 +31,7 @@ class _AppShellState extends State<AppShell> {
   final LogController _logs = LogController();
   final ValueNotifier<bool> _busy = ValueNotifier(false);
   final ValueNotifier<bool> _loggedIn = ValueNotifier(false);
+  AgentAutomationServer? _automationServer;
 
   int _index = 0;
 
@@ -37,6 +40,17 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
+    // 仅在 Debug 模式下启动 Agent 自动化本地控制台服务（Release 模式物理隔离）
+    if (kDebugMode) {
+      _automationServer = AgentAutomationServer(
+        sniffer: _sniffer,
+        downloader: _downloader,
+        logs: _logs,
+        busy: _busy,
+        loggedIn: _loggedIn,
+      )..start();
+    }
+
     // JS 内部调试日志统一加 [解析] 前缀后写入共享日志
     _sniffer.onLog = (message) => _logs.add('[解析] $message');
 
@@ -60,6 +74,7 @@ class _AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
+    _automationServer?.stop();
     _sniffer.onLog = null;
     _sniffer.dispose();
     _logs.dispose();

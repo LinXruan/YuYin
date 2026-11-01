@@ -11,6 +11,9 @@ class LogController extends ValueNotifier<List<String>> {
 
   bool _disposed = false;
 
+  /// 完整日志列表
+  List<String> get logs => value;
+
   /// 完整日志文本，供复制到剪贴板
   String get joined => value.join('\n');
 

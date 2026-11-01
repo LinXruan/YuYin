@@ -1,0 +1,18 @@
+@echo off
+chcp 65001 >nul
+setlocal
+
+rem ========================================================
+rem YuYin Agent Debug Bridge CLI
+rem Usage:
+rem   agent_cmd.bat setup
+rem   agent_cmd.bat status
+rem   agent_cmd.bat parse "<url_or_text>"
+rem   agent_cmd.bat download [all|0,1]
+rem   agent_cmd.bat logs
+rem   agent_cmd.bat clear-logs
+rem   agent_cmd.bat cancel
+rem ========================================================
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0agent_bridge.ps1" %*
+exit /b %errorlevel%
