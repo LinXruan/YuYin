@@ -37,26 +37,7 @@ void main() {
       expect(UpdateChecker.cleanHtmlContent('   '), equals('暂无更新说明'));
     });
 
-    test('排版标签转换为换行与醒目标题符号', () {
-      const html = '''
-<h3>后端</h3>
-<p>修复抖音登录状态检测</p>
-<h3>前端</h3>
-<p>修复暗夜模式部分ui<br>
-删除清除按钮<br>
-美化登录ui</p>
-''';
-      final cleaned = UpdateChecker.cleanHtmlContent(html);
-      expect(cleaned, contains('【后端】'));
-      expect(cleaned, contains('修复抖音登录状态检测'));
-      expect(cleaned, contains('【前端】'));
-      expect(cleaned, contains('删除清除按钮'));
-      expect(cleaned.contains('<p>'), isFalse);
-      expect(cleaned.contains('<h3>'), isFalse);
-      expect(cleaned.contains('<br>'), isFalse);
-    });
-
-    test('支持 XML 转义的 Atom Feed 内容', () {
+    test('精准还原 GitHub Atom XML 转义的 Markdown 排版', () {
       const xmlEscaped = '''
 &lt;h3&gt;移动端选择v8a，其它均选择universal&lt;/h3&gt;
 &lt;h3&gt;后端&lt;/h3&gt;
@@ -66,28 +47,27 @@ void main() {
 删除清除按钮&lt;br&gt;
 美化登录ui&lt;/p&gt;
 ''';
-      final cleaned = UpdateChecker.cleanHtmlContent(xmlEscaped);
-      expect(cleaned, contains('【移动端选择v8a，其它均选择universal】'));
-      expect(cleaned, contains('【后端】'));
-      expect(cleaned, contains('修复抖音登录状态检测'));
-      expect(cleaned, contains('【前端】'));
-      expect(cleaned, contains('删除清除按钮'));
-      expect(cleaned.contains('&lt;'), isFalse);
-      expect(cleaned.contains('&gt;'), isFalse);
-      expect(cleaned.contains('<h3>'), isFalse);
-      expect(cleaned.contains('<p>'), isFalse);
-    });
-
-    test('支持 Markdown 原生标题格式', () {
-      const md = '''
-### 移动端选择v8a，其它均选择universal
+      const expected = '''### 移动端选择v8a，其它均选择universal
 ### 后端
 修复抖音登录状态检测
-''';
+### 前端
+修复暗夜模式部分ui
+删除清除按钮
+美化登录ui''';
+      final cleaned = UpdateChecker.cleanHtmlContent(xmlEscaped);
+      expect(cleaned, equals(expected));
+    });
+
+    test('支持 Markdown 原生文本格式保持', () {
+      const md = '''### 移动端选择v8a，其它均选择universal
+### 后端
+修复抖音登录状态检测
+### 前端
+修复暗夜模式部分ui
+删除清除按钮
+美化登录ui''';
       final cleaned = UpdateChecker.cleanHtmlContent(md);
-      expect(cleaned, contains('【移动端选择v8a，其它均选择universal】'));
-      expect(cleaned, contains('【后端】'));
-      expect(cleaned, contains('修复抖音登录状态检测'));
+      expect(cleaned, equals(md));
     });
 
     test('HTML 实体解码且不破坏文本中的 <v8a>', () {
