@@ -4,8 +4,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/app_info.dart';
+import 'package:yuyin/models/history_item.dart';
 import 'package:yuyin/services/agent_automation_server.dart';
 import 'package:yuyin/utils/download_settings_store.dart';
+import 'package:yuyin/utils/history_store.dart';
 import 'package:yuyin/utils/log_controller.dart';
 
 void main() {
@@ -19,6 +21,7 @@ void main() {
 
     setUp(() async {
       DownloadSettingsStore.resetForTesting(defaultValue: true);
+      HistoryStore.resetForTesting(skipSave: true);
       logs = LogController();
       busy = ValueNotifier<bool>(false);
       loggedIn = ValueNotifier<bool>(false);
@@ -138,7 +141,7 @@ void main() {
       final resp = await req.close();
       expect(resp.statusCode, HttpStatus.badRequest);
       final json = jsonDecode(await utf8.decodeStream(resp)) as Map;
-      expect(json['error'], contains('当前无可用解析结果'));
+      expect(json['error'], contains('无可用下载资源'));
     });
 
     test('POST /api/eval 缺少 script 参数返回 400', () async {
@@ -150,7 +153,7 @@ void main() {
       final resp = await req.close();
       expect(resp.statusCode, HttpStatus.badRequest);
       final json = jsonDecode(await utf8.decodeStream(resp)) as Map;
-      expect(json['error'], contains('缺少必要参数: script'));
+      expect(json['error'], contains('缺少 script 参数'));
     });
 
     test('POST /api/eval Sniffer 未注入时返回 503', () async {
@@ -162,7 +165,51 @@ void main() {
       final resp = await req.close();
       expect(resp.statusCode, HttpStatus.serviceUnavailable);
       final json = jsonDecode(await utf8.decodeStream(resp)) as Map;
-      expect(json['error'], contains('嗅探器未注入'));
+      expect(json['error'], contains('Sniffer 服务未初始化'));
+    });
+
+    test('GET /api/history 与 POST /api/history/clear 正常读取与清空历史记录', () async {
+      await HistoryStore.addRecord(
+        HistoryItem(
+          id: '1',
+          url: 'https://v.douyin.com/1/',
+          fullDesc: '历史测试作品一',
+        ),
+      );
+      await HistoryStore.addRecord(
+        HistoryItem(
+          id: '2',
+          url: 'https://v.douyin.com/2/',
+          fullDesc: '历史测试作品二',
+        ),
+      );
+
+      // 1. 获取全部
+      final req1 = await client.getUrl(
+        Uri.parse('http://127.0.0.1:$testPort/api/history'),
+      );
+      final resp1 = await req1.close();
+      expect(resp1.statusCode, HttpStatus.ok);
+      final json1 = jsonDecode(await utf8.decodeStream(resp1)) as Map;
+      expect(json1['count'], 2);
+
+      // 2. 带 query 搜索
+      final req2 = await client.getUrl(
+        Uri.parse('http://127.0.0.1:$testPort/api/history?q=%E4%BD%9C%E5%93%81%E4%B8%80'),
+      );
+      final resp2 = await req2.close();
+      expect(resp2.statusCode, HttpStatus.ok);
+      final json2 = jsonDecode(await utf8.decodeStream(resp2)) as Map;
+      expect(json2['count'], 1);
+      expect((json2['records'] as List).first['id'], '1');
+
+      // 3. 清空历史
+      final req3 = await client.postUrl(
+        Uri.parse('http://127.0.0.1:$testPort/api/history/clear'),
+      );
+      final resp3 = await req3.close();
+      expect(resp3.statusCode, HttpStatus.ok);
+      expect(HistoryStore.records, isEmpty);
     });
   });
 }

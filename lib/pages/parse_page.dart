@@ -13,6 +13,8 @@ import '../utils/network_detector.dart';
 import '../utils/save_location_store.dart';
 import '../utils/url_parser.dart';
 import '../widgets/image_preview_sheet.dart';
+import '../models/history_item.dart';
+import '../utils/history_store.dart';
 import '../widgets/video_quality_sheet.dart';
 
 /// 解析页：粘贴链接 -> 嗅探 -> 选择画质/图片 -> 下载
@@ -26,6 +28,7 @@ class ParsePage extends StatefulWidget {
     required this.loggedIn,
     required this.onRequestParseTab,
     this.onTapAccount,
+    this.externalUrlNotifier,
   });
 
   final DouyinSniffer sniffer;
@@ -35,6 +38,7 @@ class ParsePage extends StatefulWidget {
   final ValueNotifier<bool> loggedIn;
   final VoidCallback onRequestParseTab;
   final VoidCallback? onTapAccount;
+  final ValueNotifier<String?>? externalUrlNotifier;
 
   @override
   State<ParsePage> createState() => _ParsePageState();
@@ -55,7 +59,49 @@ class _ParsePageState extends State<ParsePage> {
   bool _cancelLogged = false;
 
   @override
+  void initState() {
+    super.initState();
+    widget.externalUrlNotifier?.addListener(_onExternalUrlChanged);
+    final initialUrl = widget.externalUrlNotifier?.value;
+    if (initialUrl != null && initialUrl.isNotEmpty) {
+      _applyExternalUrl(initialUrl);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ParsePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.externalUrlNotifier != widget.externalUrlNotifier) {
+      oldWidget.externalUrlNotifier?.removeListener(_onExternalUrlChanged);
+      widget.externalUrlNotifier?.addListener(_onExternalUrlChanged);
+      final url = widget.externalUrlNotifier?.value;
+      if (url != null && url.isNotEmpty) {
+        _applyExternalUrl(url);
+      }
+    }
+  }
+
+  void _onExternalUrlChanged() {
+    final url = widget.externalUrlNotifier?.value;
+    if (url != null && url.isNotEmpty) {
+      _applyExternalUrl(url);
+    }
+  }
+
+  void _applyExternalUrl(String url) {
+    if (!mounted) return;
+    _inputController.text = url;
+    _inputController.selection = TextSelection.fromPosition(
+      TextPosition(offset: _inputController.text.length),
+    );
+    if (_inputScrollController.hasClients) {
+      _inputScrollController.jumpTo(0.0);
+    }
+  }
+
+  @override
   void dispose() {
+    widget.externalUrlNotifier?.removeListener(_onExternalUrlChanged);
     _hideScrollTimer?.cancel();
     if (_isParsing) {
       widget.sniffer.cancelActiveTask();
@@ -171,6 +217,43 @@ class _ParsePageState extends State<ParsePage> {
         widget.logs.add('未解析到可下载资源，请检查链接或稍后重试');
         return;
       }
+
+      // 记录成功解析作品到历史记录中
+      final historyDesc = (result.desc?.trim().isNotEmpty ?? false)
+          ? result.desc!.trim()
+          : (result.title?.trim().isNotEmpty ?? false
+              ? result.title!.trim()
+              : (UrlParser.extractShareText(_inputController.text) ?? _inputController.text));
+
+      String? historyCover;
+      for (final it in result.items) {
+        if (it.type == MediaType.image && it.url.isNotEmpty) {
+          historyCover = it.url;
+          break;
+        }
+      }
+      historyCover ??= (result.items.isNotEmpty ? result.items.first.url : null);
+
+      final summaryTags = <String>[];
+      if (result.videoCount > 0) summaryTags.add(result.isImagePost ? '实况' : '视频');
+      if (result.imageCount > 0) summaryTags.add('图集');
+      if (result.audioCount > 0) summaryTags.add('音频');
+      summaryTags.add('文案');
+
+      HistoryStore.addRecord(
+        HistoryItem(
+          id: url,
+          url: url,
+          rawInput: _inputController.text,
+          fullDesc: historyDesc,
+          title: result.title,
+          coverUrl: historyCover,
+          isImagePost: result.isImagePost,
+          mediaSummary: summaryTags.join('/'),
+          itemCount: result.items.length,
+          createdAt: DateTime.now(),
+        ),
+      );
 
       // 用户可能已切到其他 Tab，先切回解析页再弹选择面板
       widget.onRequestParseTab();

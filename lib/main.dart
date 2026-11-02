@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'pages/app_shell.dart';
 import 'utils/download_settings_store.dart';
+import 'utils/history_store.dart';
 import 'utils/save_location_store.dart';
 import 'utils/selection_mode_store.dart';
 import 'utils/theme_store.dart';
@@ -12,6 +13,7 @@ Future<void> main() async {
   await SaveLocationStore.init();
   await SelectionModeStore.init();
   await DownloadSettingsStore.init();
+  await HistoryStore.init();
   runApp(const YuYinApp());
 }
 

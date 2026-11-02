@@ -42,7 +42,7 @@
   .\tool\build_debug_apk.bat
 
   # 2. 覆盖安装至模拟器（严禁卸载旧版或清除数据）
-  adb install -r build\app\outputs\flutter-apk\YuYin_1.3.5_debug.apk
+  adb install -r build\app\outputs\flutter-apk\YuYin_1.4.0_debug.apk
   ```
 - **项目瘦身与缓存清理（避免构建产物无限膨胀）**：
   ```bash
@@ -87,6 +87,8 @@
 | `.\tool\agent_cmd.bat download 0,1` | 逗号分隔索引 | 仅下载指定序号项（如第 0、1 项） | 仅保存指定选中项 |
 | `.\tool\agent_cmd.bat logs [n]` | 可选数字 `n` (如 `20`) | 获取应用日志。提供 `n` 时仅展示最新 `n` 条（防止撑爆上下文） | 输出最近过程日志与保存结果 |
 | `.\tool\agent_cmd.bat clear-logs` | 无 | 清空应用内当前日志缓存 | `[AgentBridge] [成功] 日志已清空` |
+| `.\tool\agent_cmd.bat history [query]` | 可选搜索词 | 查看历史记录，支持关键词模糊搜索 | 终端输出历史记录表格（标题、媒体摘要、时间） |
+| `.\tool\agent_cmd.bat clear-history` | 无 | 清空应用内所有历史记录 | `[AgentBridge] [成功] 历史记录已清空` |
 | `.\tool\agent_cmd.bat cancel` | 无 | 终止当前正在进行的嗅探解析或下载任务 | 停止定时器并加载空页面 |
 | `.\tool\agent_cmd.bat eval "<script>"` | JS 脚本表达式 | 向后台嗅探 WebView 注入并同步执行 JS，返回执行结果 | 终端输出 JS 表达式求值结果 |
 
@@ -101,6 +103,8 @@
 | `/api/download` | `POST` | `{"indices":"all"}` 或 `{"indices":[0,1]}` | `{"downloadedCount":2,"savedTypes":["image"],"expectedFiles":["..._1.jpg"]}` | 下载资源落盘 |
 | `/api/logs` | `GET` | 无 (支持 `?tail=20` 或 `?limit=50`) | `{"total":120,"count":20,"logs":["..."]}` | 结构化日志流 (支持尾部/限额截取) |
 | `/api/logs/clear`| `POST` | 无 | `{"success":true,"message":"Logs cleared"}` | 清空日志缓存 |
+| `/api/history` | `GET` | 无 (支持 `?q=关键词`) | `{"count":10,"records":[{"id":"...","title":"...","fullDesc":"..."},...]}` | 查询或模糊搜索历史记录 |
+| `/api/history/clear`| `POST` | 无 | `{"success":true,"message":"历史记录已清空"}` | 清空全部历史记录 |
 | `/api/cancel` | `POST` | 无 | `{"success":true,"message":"Task cancelled"}` | 取消活动任务 |
 | `/api/eval` | `POST` | `{"script":"<js_expression>"}` | `{"success":true,"result":"..."}` | 注入执行 JS 脚本 |
 

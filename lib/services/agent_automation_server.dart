@@ -6,9 +6,11 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../app_info.dart';
+import '../models/history_item.dart';
 import '../models/media_item.dart';
 import '../utils/download_settings_store.dart';
 import '../utils/file_name_formatter.dart';
+import '../utils/history_store.dart';
 import '../utils/log_controller.dart';
 import '../utils/save_location_store.dart';
 import '../utils/url_parser.dart';
@@ -94,6 +96,10 @@ class AgentAutomationServer {
         await _handleEval(request);
       } else if (path == '/api/settings/quality' && request.method == 'POST') {
         await _handleSetQualitySetting(request);
+      } else if (path == '/api/history' && request.method == 'GET') {
+        await _handleGetHistory(request);
+      } else if (path == '/api/history/clear' && request.method == 'POST') {
+        await _handleClearHistory(request);
       } else {
         _sendJson(
           request,
@@ -191,6 +197,46 @@ class AgentAutomationServer {
       final result = await currentSniffer.sniffVideoUrl(url);
       _lastResult = result;
       _lastRawInput = text;
+
+      // 成功解析后自动计入历史记录
+      if (result.items.isNotEmpty) {
+        String? coverUrl;
+        for (final it in result.items) {
+          if (it.type == MediaType.image && it.url.isNotEmpty) {
+            coverUrl = it.url;
+            break;
+          }
+        }
+        coverUrl ??= (result.items.isNotEmpty ? result.items.first.url : null);
+
+        final summaryTags = <String>[];
+        if (result.videoCount > 0) {
+          summaryTags.add(result.isImagePost ? '实况' : '视频');
+        }
+        if (result.imageCount > 0) summaryTags.add('图集');
+        if (result.audioCount > 0) summaryTags.add('音频');
+        summaryTags.add('文案');
+
+        final fullDesc = (result.desc?.trim().isNotEmpty ?? false)
+            ? result.desc!.trim()
+            : (result.title?.trim().isNotEmpty ?? false
+                ? result.title!.trim()
+                : text);
+
+        HistoryStore.addRecord(
+          HistoryItem(
+            id: url,
+            url: url,
+            rawInput: text,
+            fullDesc: fullDesc,
+            title: result.title,
+            coverUrl: coverUrl,
+            isImagePost: result.isImagePost,
+            mediaSummary: summaryTags.join('/'),
+            itemCount: result.items.length,
+          ),
+        );
+      }
 
       _sendJson(request, HttpStatus.ok, {
         'success': true,
@@ -418,6 +464,28 @@ class AgentAutomationServer {
       'success': true,
       'onlyHighestQualityPerResolution':
           DownloadSettingsStore.onlyHighestQualityPerResolution,
+    });
+  }
+
+  /// GET /api/history：获取当前全部历史记录或按关键字搜索
+  Future<void> _handleGetHistory(HttpRequest request) async {
+    final query = request.uri.queryParameters['q'];
+    final records = query != null && query.trim().isNotEmpty
+        ? HistoryStore.search(query.trim())
+        : HistoryStore.records;
+
+    _sendJson(request, HttpStatus.ok, {
+      'count': records.length,
+      'records': records.map((r) => r.toJson()).toList(),
+    });
+  }
+
+  /// POST /api/history/clear：清空历史记录
+  Future<void> _handleClearHistory(HttpRequest request) async {
+    await HistoryStore.clearAll();
+    _sendJson(request, HttpStatus.ok, {
+      'success': true,
+      'message': '历史记录已清空',
     });
   }
 

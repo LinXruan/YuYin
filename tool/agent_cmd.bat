@@ -11,6 +11,8 @@ rem   agent_cmd.bat parse "<url_or_text>"
 rem   agent_cmd.bat download [all|0,1]
 rem   agent_cmd.bat logs
 rem   agent_cmd.bat clear-logs
+rem   agent_cmd.bat history [query]
+rem   agent_cmd.bat clear-history
 rem   agent_cmd.bat cancel
 rem ========================================================
 

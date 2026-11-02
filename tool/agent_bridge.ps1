@@ -1,4 +1,4 @@
-﻿param (
+param (
     [Parameter(Position = 0)]
     [string]$Action = "status",
 
@@ -91,6 +91,22 @@ switch ($Action.ToLower()) {
         Write-Host "[AgentBridge] [成功] 日志已清空"
     }
 
+    "history" {
+        $q = if ($Arg1) { "?q=$([System.Uri]::EscapeDataString($Arg1))" } else { "" }
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/history$q" -Method Get
+        Write-Host "=== 历史记录 (共 $($resp.count) 条) ==="
+        if ($resp.records.Count -gt 0) {
+            $resp.records | Format-Table -Property id, title, mediaSummary, formattedTime, itemCount -AutoSize
+        } else {
+            Write-Host "暂无历史记录"
+        }
+    }
+
+    "clear-history" {
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/history/clear" -Method Post
+        Write-Host "[AgentBridge] [成功] 历史记录已清空"
+    }
+
     "cancel" {
         $resp = Invoke-RestMethod -Uri "$baseUrl/api/cancel" -Method Post
         Write-Host "[AgentBridge] [成功] 已取消当前任务"
@@ -107,6 +123,6 @@ switch ($Action.ToLower()) {
 
     default {
         Write-Host "未知指令: $Action"
-        Write-Host "支持的指令: setup, status, quality [on|off], parse, download, logs, clear-logs, cancel, eval"
+        Write-Host "支持的指令: setup, status, quality [on|off], parse, download, logs, clear-logs, history [query], clear-history, cancel, eval"
     }
 }
