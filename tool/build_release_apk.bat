@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 chcp 65001 >nul
 setlocal enabledelayedexpansion
 
@@ -109,6 +109,32 @@ if exist "%RAW_APK%" (
 )
 
 :DONE
+rem ========================================================
+rem 自动清理：清理历史旧版本的 Release APK 与测试编译快照
+rem ========================================================
+set "CLEAN_COUNT=0"
+for /f "delims=" %%f in ('dir /b "%OUT_DIR%\YuYin_*_v8a.apk" 2^>nul') do (
+  if not "%%~nxf"=="YuYin_%APP_VER%_v8a.apk" (
+    del /f /q "%OUT_DIR%\%%~nxf" >nul 2>nul
+    set /a "CLEAN_COUNT+=1"
+  )
+)
+for /f "delims=" %%f in ('dir /b "%OUT_DIR%\YuYin_*_Universal.apk" 2^>nul') do (
+  if not "%%~nxf"=="YuYin_%APP_VER%_Universal.apk" (
+    del /f /q "%OUT_DIR%\%%~nxf" >nul 2>nul
+    set /a "CLEAN_COUNT+=1"
+  )
+)
+if !CLEAN_COUNT! GTR 0 (
+  echo.
+  echo [自动清理] 已清理 !CLEAN_COUNT! 个历史旧版本 Release APK
+)
+
+if exist "build\test_cache" (
+  rmdir /s /q "build\test_cache" >nul 2>nul
+  echo [自动清理] 已清理 build\test_cache 单元测试编译快照
+)
+
 echo.
 echo ========================================================
 echo   构建完成！产物列表 [目录: %OUT_DIR%\]:
@@ -127,5 +153,3 @@ if exist "%OUT_DIR%\YuYin_%APP_VER%_Universal.apk" (
 echo ========================================================
 popd
 exit /b 0
-
-

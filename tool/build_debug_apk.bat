@@ -53,6 +53,25 @@ if exist "%RAW_APK%" (
   echo [警告] 编译成功，但未找到生成的 app-debug.apk。
 )
 
+rem ========================================================
+rem 自动清理：清理历史旧版本的 Debug APK 与测试编译快照
+rem ========================================================
+set "CLEAN_COUNT=0"
+for /f "delims=" %%f in ('dir /b "%OUT_DIR%\YuYin_*_debug.apk" 2^>nul') do (
+  if not "%%~nxf"=="YuYin_%APP_VER%_debug.apk" (
+    del /f /q "%OUT_DIR%\%%~nxf" >nul 2>nul
+    set /a "CLEAN_COUNT+=1"
+  )
+)
+if !CLEAN_COUNT! GTR 0 (
+  echo [自动清理] 已清理 !CLEAN_COUNT! 个历史旧版本 Debug APK
+)
+
+if exist "build\test_cache" (
+  rmdir /s /q "build\test_cache" >nul 2>nul
+  echo [自动清理] 已清理 build\test_cache 单元测试编译快照
+)
+
 echo.
 echo ========================================================
 echo   构建完成！产物列表 [目录: %OUT_DIR%\]:

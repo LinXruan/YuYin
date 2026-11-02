@@ -23,14 +23,22 @@
   # 返回 1 即代表系统完全引导完成
   ```
 
-### 1.2 应用编译、安装与启停控制
+### 1.2 应用编译、安装、瘦身与启停控制
 - **编译与覆盖安装**：
   ```bash
-  # 1. 编译 Debug APK
+  # 1. 编译 Debug APK（会自动清理旧版本 debug apk 与测试快照）
   .\tool\build_debug_apk.bat
 
   # 2. 覆盖安装至模拟器（严禁卸载旧版或清除数据）
-  adb install -r build\app\outputs\flutter-apk\YuYin_1.3.3_debug.apk
+  adb install -r build\app\outputs\flutter-apk\YuYin_1.3.5_debug.apk
+  ```
+- **项目瘦身与缓存清理（避免构建产物无限膨胀）**：
+  ```bash
+  # 日常极速清理（推荐，秒级释放数 GB，保留 Gradle 增量构建缓存）
+  .\tool\clean_project.bat quick
+
+  # 全量深度清理（调用 flutter clean 并自动 pub get 重建）
+  .\tool\clean_project.bat full
   ```
 - **启动应用（唤醒前台）**：
   ```bash

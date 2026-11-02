@@ -30,6 +30,8 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+*.dill
+/log/
 
 # Symbolication related
 app.*.symbols

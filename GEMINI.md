@@ -9,7 +9,7 @@
 ## 1. 项目概况
 
 - **应用**：余音（YuYin），Android 端抖音无水印视频 / 图集 / 实况图下载工具。
-- **包名 / 版本**：debug 版 `com.debug.yuyin`，release 版 `com.release.yuyin`；版本 `1.2.7+137`（以 `pubspec.yaml` 和 `lib/app_info.dart` 为准）。
+- **包名 / 版本**：debug 版 `com.debug.yuyin`，release 版 `com.release.yuyin`；版本 `1.3.5+146`（以 `pubspec.yaml` 和 `lib/app_info.dart` 为准）。
 - **技术栈**：Flutter 3.47.6 / Dart 3.13.5，Material 3，仅 Android（忽略 Web / Windows）。
 - **依赖**：`webview_flutter`、`dio`、`path_provider`、`gal`；不引入第三方状态管理。
 - **现状**：解析、登录、画质/图集选择、下载、调试日志、关于页均已完成；历史页暂为占位。
@@ -19,10 +19,11 @@
 - `flutter pub get`
 - `flutter analyze`（修改 Dart 后必跑）
 - `flutter test`
-- `.\tool\build_release_apk.bat [all|v8a|universal]`（推荐：一键编译发布包，产出 `YuYin_<version>_v8a.apk` 与 `Universal` 双版本）
+- `.\tool\clean_project.bat [quick|full]`（推荐：一键项目瘦身与清理，quick 秒级释放数 GB，full 深度重置）
+- `.\tool\build_release_apk.bat [all|v8a|universal]`（推荐：一键编译发布包，产出 `YuYin_<version>_v8a.apk` 与 `Universal` 双版本，自动清理旧版 APK）
 - `flutter build apk --release --target-platform android-arm64`（编译 v8a 单架构轻量版，约 18~20MB）
 - `flutter build apk --release`（编译 Universal 全架构通用版，约 51MB）
-- `.\tool\build_debug_apk.bat`（编译 debug 版，产出 `YuYin_<version>_debug.apk`）
+- `.\tool\build_debug_apk.bat`（编译 debug 版，产出 `YuYin_<version>_debug.apk`，自动清理旧版 APK 与测试快照）
 - `.\tool\install_release_apk.bat`（优先自动安装轻量 v8a 版到已连接真机）
 - 重新生成应用图标：
   `D:\Install\anaconda3\envs\deepseek\python.exe tool\generate_app_icon.py`
