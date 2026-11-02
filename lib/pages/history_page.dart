@@ -27,7 +27,8 @@ class _HistoryPageState extends State<HistoryPage> {
 
   bool _isSelectionMode = false;
   final Set<String> _selectedIds = <String>{};
-  bool _isPromptDismissed = false;
+  bool _sessionDismissed = false;
+  bool _permanentlyDismissed = false;
 
   String _searchQuery = '';
 
@@ -35,6 +36,11 @@ class _HistoryPageState extends State<HistoryPage> {
   void initState() {
     super.initState();
     HistoryStore.recordsNotifier.addListener(_onRecordsChanged);
+    HistoryStore.isPromptDismissed().then((dismissed) {
+      if (mounted && dismissed) {
+        setState(() => _permanentlyDismissed = true);
+      }
+    });
   }
 
   @override
@@ -130,45 +136,6 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
-  Future<void> _confirmClearAll() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('清空历史记录'),
-        content: const Text('确定要清空全部历史解析记录吗？此操作不可撤销。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('清空'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && mounted) {
-      await HistoryStore.clearAll();
-      setState(() {
-        _selectedIds.clear();
-        _isSelectionMode = false;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('已清空全部历史记录'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -199,35 +166,26 @@ class _HistoryPageState extends State<HistoryPage> {
                       ),
                     ),
                     const Spacer(),
-                    if (hasAnyRecord) ...[
-                      if (!_isSelectionMode) ...[
-                        // 常规模式：只保留清空按钮
-                        _PillButton(
-                          icon: Icons.delete_sweep_outlined,
-                          label: '清空',
-                          onTap: _confirmClearAll,
-                        ),
-                      ] else ...[
-                        // 多选模式：全选 / 删除
-                        _PillButton(
-                          icon: Icons.select_all_rounded,
-                          label: _selectedIds.length == displayedItems.length
-                              ? '取消全选'
-                              : '全选',
-                          onTap: () => _toggleSelectAll(displayedItems),
-                        ),
-                        const SizedBox(width: 8),
-                        _PillButton(
-                          icon: Icons.delete_outline_rounded,
-                          label: _selectedIds.isEmpty
-                              ? '删除'
-                              : '删除(${_selectedIds.length})',
-                          isDestructive: _selectedIds.isNotEmpty,
-                          onTap: _selectedIds.isNotEmpty
-                              ? _confirmDeleteSelected
-                              : null,
-                        ),
-                      ],
+                    if (hasAnyRecord && _isSelectionMode) ...[
+                      // 多选模式：全选 / 删除
+                      _PillButton(
+                        icon: Icons.select_all_rounded,
+                        label: _selectedIds.length == displayedItems.length
+                            ? '取消全选'
+                            : '全选',
+                        onTap: () => _toggleSelectAll(displayedItems),
+                      ),
+                      const SizedBox(width: 8),
+                      _PillButton(
+                        icon: Icons.delete_outline_rounded,
+                        label: _selectedIds.isEmpty
+                            ? '删除'
+                            : '删除(${_selectedIds.length})',
+                        isDestructive: _selectedIds.isNotEmpty,
+                        onTap: _selectedIds.isNotEmpty
+                            ? _confirmDeleteSelected
+                            : null,
+                      ),
                     ],
                   ],
                 ),
@@ -270,7 +228,10 @@ class _HistoryPageState extends State<HistoryPage> {
               ),
 
             // 2.5 提示栏：在至少存在 1 条历史记录且非多选态时展示
-            if (hasAnyRecord && !_isSelectionMode && !_isPromptDismissed)
+            if (hasAnyRecord &&
+                !_isSelectionMode &&
+                !_sessionDismissed &&
+                !_permanentlyDismissed)
               _buildPromptBanner(theme),
 
             // 3. 上下滑动的内容列表流
@@ -380,43 +341,78 @@ class _HistoryPageState extends State<HistoryPage> {
       padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: borderColor, width: 1.0),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Icon(
-              Icons.tips_and_updates_outlined,
-              size: 18,
-              color: iconColor,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                '长按进入选择模式',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: textColor,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w500,
-                  height: 1.3,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Icon(
+                    Icons.tips_and_updates_outlined,
+                    size: 20,
+                    color: iconColor,
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 4),
-            InkWell(
-              onTap: () => setState(() => _isPromptDismissed = true),
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Icon(
-                  Icons.close_rounded,
-                  size: 16,
-                  color: textColor.withValues(alpha: 0.5),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '长按进入选择模式',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: textColor,
+                      fontWeight: FontWeight.w500,
+                      height: 1.4,
+                    ),
+                  ),
                 ),
-              ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    setState(() => _sessionDismissed = true);
+                  },
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: isDark
+                        ? const Color(0xFFD4C2C6)
+                        : theme.colorScheme.onSurfaceVariant,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                  ),
+                  child: const Text('关闭'),
+                ),
+                const SizedBox(width: 4),
+                TextButton(
+                  onPressed: () async {
+                    setState(() => _permanentlyDismissed = true);
+                    await HistoryStore.setPromptDismissed(true);
+                  },
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: isDark
+                        ? const Color(0xFFFFB0C8)
+                        : theme.colorScheme.primary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                  ),
+                  child: const Text('不再显示'),
+                ),
+              ],
             ),
           ],
         ),

@@ -11,6 +11,7 @@ class HistoryStore {
   HistoryStore._();
 
   static const String _fileName = 'history_records.json';
+  static const String _hidePromptFileName = 'hide_history_prompt.flag';
   static const int maxHistoryCount = 500;
 
   /// 内存中常驻的历史记录列表（按最新解析时间降序排列）
@@ -143,6 +144,35 @@ class HistoryStore {
   static Future<File> _getFile() async {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}/$_fileName');
+  }
+
+  static Future<File> _getHidePromptFile() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File('${dir.path}/$_hidePromptFileName');
+  }
+
+  /// 查询是否已永久隐藏历史提示卡片（“不再显示”）
+  static Future<bool> isPromptDismissed() async {
+    try {
+      final file = await _getHidePromptFile();
+      return await file.exists();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 设置是否永久隐藏历史提示卡片（“不再显示”）
+  static Future<void> setPromptDismissed(bool dismissed) async {
+    try {
+      final file = await _getHidePromptFile();
+      if (dismissed) {
+        await file.writeAsString('1', flush: true);
+      } else if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {
+      // 忽略存储异常
+    }
   }
 
   static Future<void> _save() async {

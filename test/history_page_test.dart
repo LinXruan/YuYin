@@ -61,17 +61,19 @@ void main() {
     expect(find.text('完整文案描述二'), findsWidgets);
     expect(find.text('视频/文案'), findsOneWidget);
     expect(find.text('图集/音频/文案'), findsOneWidget);
-    // PLAN_42: 无“选择”按钮，仅保留“清空”
+    // PLAN_42: 常规模式无“选择”/“全选”/“删除”/“清空”按钮，进入选择页仅限长按
     expect(find.text('选择'), findsNothing);
-    expect(find.text('清空'), findsOneWidget);
+    expect(find.text('全选'), findsNothing);
+    expect(find.text('删除'), findsNothing);
+    expect(find.text('清空'), findsNothing);
 
-    // PLAN_42: 搜索框下方展示 PLAN_22 质感的提示栏
+    // PLAN_42: 搜索框下方展示 PLAN_22 质感的提示栏（包含“关闭”与“不再显示”两个按钮）
     expect(find.text('长按进入选择模式'), findsOneWidget);
+    expect(find.text('关闭'), findsOneWidget);
+    expect(find.text('不再显示'), findsOneWidget);
 
-    // 点击提示栏右侧关闭按钮可以关闭该提示
-    final closePromptBtn = find.byIcon(Icons.close_rounded);
-    expect(closePromptBtn, findsOneWidget);
-    await tester.tap(closePromptBtn);
+    // 点击提示栏右侧【关闭】按钮可以关闭该提示
+    await tester.tap(find.text('关闭'));
     await tester.pumpAndSettle();
     expect(find.text('长按进入选择模式'), findsNothing);
 
@@ -180,9 +182,10 @@ void main() {
     await widgetsAppState.didPopRoute();
     await tester.pumpAndSettle();
 
-    // 验证：已退出多选模式，顶栏恢复为仅有“清空”按钮
+    // 验证：已退出多选模式，顶栏恢复为无按钮状态
     expect(find.text('全选'), findsNothing);
-    expect(find.text('清空'), findsOneWidget);
+    expect(find.text('删除'), findsNothing);
+    expect(find.text('清空'), findsNothing);
 
     // 3. 再次长按重新进入多选模式
     await tester.longPress(find.text('测试条目一').first);
@@ -208,5 +211,22 @@ void main() {
 
     expect(HistoryStore.records, isEmpty);
     expect(find.text('暂无历史记录'), findsOneWidget);
+  });
+
+  testWidgets('提示栏点击“不再显示”：持久化标记隐藏并在关闭后消失', (tester) async {
+    await HistoryStore.addRecord(
+      HistoryItem(id: '1', url: 'https://v.douyin.com/1/', fullDesc: '测试条目'),
+    );
+
+    await tester.pumpWidget(buildTestWidget());
+    await tester.pumpAndSettle();
+
+    expect(find.text('长按进入选择模式'), findsOneWidget);
+    expect(find.text('不再显示'), findsOneWidget);
+
+    await tester.tap(find.text('不再显示'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('长按进入选择模式'), findsNothing);
   });
 }
