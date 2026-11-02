@@ -625,8 +625,6 @@ class _HistoryCard extends StatelessWidget {
                     item.coverUrl!,
                     width: size,
                     height: size,
-                    cacheWidth: 160,
-                    cacheHeight: 160,
                     fit: BoxFit.cover,
                     alignment: Alignment.center,
                     headers: const {

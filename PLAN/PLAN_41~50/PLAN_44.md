@@ -1,27 +1,22 @@
-# PLAN_44：抖音作品真实原封面捕获机制与历史缩略图展示规范 (版本 1.4.1+153)
+# PLAN_44：抖音作品真实原封面捕获机制与历史缩略图展示规范 (版本 1.4.1+154)
 
 ## 一、需求背景与目标
 
-在解决进入选择模式重复拉取视频流的性能问题与提示条单行化后，本版本（1.4.1+153）针对封面抓取准确度与历史记录缩略图呈现规范进行最终标定：
+在解决封面抓取准确度后，本版本（1.4.1+154）彻底解决历史记录小框缩略图“依然伸缩变畸变、未能自动裁剪”的渲染底层缺陷：
 
-1. **作品真实封面（cover 精准捕获）**：
-   - **数据结构解析确认**：
-     - 在抖音数据协议中，创作者发布时设定的外露展示封面保存在 `video.cover` 字段中（即测试链接抓取的 `oQj5EMCqEwAIjD9x...`，下载解码后确为 440x330、4:3 的完整三段式动漫少女图，与用户素材 `sources\152_抖音口令及封面图\封面.jpg` 一致）；
-     - `video.origin_cover` 字段为视频流在 0.0s 处的原始未经处理切帧（视频带有黑屏淡入时为纯黑图）；
-   - **提取优先级保持**：
-     - 坚持以创作者外露展示封面 `cover` 为先：`cover > origin_cover > dynamic_cover > poster`，杜绝误抓 0.0s 黑屏切帧。
+1. **“伸缩未自动裁剪”根本原因分析**：
+   - 在 PLAN_43 中，为了限制内存显存占用，在 `Image.network` 中同时传入了 `cacheWidth: 160` 和 `cacheHeight: 160`；
+   - **Flutter 解码层物理缺陷**：在 Flutter 原生引擎中，当同时显式指定 `cacheWidth` 与 `cacheHeight` 时，`ResizeImage` 会在图像解码阶段**无视图片本身的原始长宽比，强行把图片拉伸/压扁重采样为 160x160 的正方形**；
+   - 结果到了 UI 渲染层，`BoxFit.cover` 接收到的已经是被引擎层强行挤压变形的 1:1 正方形图像，因而不再执行任何边界裁切，直接把已经畸变变扁/拉伸的画面铺满，表现为“依然伸缩、没有自动裁剪”；
+   - **对齐 149 与保存页**：在 149 版本及保存页（`ImagePreviewSheet`）中，并未同时锁死双向 cache 尺寸（149 未设双向 cache，保存页仅设单向 `cacheWidth`）。
 
-2. **历史记录左侧小框展示与解析保存页对齐（填满裁切、等比不拉伸）**：
-   - **明确展示规范**：
-     - 用户明确要求：小框显示策略与解析页的保存页（`ImagePreviewSheet` 网格缩略图）保持一致；
-     - 缩略图使用 **`BoxFit.cover`** 配合 **`Alignment.center`**：
-       - 图片等比例缩放填满 80x80 小方框，超出部分自然裁切，**绝不产生长宽比变形（不横向拉伸、不纵向压扁）**；
-       - 与 149 版本以及保存页的视觉体验完全对齐，避免 `BoxFit.contain` 产生的黑底留边，保证列表视觉质感统一饱满。
+2. **优化方案**：
+   - 彻底移除 `cacheWidth: 160` 与 `cacheHeight: 160` 强制双向定宽高解码限制，让 Flutter 解码器完整保留封面图像的原始真实高宽比；
+   - 依靠 `fit: BoxFit.cover` 与 `alignment: Alignment.center`，在 80x80 方框内实现纯正的等比自适应外切裁切（居中截取，不拉伸、不压扁、自动裁切多余部分），彻底恢复到 149 版本的视觉效果。
 
 3. **版本演进与发布方式**：
-   - 基础版本保持 `1.4.1`，内部构建版本号升级为 `153`（即 `1.4.1+153`）；
-   - 运行静态检查与自动化测试；
-   - 依据用户要求跳过模拟器调试，直接运行 `.\tool\build_release_apk.bat all` 编译 Release 发布包（产出 v8a 与 Universal 双版本）。
+   - 版本保持 `1.4.1`，内部构建版本号升级为 `154`（即 `1.4.1+154`）；
+   - 不启动模拟器调试，直接运行 `.\tool\build_release_apk.bat all` 编译 Release 发布包（产出 v8a 与 Universal 双版本）。
 
 ---
 
@@ -29,41 +24,18 @@
 
 ```mermaid
 flowchart TD
-    subgraph DouyinData["抖音数据结构解析"]
-        CV["video.cover (创作者发布封面/外露封面，最高优先级)"]
-        OC["video.origin_cover (0.0s 原始切帧，黑屏淡入时为全黑)"]
-        DC["video.dynamic_cover (动图封面)"]
-        PT["video.poster (海报兜底)"]
+    subgraph BugRootCause["旧有缺陷根因 (PLAN_43/153)"]
+        RawImg["原始图片 (440x330, 4:3)"] --> CacheSize["cacheWidth: 160 & cacheHeight: 160"]
+        CacheSize --> Decode["Flutter ResizeImage 引擎强制压成 160x160 正方形"]
+        Decode --> Distort["图像本身已变形挤压，BoxFit.cover 无法执行比例裁切"]
     end
 
-    subgraph ExtractEngine["双通道封面捕获引擎"]
-        CV -->|Priority 1| Extractor["pickCover / pickCoverUrl"]
-        OC -->|Priority 2| Extractor
-        DC -->|Priority 3| Extractor
-        PT -->|Priority 4| Extractor
-    end
-
-    subgraph ChannelOutput["产出真实作品封面 URL"]
-        Extractor --> Sniff["SniffResult(coverUrl)"]
-        Extractor --> Share["DouyinShareResult(coverUrl)"]
-    end
-
-    subgraph ThumbnailDisplay["历史记录小框渲染规范 (对齐保存页)"]
-        Sniff --> HistoryItem["写入历史持久化 (HistoryStore)"]
-        Share --> HistoryItem
-        HistoryItem --> Thumb["_buildThumbnail"]
-        Thumb --> Box["80x80 圆角容器 (ClipRRect 10dp)"]
-        Box --> Cover["Image.network(fit: BoxFit.cover, alignment: Alignment.center)"]
-        Cover --> Result["等比缩放填满方框 (等比不拉伸变形，对齐保存页)"]
+    subgraph FixSolution["修复方案 (PLAN_44/154, 对齐 149)"]
+        RawImg2["原始图片 (440x330, 4:3)"] --> NativeDecode["原生宽高比解码 (移除双向固定 cache)"]
+        NativeDecode --> CoverCrop["BoxFit.cover 等比例居中自动裁切"]
+        CoverCrop --> Perfect["80x80 方框等比饱满呈现，绝无拉伸变形"]
     end
 ```
-
-### 1. 历史缩略图组件规范 (`lib/pages/history_page.dart`)
-- `HistoryCard._buildThumbnail`：
-  - 容器尺寸：固定 80x80，圆角 `BorderRadius.circular(10)`；
-  - 图片渲染：`Image.network(..., fit: BoxFit.cover, alignment: Alignment.center, cacheWidth: 160, cacheHeight: 160)`；
-  - 保持等长宽比缩放填满，不留黑边，无拉伸挤压变形；
-  - 视频作品在右下角悬浮半透明微标（`Icons.play_arrow_rounded`）。
 
 ---
 
@@ -71,15 +43,12 @@ flowchart TD
 
 | 序号 | 文件路径 | 修改类型 | 说明 |
 | :--- | :--- | :--- | :--- |
-| 1 | `PLAN/PLAN_41~50/PLAN_44.md` | MODIFY | 更新为 1.4.1+153 版本规划与 BoxFit.cover 展示规范 |
-| 2 | `pubspec.yaml` | MODIFY | 版本号提升至 `1.4.1+153` |
-| 3 | `lib/app_info.dart` | MODIFY | 常量更新为 `1.4.1+153` |
-| 4 | `GEMINI.md` / `CLAUDE.md` | MODIFY | 维护守则版本同步更新至 `1.4.1+153` |
-| 5 | `lib/pages/history_page.dart` | MODIFY | `_buildThumbnail` 改为 `BoxFit.cover` 对齐保存页填满无变形规范 |
-| 6 | `lib/services/douyin_share_api.dart` | MODIFY | 维持封面提取优先级 |
-| 7 | `lib/services/js_script_builder.dart` | MODIFY | Web 嗅探 JS 封面抓取规则对齐 |
-| 8 | `test/douyin_share_api_test.dart` | MODIFY | 校验封面抓取优先级 |
-| 9 | `test/history_page_test.dart` | MODIFY | 校验 `BoxFit.cover` 渲染参数 |
+| 1 | `PLAN/PLAN_41~50/PLAN_44.md` | MODIFY | 更新为 1.4.1+154 版本规划与 cache 双向尺寸挤压根因分析 |
+| 2 | `pubspec.yaml` | MODIFY | 版本号提升至 `1.4.1+154` |
+| 3 | `lib/app_info.dart` | MODIFY | 常量更新为 `1.4.1+154` |
+| 4 | `GEMINI.md` / `CLAUDE.md` | MODIFY | 维护守则版本同步更新至 `1.4.1+154` |
+| 5 | `lib/pages/history_page.dart` | MODIFY | 移除 `cacheWidth/cacheHeight` 双向挤压限制，恢复自然等比裁切 |
+| 6 | `test/history_page_test.dart` | MODIFY | 维护相关测试用例 |
 
 ---
 
@@ -88,7 +57,7 @@ flowchart TD
 1. **静态分析**：
    - `flutter analyze` 0 issues。
 2. **自动化测试**：
-   - `flutter test` 183 项单测与 Widget 测试 100% 全绿通过。
+   - `flutter test` 183 项全绿通过。
 3. **Release 打包**：
    - 运行 `.\tool\build_release_apk.bat all`；
-   - 成功产出 `YuYin_1.4.1_v8a.apk` 与 `YuYin_1.4.1_Universal.apk`。
+   - 产出 `YuYin_1.4.1_v8a.apk` 与 `YuYin_1.4.1_Universal.apk`。
