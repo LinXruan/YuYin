@@ -19,6 +19,7 @@
 - `flutter pub get`
 - `flutter analyze`（修改 Dart 后必跑）
 - `flutter test`
+- `D:\Install\anaconda3\envs\deepseek\python.exe tool\launch_emulator.py`（启动模拟器，带桌面交互窗口）
 - `.\tool\clean_project.bat [quick|full]`（推荐：一键项目瘦身与清理，quick 秒级释放数 GB，full 深度重置）
 - `.\tool\build_release_apk.bat [all|v8a|universal]`（推荐：一键编译发布包，产出 `YuYin_<version>_v8a.apk` 与 `Universal` 双版本，自动清理旧版 APK）
 - `flutter build apk --release --target-platform android-arm64`（编译 v8a 单架构轻量版，约 18~20MB）
@@ -74,4 +75,5 @@
 
 > [!IMPORTANT]
 > **Agent Debug 与模拟器操控指南已全部收敛至 [DEBUG.md](DEBUG.md)**：
-> 包括模拟器启动、`AgentAutomationServer` 无头 HTTP 控制台、`.\tool\agent_cmd.bat` 快捷指令、测试口令样本与日志拉取方式等，**Agent 进行调试或测试时请务必查阅 [DEBUG.md](DEBUG.md)**。
+> 核心强调：**后续所有调试必须统一使用带桌面界面的模拟器！严禁以无头模式运行**。Agent 启动模拟器统一执行 `D:\Install\anaconda3\envs\deepseek\python.exe tool\launch_emulator.py`。
+> 包括模拟器启动、`AgentAutomationServer` HTTP 控制台、`.\tool\agent_cmd.bat` 快捷指令、测试口令样本与日志拉取方式等，**Agent 进行调试或测试时请务必查阅 [DEBUG.md](DEBUG.md)**。
