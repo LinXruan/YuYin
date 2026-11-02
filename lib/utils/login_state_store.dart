@@ -4,19 +4,25 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../services/auth/auth_contracts.dart';
+import '../services/auth/auth_models.dart';
 import '../services/login_detector_script.dart';
 
-/// 登录状态本地持久化：保存登录标记及简要用户公开信息（昵称、头像链接）。
+/// 登录状态本地持久化：保存登录标记及简要用户公开信息（用户 ID）。
 ///
 /// 严格遵守隐私安全守则：绝不保存用户账号、密码、Token 或 Cookie。
-class LoginStateStore {
-  LoginStateStore._();
+/// 同时实现了面向对象的 [IAuthPersistence] 契约，支持依赖注入与解耦。
+class LoginStateStore implements IAuthPersistence {
+  const LoginStateStore();
 
   static const String _flagFileName = 'login_state.flag';
   static const String _profileFileName = 'login_profile.json';
   static const String _hidePromptFileName = 'hide_login_prompt.flag';
 
-  /// 是否处于登录状态
+  /// 单例实例，方便需要面向对象接口注入时使用
+  static const LoginStateStore instance = LoginStateStore();
+
+  /// 是否处于登录状态（静态快捷方法）
   static Future<bool> isLoggedIn() async {
     try {
       final file = await _flagFile();
@@ -132,6 +138,50 @@ class LoginStateStore {
       // 忽略清理异常
     }
   }
+
+  // ==========================================
+  // IAuthPersistence 面向对象契约实现
+  // ==========================================
+
+  @override
+  Future<AuthSession?> loadSession() async {
+    final loggedIn = await isLoggedIn();
+    if (!loggedIn) {
+      return const AuthSession(status: AuthStatus.unauthenticated);
+    }
+    final profile = await getProfile();
+    return AuthSession(
+      status: AuthStatus.authenticated,
+      userId: profile?.userId,
+    );
+  }
+
+  @override
+  Future<void> saveSession(AuthSession session) async {
+    if (session.status == AuthStatus.authenticated) {
+      await markLoggedIn(
+        profile: session.userId != null
+            ? LoginProfile(userId: session.userId)
+            : null,
+      );
+    } else {
+      await clearLogin();
+    }
+  }
+
+  @override
+  Future<void> clearSession() => clearLogin();
+
+  @override
+  Future<bool> isPromptDismissed() => isLoginPromptDismissed();
+
+  @override
+  Future<void> setPromptDismissed(bool dismissed) =>
+      setLoginPromptDismissed(dismissed);
+
+  // ==========================================
+  // 私有路径辅助方法
+  // ==========================================
 
   static Future<File> _flagFile() async {
     final dir = await getApplicationSupportDirectory();

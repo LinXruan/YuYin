@@ -9,6 +9,7 @@ import '../utils/login_state_store.dart';
 import '../utils/url_parser.dart';
 import 'douyin_share_api.dart';
 import 'js_script_builder.dart';
+import 'sniffer/quality_resolution_policy.dart';
 
 /// 隐藏式 WebView 嗅探服务：抓取无水印视频/图文/实况图直链
 ///
@@ -101,7 +102,16 @@ class DouyinSniffer {
     onLog?.call(message);
   }
 
-  DouyinSniffer() {
+  /// 会话失效回调，当嗅探过程检测到登录墙或未登录拦截时通知
+  void Function(String reason)? onSessionExpired;
+
+  late final QualityResolutionPolicy _qualityPolicy;
+
+  /// 画质决议策略对象
+  QualityResolutionPolicy get qualityPolicy => _qualityPolicy;
+
+  DouyinSniffer({QualityResolutionPolicy? qualityPolicy}) {
+    _qualityPolicy = qualityPolicy ?? QualityResolutionPolicy();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setUserAgent(desktopUserAgent)
@@ -168,6 +178,7 @@ class DouyinSniffer {
     _targetAwemeId = null;
     _shareFallbackStarted = false;
     _shareVideoFallback = null;
+    _qualityPolicy.reset();
     _pendingImageResult = null;
     _imageGraceTimer?.cancel();
     _imageGraceTimer = null;
@@ -306,6 +317,33 @@ class DouyinSniffer {
     }
     _lastPageUrl = url;
 
+    // 检测页面是否被重定向到登录页/登录墙
+    if (_isTaskActive &&
+        (url.contains('passport.douyin.com') ||
+            url.contains('/login') ||
+            url.contains('reflow_login'))) {
+      _log('检测到页面重定向至登录页，判定当前会话已失效或受限');
+      onSessionExpired?.call('主页面重定向至登录页');
+      final action = _qualityPolicy.onLoginWallOrInvalidated();
+      if (action == QualityResolutionAction.resolveWithCachedFallback) {
+        final fallback = _qualityPolicy.cachedFallback;
+        if (fallback != null && fallback.items.isNotEmpty) {
+          _log('遭遇登录拦截，立即采用已暂存的分享页兜底视频完成解析');
+          unawaited(
+            _finishWithItems(
+              fallback.items,
+              false,
+              taskId,
+              title: fallback.title,
+              desc: fallback.desc,
+              coverUrl: fallback.coverUrl,
+            ),
+          );
+          return;
+        }
+      }
+    }
+
     // C 分享页自身的 /share/video/ 不能覆盖主页面类型
     if (!_webviewShareFallback) {
       final kind = UrlParser.classifyWorkPage(url);
@@ -368,7 +406,32 @@ class DouyinSniffer {
         _log('分享页兜底命中（等待实况补充）: ${result.items.length} 个资源');
         _scheduleImageFallback(result, taskId);
       } else if (result.items.isNotEmpty) {
-        if (!_isLoggedIn) {
+        _shareVideoFallback = result;
+        final action = _qualityPolicy.onShareVideoArrived(
+          result: result,
+          isLoggedIn: _isLoggedIn,
+          onWaitTimeout: () {
+            if (_disposed || taskId != _taskId) return;
+            final completer = _completer;
+            if (completer == null || completer.isCompleted) return;
+            final fallback = _qualityPolicy.cachedFallback;
+            if (fallback != null && fallback.items.isNotEmpty) {
+              _log('画质等待窗口期满(${_qualityPolicy.qualityWaitWindow.inSeconds}秒)，以分享页视频完成解析');
+              unawaited(
+                _finishWithItems(
+                  fallback.items,
+                  false,
+                  taskId,
+                  title: fallback.title,
+                  desc: fallback.desc,
+                  coverUrl: fallback.coverUrl,
+                ),
+              );
+            }
+          },
+        );
+
+        if (action == QualityResolutionAction.immediateResolve) {
           _log('未登录状态：分享页已获取无水印视频，极速完成解析');
           unawaited(
             _finishWithItems(
@@ -380,9 +443,8 @@ class DouyinSniffer {
               coverUrl: result.coverUrl,
             ),
           );
-        } else {
-          _shareVideoFallback = result;
-          _log('分享页已取到 ${result.items.length} 个视频档位，已登录状态等待主 WebView 完整画质');
+        } else if (action == QualityResolutionAction.scheduleQualityWait) {
+          _log('分享页已取到 ${result.items.length} 个视频档位，开启 ${_qualityPolicy.qualityWaitWindow.inSeconds} 秒画质晋升等待窗口');
         }
       }
     } on DouyinShareCancelledException {
@@ -644,6 +706,7 @@ class DouyinSniffer {
       if (items.isNotEmpty) {
         final desc = data['desc']?.toString();
         final coverUrl = data['coverUrl']?.toString();
+        _qualityPolicy.onWebVideoExtracted();
         _finishWithItems(
           items,
           data['isImagePost'] == true,
@@ -802,6 +865,7 @@ class DouyinSniffer {
     _imageGraceTimer = null;
     _pendingImageResult = null;
     _shareApi.cancelPending();
+    _qualityPolicy.reset();
     if (_webviewShareFallback) {
       _webviewShareFallback = false;
       unawaited(_restoreDesktopUserAgent());

@@ -4,10 +4,11 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../app_info.dart';
 import '../services/agent_automation_server.dart';
+import '../services/auth/auth_models.dart';
+import '../services/auth/auth_session_manager.dart';
 import '../services/douyin_sniffer.dart';
 import '../services/video_downloader.dart';
 import '../utils/log_controller.dart';
-import '../utils/login_state_store.dart';
 import '../utils/network_detector.dart';
 import 'history_page.dart';
 import 'login_webview_page.dart';
@@ -38,9 +39,14 @@ class _AppShellState extends State<AppShell> {
 
   static const List<String> _titles = ['余音', '历史', '设置'];
 
+  late final AuthSessionManager _authManager;
+
   @override
   void initState() {
     super.initState();
+    _authManager = AuthSessionManager();
+    _authManager.addListener(_onAuthSessionChanged);
+
     // 仅在 Debug 模式下启动 Agent 自动化本地控制台服务（Release 模式物理隔离）
     if (kDebugMode) {
       _automationServer = AgentAutomationServer(
@@ -54,30 +60,34 @@ class _AppShellState extends State<AppShell> {
 
     // JS 内部调试日志统一加 [解析] 前缀后写入共享日志
     _sniffer.onLog = (message) => _logs.add('[解析] $message');
-    _sniffer.isLoggedIn = () => _loggedIn.value;
+    _sniffer.isLoggedIn = () => _authManager.isLoggedIn;
+    _sniffer.onSessionExpired = (reason) {
+      _logs.add('会话异常: $reason，已自动同步为未登录');
+      _authManager.notifySessionExpired(reason: reason);
+    };
 
-    // 恢复上次留下的登录标记，并静默通过 WebView Cookie 本地库二次校验（0 网络开销）
-    LoginStateStore.isLoggedIn().then((isSaved) async {
-      if (!mounted) return;
-      if (!isSaved) {
-        _loggedIn.value = false;
-        return;
+    // 启动基于 AuthSessionManager 的冷启动秒开与异步权威鉴权
+    _authManager.initialize();
+  }
+
+  void _onAuthSessionChanged() {
+    if (!mounted) return;
+    final isAuthed = _authManager.isLoggedIn;
+    if (_loggedIn.value != isAuthed) {
+      _loggedIn.value = isAuthed;
+      if (!isAuthed && _authManager.status == AuthStatus.expired) {
+        _logs.add('检测到服务端账号会话已失效，已自动退出登录态');
       }
-      final hasCookie = await LoginStateStore.checkWebViewCookieSession();
-      if (!mounted) return;
-      if (hasCookie) {
-        _loggedIn.value = true;
-      } else {
-        _loggedIn.value = false;
-        await LoginStateStore.clearLogin();
-      }
-    });
+    }
   }
 
   @override
   void dispose() {
+    _authManager.removeListener(_onAuthSessionChanged);
+    _authManager.dispose();
     _automationServer?.stop();
     _sniffer.onLog = null;
+    _sniffer.onSessionExpired = null;
     _sniffer.dispose();
     _logs.dispose();
     _pendingInputUrl.dispose();
@@ -90,16 +100,18 @@ class _AppShellState extends State<AppShell> {
   Future<void> _openLoginPage({bool initialLoggedIn = false}) async {
     final done = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => LoginWebViewPage(initialLoggedIn: initialLoggedIn),
+        builder: (_) => LoginWebViewPage(
+          initialLoggedIn: initialLoggedIn,
+          authManager: _authManager,
+        ),
       ),
     );
     if (!mounted) return;
     if (done == true) {
-      _loggedIn.value = true;
+      await _authManager.markLoggedIn();
       _logs.add('登录完成，Cookie 已保存，可重新解析获取高清画质');
     } else if (done == false) {
-      _loggedIn.value = false;
-      await LoginStateStore.clearLogin();
+      await _authManager.logout();
       _logs.add('检测到账号已退出登录，恢复未登录状态');
     }
   }
@@ -113,7 +125,17 @@ class _AppShellState extends State<AppShell> {
       return;
     }
 
-    if (!loggedIn) {
+    var effectiveLoggedIn = loggedIn;
+    // 若当前为已登录状态，进入前先主动核验服务端会话存活性
+    if (effectiveLoggedIn) {
+      final stillValid = await _authManager.verifyRemote();
+      if (!mounted) return;
+      if (!stillValid) {
+        effectiveLoggedIn = false;
+      }
+    }
+
+    if (!effectiveLoggedIn) {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
@@ -133,7 +155,7 @@ class _AppShellState extends State<AppShell> {
       );
       if (confirmed != true || !mounted) return;
     }
-    await _openLoginPage(initialLoggedIn: loggedIn);
+    await _openLoginPage(initialLoggedIn: effectiveLoggedIn);
   }
 
   void _selectTab(int index) {

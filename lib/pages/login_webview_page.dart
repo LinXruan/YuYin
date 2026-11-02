@@ -3,16 +3,24 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../services/auth/auth_session_manager.dart';
 import '../services/douyin_sniffer.dart';
 import '../services/login_detector_script.dart';
 import '../utils/login_state_store.dart';
 
 /// 抖音网页登录页：支持全自动识别登录与登出状态感知
 class LoginWebViewPage extends StatefulWidget {
-  const LoginWebViewPage({super.key, this.initialLoggedIn = false});
+  const LoginWebViewPage({
+    super.key,
+    this.initialLoggedIn = false,
+    this.authManager,
+  });
 
   /// 打开页面时是否此前已处于登录状态（从“我的主页”进入时为 true，不自动倒计时关闭）
   final bool initialLoggedIn;
+
+  /// 全局会话管理器（若传入则联动管理状态）
+  final AuthSessionManager? authManager;
 
   @override
   State<LoginWebViewPage> createState() => _LoginWebViewPageState();
@@ -86,6 +94,7 @@ class _LoginWebViewPageState extends State<LoginWebViewPage> {
           _autoReturnTimer = null;
         });
         LoginStateStore.clearLogin();
+        widget.authManager?.logout();
         break;
 
       case LoginEventType.loginSuccess:
@@ -99,6 +108,7 @@ class _LoginWebViewPageState extends State<LoginWebViewPage> {
         });
 
         LoginStateStore.markLoggedIn(profile: event.profile);
+        widget.authManager?.markLoggedIn(userId: event.profile?.userId);
 
         if (shouldAutoReturn) {
           _autoReturnTimer?.cancel();
