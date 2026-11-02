@@ -150,47 +150,44 @@ class _AppShellState extends State<AppShell> {
               padding: const EdgeInsets.only(right: 12),
               child: ValueListenableBuilder<bool>(
                 valueListenable: _loggedIn,
-                builder: (context, loggedIn, _) => ValueListenableBuilder<bool>(
-                  valueListenable: _busy,
-                  builder: (context, busy, _) {
-                    final theme = Theme.of(context);
-                    final isDark = theme.brightness == Brightness.dark;
-                    return OutlinedButton.icon(
-                      onPressed: busy ? null : () => _onAccountTap(loggedIn),
-                      icon: Icon(
-                        loggedIn ? Icons.person_rounded : Icons.login_rounded,
-                        size: 16,
+                builder: (context, loggedIn, _) {
+                  final theme = Theme.of(context);
+                  final isDark = theme.brightness == Brightness.dark;
+                  return OutlinedButton.icon(
+                    onPressed: () => _onAccountTap(loggedIn),
+                    icon: Icon(
+                      loggedIn ? Icons.person_rounded : Icons.login_rounded,
+                      size: 16,
+                    ),
+                    label: Text(
+                      loggedIn ? '我的主页' : '抖音登录/提画质',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                       ),
-                      label: Text(
-                        loggedIn ? '我的主页' : '抖音登录/提画质',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: theme.colorScheme.primary,
+                      backgroundColor: theme.colorScheme.primary.withValues(
+                        alpha: isDark ? 0.12 : 0.06,
                       ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: theme.colorScheme.primary,
-                        backgroundColor: theme.colorScheme.primary.withValues(
-                          alpha: isDark ? 0.12 : 0.06,
+                      side: BorderSide(
+                        color: theme.colorScheme.primary.withValues(
+                          alpha: isDark ? 0.45 : 0.35,
                         ),
-                        side: BorderSide(
-                          color: theme.colorScheme.primary.withValues(
-                            alpha: isDark ? 0.45 : 0.35,
-                          ),
-                          width: 1.2,
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 0,
-                        ),
-                        minimumSize: const Size(0, 34),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(17),
-                        ),
+                        width: 1.2,
                       ),
-                    );
-                  },
-                ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 0,
+                      ),
+                      minimumSize: const Size(0, 34),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(17),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
         ],

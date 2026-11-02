@@ -51,16 +51,29 @@ class _ParsePageState extends State<ParsePage> {
   bool _showScrollIndicator = false;
   double _scrollProgress = 0.0;
   double _thumbHeight = 40.0;
+  bool _isParsing = false;
+  bool _cancelLogged = false;
 
   @override
   void dispose() {
     _hideScrollTimer?.cancel();
+    if (_isParsing) {
+      widget.sniffer.cancelActiveTask();
+    }
     _downloadCancelToken?.cancel('页面已销毁');
     _downloadCancelToken = null;
     _downloadProgress.dispose();
     _inputController.dispose();
     _inputScrollController.dispose();
     super.dispose();
+  }
+
+  /// 用户主动终止当前解析流程
+  void _cancelParse() {
+    if (!_isParsing) return;
+    _isParsing = false;
+    if (mounted) setState(() {});
+    widget.sniffer.cancelActiveTask();
   }
 
   /// 一键粘贴剪贴板内容
@@ -134,18 +147,26 @@ class _ParsePageState extends State<ParsePage> {
     _downloadProgress.value = null;
     _lastProgressKey = '';
     widget.busy.value = true;
+    _isParsing = true;
+    _cancelLogged = false;
+    if (mounted) setState(() {});
 
     final url = UrlParser.extractDouyinUrl(_inputController.text);
     if (url == null) {
       widget.logs.add('未识别到有效的抖音链接，请检查粘贴内容');
       widget.busy.value = false;
+      _isParsing = false;
+      if (mounted) setState(() {});
       return;
     }
 
     try {
       widget.logs.add('正在解析作品...');
       final result = await widget.sniffer.sniffVideoUrl(url);
-      if (!mounted) return;
+      if (!mounted || !_isParsing) return;
+      _isParsing = false;
+      if (mounted) setState(() {});
+
       if (result.items.isEmpty) {
         widget.logs.add('未解析到可下载资源，请检查链接或稍后重试');
         return;
@@ -188,12 +209,22 @@ class _ParsePageState extends State<ParsePage> {
       }
     } catch (error) {
       if (!mounted) return;
-      widget.logs.add('操作失败：${_friendlyError(error)}');
+      final errorText = error.toString();
+      if (errorText.contains('用户已取消解析')) {
+        if (!_cancelLogged) {
+          _cancelLogged = true;
+          widget.logs.add('已取消解析');
+        }
+      } else {
+        widget.logs.add('操作失败：${_friendlyError(error)}');
+      }
     } finally {
       _downloadCancelToken = null;
       if (mounted) {
+        _isParsing = false;
         widget.busy.value = false;
         _downloadProgress.value = null;
+        setState(() {});
       }
     }
   }
@@ -317,20 +348,38 @@ class _ParsePageState extends State<ParsePage> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       FilledButton.tonalIcon(
-                        onPressed: busy ? null : _pasteFromClipboard,
+                        onPressed: _pasteFromClipboard,
                         icon: const Icon(Icons.paste_rounded, size: 18),
                         label: const Text('粘贴'),
                       ),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  FilledButton.icon(
-                    onPressed: busy ? null : _startParse,
-                    icon: const Icon(Icons.download),
-                    label: Text(busy ? '处理中...' : '解析作品'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: busy ? null : _startParse,
+                          icon: const Icon(Icons.download),
+                          label: Text(busy ? '处理中...' : '解析作品'),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
+                      ),
+                      if (_isParsing) ...[
+                        const SizedBox(width: 8),
+                        IconButton.filledTonal(
+                          onPressed: _cancelParse,
+                          icon: const Icon(Icons.close_rounded, size: 20),
+                          tooltip: '终止解析',
+                          style: IconButton.styleFrom(
+                            shape: const CircleBorder(),
+                            minimumSize: const Size(48, 48),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 16),
                   ValueListenableBuilder<double?>(

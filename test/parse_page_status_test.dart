@@ -127,11 +127,16 @@ void main() {
       expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
       expect(find.byIcon(Icons.info_outline), findsNothing);
 
-      // 4. 再次触发新任务（reset）
-      logs.reset('提取短链中...');
+      // 5. 取消态验证（已取消下载 与 已取消解析 均显示单行且渲染 Info 图标）
+      logs.add('已取消下载');
       await tester.pumpAndSettle();
+      expect(find.text('已取消下载'), findsOneWidget);
+      expect(find.byIcon(Icons.info_outline), findsOneWidget);
+      expect(find.byIcon(Icons.check_circle_outline), findsNothing);
 
-      expect(find.text('提取短链中...'), findsOneWidget);
+      logs.add('已取消解析');
+      await tester.pumpAndSettle();
+      expect(find.text('已取消解析'), findsOneWidget);
       expect(find.byIcon(Icons.info_outline), findsOneWidget);
       expect(find.byIcon(Icons.check_circle_outline), findsNothing);
     });

@@ -347,7 +347,7 @@ class AgentAutomationServer {
     _activeDownloadToken?.cancel('Agent 指令取消');
     _activeDownloadToken = null;
     busy.value = false;
-    logs.add('已取消当前任务');
+    logs.add('已取消解析');
     _sendJson(request, HttpStatus.ok, {'success': true});
   }
 

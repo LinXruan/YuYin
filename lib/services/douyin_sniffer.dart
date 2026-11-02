@@ -92,12 +92,13 @@ class DouyinSniffer {
   /// 当前嗅探任务执行时检测到的登录状态
   bool get isUserLoggedIn => _isLoggedIn;
 
-  /// 同时写入 logcat 和调试页日志，带相对启动时间
+  /// 写入终端调试日志与界面共享日志（界面日志保持纯净，终端 Debug 模式保留耗时标记）
   void _log(String message) {
-    final ms = DateTime.now().difference(_taskStartedAt).inMilliseconds;
-    final formatted = '[+${(ms / 1000).toStringAsFixed(2)}s] $message';
-    debugPrint('[JS-Sniffer] $formatted');
-    onLog?.call(formatted);
+    if (kDebugMode) {
+      final ms = DateTime.now().difference(_taskStartedAt).inMilliseconds;
+      debugPrint('[JS-Sniffer] [+${(ms / 1000).toStringAsFixed(2)}s] $message');
+    }
+    onLog?.call(message);
   }
 
   DouyinSniffer() {
