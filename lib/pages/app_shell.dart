@@ -53,6 +53,7 @@ class _AppShellState extends State<AppShell> {
 
     // JS 内部调试日志统一加 [解析] 前缀后写入共享日志
     _sniffer.onLog = (message) => _logs.add('[解析] $message');
+    _sniffer.isLoggedIn = () => _loggedIn.value;
 
     // 恢复上次留下的登录标记，并静默通过 WebView Cookie 本地库二次校验（0 网络开销）
     LoginStateStore.isLoggedIn().then((isSaved) async {

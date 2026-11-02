@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../models/media_item.dart';
+import '../utils/login_state_store.dart';
 import '../utils/url_parser.dart';
 import 'douyin_share_api.dart';
 import 'js_script_builder.dart';
@@ -82,6 +83,14 @@ class DouyinSniffer {
 
   /// JS 调试日志回调，由主界面设置
   void Function(String message)? onLog;
+
+  /// 登录状态回调，由主界面设置
+  bool Function()? isLoggedIn;
+
+  bool _isLoggedIn = false;
+
+  /// 当前嗅探任务执行时检测到的登录状态
+  bool get isUserLoggedIn => _isLoggedIn;
 
   /// 同时写入 logcat 和调试页日志，带相对启动时间
   void _log(String message) {
@@ -175,6 +184,19 @@ class DouyinSniffer {
     _loggedCaptchaFailure = false;
     _lateFallbackTimer?.cancel();
     _lateFallbackTimer = null;
+
+    if (isLoggedIn != null) {
+      _isLoggedIn = isLoggedIn!();
+    } else {
+      try {
+        final isSaved = await LoginStateStore.isLoggedIn();
+        _isLoggedIn =
+            isSaved && await LoginStateStore.checkWebViewCookieSession();
+      } catch (_) {
+        _isLoggedIn = false;
+      }
+    }
+    _log('开始解析 (task#$taskId, 登录状态: ${_isLoggedIn ? '已登录' : '未登录'}): $shareUrl');
 
     _timeoutTimer?.cancel();
     _timeoutTimer = Timer(_kTaskTimeout, () {
@@ -344,8 +366,21 @@ class DouyinSniffer {
         _log('分享页兜底命中（等待实况补充）: ${result.items.length} 个资源');
         _scheduleImageFallback(result, taskId);
       } else if (result.items.isNotEmpty) {
-        _shareVideoFallback = result;
-        _log('分享页已取到 ${result.items.length} 个视频档位，等待 WebView 结果');
+        if (!_isLoggedIn) {
+          _log('未登录状态：分享页已获取无水印视频，极速完成解析');
+          unawaited(
+            _finishWithItems(
+              result.items,
+              false,
+              taskId,
+              title: result.title,
+              desc: result.desc,
+            ),
+          );
+        } else {
+          _shareVideoFallback = result;
+          _log('分享页已取到 ${result.items.length} 个视频档位，已登录状态等待主 WebView 完整画质');
+        }
       }
     } on DouyinShareCancelledException {
       // WebView 先完成或新任务开始时会被主动取消，不必显示为失败
@@ -387,14 +422,14 @@ class DouyinSniffer {
     });
   }
 
-  /// B 失败：图文页 3 秒后切 C；视频页先等主 WebView
+  /// B 失败：未登录或图文页 3 秒后切 C；已登录视频页先等主 WebView
   void _handleShareFallbackFailure(
     String awemeId,
     int taskId,
     String message,
   ) {
     _shareFallbackFailed = true;
-    if (_isNotePage) {
+    if (_isNotePage || !_isLoggedIn) {
       _log('分享页兜底失败: $message（3 秒后切换 WebView 兜底）');
       _scheduleWebViewShareFallback(
         awemeId,
@@ -426,7 +461,7 @@ class DouyinSniffer {
       final completer = _completer;
       if (completer == null || completer.isCompleted) return;
 
-      if (_isNotePage) {
+      if (_isNotePage || !_isLoggedIn) {
         unawaited(_startWebViewShareFallback(awemeId, taskId));
         return;
       }
@@ -469,9 +504,9 @@ class DouyinSniffer {
     final completer = _completer;
     if (completer == null || completer.isCompleted) return;
 
-    // 非图文页且已确认视频：普通 C 不启动；只有迟到兜底才允许
-    if (!_isNotePage && _degradedVideoSeen && !lateFallback) {
-      _log('已确认视频作品，取消分享页切换，保留主 WebView');
+    // 已登录且确认是视频作品时，普通 C 不启动（等待主 WebView 提取全码率），只有迟到兜底才允许
+    if (_isLoggedIn && !_isNotePage && _degradedVideoSeen && !lateFallback) {
+      _log('已确认视频作品且处于登录状态，保留主 WebView 提取完整画质');
       return;
     }
 
