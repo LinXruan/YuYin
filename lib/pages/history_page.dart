@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/history_item.dart';
 import '../services/douyin_sniffer.dart';
@@ -26,6 +27,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   bool _isSelectionMode = false;
   final Set<String> _selectedIds = <String>{};
+  bool _isPromptDismissed = false;
 
   String _searchQuery = '';
 
@@ -69,9 +71,10 @@ class _HistoryPageState extends State<HistoryPage> {
     setState(() => _searchQuery = '');
   }
 
-  void _toggleSelectionMode() {
+  void _exitSelectionMode() {
+    if (!_isSelectionMode) return;
     setState(() {
-      _isSelectionMode = !_isSelectionMode;
+      _isSelectionMode = false;
       _selectedIds.clear();
     });
   }
@@ -172,68 +175,63 @@ class _HistoryPageState extends State<HistoryPage> {
     final displayedItems = HistoryStore.search(_searchQuery);
     final hasAnyRecord = HistoryStore.records.isNotEmpty;
 
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            // 1. 顶部自定义标题与操作胶囊按钮栏
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 16, 8),
-              child: Row(
-                children: [
-                  Text(
-                    '历史',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
+    return PopScope(
+      canPop: !_isSelectionMode,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _isSelectionMode) {
+          _exitSelectionMode();
+        }
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: Column(
+            children: [
+              // 1. 顶部自定义标题与操作胶囊按钮栏
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 16, 8),
+                child: Row(
+                  children: [
+                    Text(
+                      '历史',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
                     ),
-                  ),
-                  const Spacer(),
-                  if (hasAnyRecord) ...[
-                    if (!_isSelectionMode) ...[
-                      // 常规模式：选择按钮与清空按钮
-                      _PillButton(
-                        icon: Icons.checklist_rounded,
-                        label: '选择',
-                        onTap: _toggleSelectionMode,
-                      ),
-                      const SizedBox(width: 8),
-                      _PillButton(
-                        icon: Icons.delete_sweep_outlined,
-                        label: '清空',
-                        onTap: _confirmClearAll,
-                      ),
-                    ] else ...[
-                      // 多选模式：全选 / 删除 / 完成
-                      _PillButton(
-                        icon: Icons.select_all_rounded,
-                        label: _selectedIds.length == displayedItems.length
-                            ? '取消全选'
-                            : '全选',
-                        onTap: () => _toggleSelectAll(displayedItems),
-                      ),
-                      const SizedBox(width: 8),
-                      _PillButton(
-                        icon: Icons.delete_outline_rounded,
-                        label: _selectedIds.isEmpty
-                            ? '删除'
-                            : '删除(${_selectedIds.length})',
-                        isDestructive: _selectedIds.isNotEmpty,
-                        onTap: _selectedIds.isNotEmpty
-                            ? _confirmDeleteSelected
-                            : null,
-                      ),
-                      const SizedBox(width: 8),
-                      _PillButton(
-                        icon: Icons.check_rounded,
-                        label: '完成',
-                        onTap: _toggleSelectionMode,
-                      ),
+                    const Spacer(),
+                    if (hasAnyRecord) ...[
+                      if (!_isSelectionMode) ...[
+                        // 常规模式：只保留清空按钮
+                        _PillButton(
+                          icon: Icons.delete_sweep_outlined,
+                          label: '清空',
+                          onTap: _confirmClearAll,
+                        ),
+                      ] else ...[
+                        // 多选模式：全选 / 删除
+                        _PillButton(
+                          icon: Icons.select_all_rounded,
+                          label: _selectedIds.length == displayedItems.length
+                              ? '取消全选'
+                              : '全选',
+                          onTap: () => _toggleSelectAll(displayedItems),
+                        ),
+                        const SizedBox(width: 8),
+                        _PillButton(
+                          icon: Icons.delete_outline_rounded,
+                          label: _selectedIds.isEmpty
+                              ? '删除'
+                              : '删除(${_selectedIds.length})',
+                          isDestructive: _selectedIds.isNotEmpty,
+                          onTap: _selectedIds.isNotEmpty
+                              ? _confirmDeleteSelected
+                              : null,
+                        ),
+                      ],
                     ],
                   ],
-                ],
+                ),
               ),
-            ),
 
             // 2. 搜索框（匹配作品完整文案）
             if (hasAnyRecord || _searchQuery.isNotEmpty)
@@ -270,6 +268,10 @@ class _HistoryPageState extends State<HistoryPage> {
                   ),
                 ),
               ),
+
+            // 2.5 提示栏：在至少存在 1 条历史记录且非多选态时展示
+            if (hasAnyRecord && !_isSelectionMode && !_isPromptDismissed)
+              _buildPromptBanner(theme),
 
             // 3. 上下滑动的内容列表流
             Expanded(
@@ -332,17 +334,89 @@ class _HistoryPageState extends State<HistoryPage> {
                               }
                             },
                             onLongPress: () {
-                              if (!_isSelectionMode) {
-                                setState(() {
+                              HapticFeedback.selectionClick();
+                              setState(() {
+                                if (!_isSelectionMode) {
                                   _isSelectionMode = true;
+                                  _selectedIds.clear();
                                   _selectedIds.add(item.id);
-                                });
-                              }
+                                } else {
+                                  if (isSelected) {
+                                    _selectedIds.remove(item.id);
+                                  } else {
+                                    _selectedIds.add(item.id);
+                                  }
+                                }
+                              });
                             },
                           ),
                         );
                       },
                     ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+  /// 搜索框下方提示栏（样式与 PLAN_22 解析页未登录提示浮窗完全对齐）
+  Widget _buildPromptBanner(ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+
+    final backgroundColor = isDark
+        ? const Color(0xFF261F22)
+        : theme.colorScheme.primaryContainer.withValues(alpha: 0.28);
+    final borderColor = isDark
+        ? const Color(0xFF7B2949).withValues(alpha: 0.6)
+        : theme.colorScheme.primary.withValues(alpha: 0.25);
+    final iconColor =
+        isDark ? const Color(0xFFFFB0C8) : theme.colorScheme.primary;
+    final textColor =
+        isDark ? const Color(0xFFECE0E2) : theme.colorScheme.onSurface;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor, width: 1.0),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.tips_and_updates_outlined,
+              size: 18,
+              color: iconColor,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '长按进入选择模式',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: textColor,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                  height: 1.3,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            InkWell(
+              onTap: () => setState(() => _isPromptDismissed = true),
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  Icons.close_rounded,
+                  size: 16,
+                  color: textColor.withValues(alpha: 0.5),
+                ),
+              ),
             ),
           ],
         ),
@@ -368,7 +442,7 @@ class _HistoryPageState extends State<HistoryPage> {
             Text(
               hasAnyRecord ? '未找到匹配的作品文案' : '暂无历史记录',
               style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
@@ -490,18 +564,6 @@ class _HistoryCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // 多选模式复选框
-                if (isSelectionMode) ...[
-                  Checkbox(
-                    value: isSelected,
-                    onChanged: (_) => onTap(),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                ],
-
                 // 左侧封面缩略图
                 _buildThumbnail(theme),
                 const SizedBox(width: 14),

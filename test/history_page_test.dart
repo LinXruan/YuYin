@@ -17,7 +17,7 @@ void main() {
     );
   }
 
-  testWidgets('空状态：展示无历史记录提示且无选择/清空按钮', (tester) async {
+  testWidgets('空状态：展示无历史记录提示且无选择/清空按钮与提示栏', (tester) async {
     await tester.pumpWidget(buildTestWidget());
     await tester.pumpAndSettle();
 
@@ -26,9 +26,10 @@ void main() {
     expect(find.text('成功解析的作品会自动记录在这里，点一下即可重新载入'), findsOneWidget);
     expect(find.text('选择'), findsNothing);
     expect(find.text('清空'), findsNothing);
+    expect(find.text('长按进入选择模式'), findsNothing);
   });
 
-  testWidgets('列表展示：有数据时正确展示标题、时间、媒体摘要及操作按钮', (tester) async {
+  testWidgets('列表展示：有数据时展示标题、提示栏、时间、媒体摘要且无选择按钮', (tester) async {
     final now = DateTime.now();
     await HistoryStore.addRecord(
       HistoryItem(
@@ -60,14 +61,25 @@ void main() {
     expect(find.text('完整文案描述二'), findsWidgets);
     expect(find.text('视频/文案'), findsOneWidget);
     expect(find.text('图集/音频/文案'), findsOneWidget);
-    expect(find.text('选择'), findsOneWidget);
+    // PLAN_42: 无“选择”按钮，仅保留“清空”
+    expect(find.text('选择'), findsNothing);
     expect(find.text('清空'), findsOneWidget);
+
+    // PLAN_42: 搜索框下方展示 PLAN_22 质感的提示栏
+    expect(find.text('长按进入选择模式'), findsOneWidget);
+
+    // 点击提示栏右侧关闭按钮可以关闭该提示
+    final closePromptBtn = find.byIcon(Icons.close_rounded);
+    expect(closePromptBtn, findsOneWidget);
+    await tester.tap(closePromptBtn);
+    await tester.pumpAndSettle();
+    expect(find.text('长按进入选择模式'), findsNothing);
 
     // 确保界面上任何位置均不包含“抖音”二字
     expect(find.textContaining('抖音'), findsNothing);
   });
 
-  testWidgets('点击条目：触发 onSelectRecord 回调', (tester) async {
+  testWidgets('点击条目：常规模式下触发 onSelectRecord 回调', (tester) async {
     HistoryItem? selectedItem;
     final item = HistoryItem(
       id: 'target_id',
@@ -134,7 +146,7 @@ void main() {
     expect(find.text('成都街头美食探店 地道火锅麻辣鲜香'), findsWidgets);
   });
 
-  testWidgets('多选模式与批量删除功能', (tester) async {
+  testWidgets('PLAN_42: 长按卡片进入多选模式、无勾选框、安卓返回键退出多选、批量删除', (tester) async {
     await HistoryStore.addRecord(
       HistoryItem(id: '1', url: 'https://v.douyin.com/1/', fullDesc: '测试条目一'),
     );
@@ -148,33 +160,49 @@ void main() {
     await tester.pumpWidget(buildTestWidget());
     await tester.pumpAndSettle();
 
-    // 1. 点击“选择”进入多选模式
-    await tester.tap(find.text('选择'));
+    // 验证初始状态：无勾选框、无“选择”按钮、无“完成”按钮
+    expect(find.byType(Checkbox), findsNothing);
+    expect(find.text('选择'), findsNothing);
+    expect(find.text('完成'), findsNothing);
+
+    // 1. 长按“测试条目一”进入多选模式，自动选中第一项
+    await tester.longPress(find.text('测试条目一').first);
     await tester.pumpAndSettle();
 
+    // 验证：进入多选模式后依然无 Checkbox，仅有边框变色高光提示
+    expect(find.byType(Checkbox), findsNothing);
     expect(find.text('全选'), findsOneWidget);
-    expect(find.text('完成'), findsOneWidget);
-    expect(find.text('删除'), findsOneWidget);
+    expect(find.text('完成'), findsNothing); // PLAN_42: “完成”按钮已删除
+    expect(find.text('删除(1)'), findsOneWidget);
 
-    // 2. 点击测试条目一勾选
-    await tester.tap(find.text('测试条目一').first);
+    // 2. 测试通过 Android 返回键（PopScope）退出多选模式
+    final dynamic widgetsAppState = tester.state(find.byType(WidgetsApp));
+    await widgetsAppState.didPopRoute();
+    await tester.pumpAndSettle();
+
+    // 验证：已退出多选模式，顶栏恢复为仅有“清空”按钮
+    expect(find.text('全选'), findsNothing);
+    expect(find.text('清空'), findsOneWidget);
+
+    // 3. 再次长按重新进入多选模式
+    await tester.longPress(find.text('测试条目一').first);
     await tester.pumpAndSettle();
     expect(find.text('删除(1)'), findsOneWidget);
 
-    // 3. 点击“全选”
+    // 4. 点击“全选”
     await tester.tap(find.text('全选'));
     await tester.pumpAndSettle();
     expect(find.text('删除(3)'), findsOneWidget);
     expect(find.text('取消全选'), findsOneWidget);
 
-    // 4. 点击“删除(3)”弹出确认弹窗
+    // 5. 点击“删除(3)”弹出确认弹窗
     await tester.tap(find.text('删除(3)'));
     await tester.pumpAndSettle();
 
     expect(find.text('确认删除'), findsOneWidget);
     expect(find.text('确定要删除选中的 3 条历史记录吗？'), findsOneWidget);
 
-    // 5. 确认删除
+    // 6. 确认删除
     await tester.tap(find.widgetWithText(FilledButton, '删除'));
     await tester.pumpAndSettle();
 

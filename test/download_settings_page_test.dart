@@ -23,7 +23,7 @@ void main() {
 
     // 2. 验证“自定义保存位置”入口
     expect(find.text('自定义保存位置'), findsOneWidget);
-    expect(find.text('默认相册路径（/Movies、/Pictures、/Music）'), findsOneWidget);
+    expect(find.text('当前为默认路径'), findsOneWidget);
 
     // 3. 验证“仅显示同分辨率下最高画质”开关
     expect(find.text('仅显示同分辨率下最高画质'), findsOneWidget);

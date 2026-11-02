@@ -27,8 +27,8 @@ class DownloadSettingsPage extends StatelessWidget {
                 title: const Text('自定义保存位置'),
                 subtitle: Text(
                   isDefault
-                      ? '默认相册路径（/Movies、/Pictures、/Music）'
-                      : '已自定义部分或全部目录',
+                      ? '当前为默认路径'
+                      : '已自定义保存路径',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => SaveLocationDialog.show(context),
@@ -45,7 +45,7 @@ class DownloadSettingsPage extends StatelessWidget {
                 secondary: const Icon(Icons.high_quality_outlined),
                 title: const Text('仅显示同分辨率下最高画质'),
                 subtitle: const Text(
-                  '开启后，同一分辨率（如 1080P）只展示最高码率的最优档位；关闭则列出全部检测到的画质档位',
+                  '保存页同一分辨率只展示最高画质的下载选项',
                 ),
                 value: onlyHighest,
                 onChanged: (val) {
