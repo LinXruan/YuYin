@@ -237,7 +237,7 @@ void main() {
     expect(find.text('长按进入选择模式'), findsNothing);
   });
 
-  testWidgets('历史卡片封面缩略图使用 BoxFit.contain 确保不拉伸不压缩', (tester) async {
+  testWidgets('历史卡片封面缩略图使用 BoxFit.cover 裁切填满且不拉伸变形（对齐保存页）', (tester) async {
     await HistoryStore.addRecord(
       HistoryItem(
         id: '1',
@@ -253,7 +253,7 @@ void main() {
     final imageFinder = find.byType(Image);
     expect(imageFinder, findsOneWidget);
     final imageWidget = tester.widget<Image>(imageFinder);
-    expect(imageWidget.fit, BoxFit.contain);
+    expect(imageWidget.fit, BoxFit.cover);
     expect(imageWidget.alignment, Alignment.center);
   });
 }
