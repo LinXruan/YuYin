@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 
 import '../app_info.dart';
 import '../models/media_item.dart';
+import '../utils/download_settings_store.dart';
 import '../utils/file_name_formatter.dart';
 import '../utils/log_controller.dart';
 import '../utils/save_location_store.dart';
@@ -91,6 +92,8 @@ class AgentAutomationServer {
         await _handleCancel(request);
       } else if (path == '/api/eval' && request.method == 'POST') {
         await _handleEval(request);
+      } else if (path == '/api/settings/quality' && request.method == 'POST') {
+        await _handleSetQualitySetting(request);
       } else {
         _sendJson(
           request,
@@ -136,6 +139,11 @@ class AgentAutomationServer {
       'lastInput': _lastRawInput,
       'lastResult': lastResultJson,
       'logsCount': logs.logs.length,
+      'downloadSettings': {
+        'onlyHighestQualityPerResolution':
+            DownloadSettingsStore.onlyHighestQualityPerResolution,
+        'isSaveLocationDefault': SaveLocationStore.isAllDefault,
+      },
     });
   }
 
@@ -387,6 +395,30 @@ class AgentAutomationServer {
         {'error': 'JS 执行失败: $e', 'code': 500},
       );
     }
+  }
+
+  /// POST /api/settings/quality：切换“仅显示同分辨率下最高画质”开关
+  Future<void> _handleSetQualitySetting(HttpRequest request) async {
+    final body = await _readJsonBody(request);
+    final enabled = body['onlyHighestQualityPerResolution'];
+    if (enabled is! bool) {
+      _sendJson(
+        request,
+        HttpStatus.badRequest,
+        {
+          'error': '缺少必要布尔参数: onlyHighestQualityPerResolution',
+          'code': 400,
+        },
+      );
+      return;
+    }
+
+    await DownloadSettingsStore.setOnlyHighestQualityPerResolution(enabled);
+    _sendJson(request, HttpStatus.ok, {
+      'success': true,
+      'onlyHighestQualityPerResolution':
+          DownloadSettingsStore.onlyHighestQualityPerResolution,
+    });
   }
 
   List<Map<String, dynamic>> _serializeItems(List<MediaItem> items) {

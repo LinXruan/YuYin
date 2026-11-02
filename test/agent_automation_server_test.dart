@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/app_info.dart';
 import 'package:yuyin/services/agent_automation_server.dart';
+import 'package:yuyin/utils/download_settings_store.dart';
 import 'package:yuyin/utils/log_controller.dart';
 
 void main() {
@@ -17,6 +18,7 @@ void main() {
     const testPort = 9876;
 
     setUp(() async {
+      DownloadSettingsStore.resetForTesting(defaultValue: true);
       logs = LogController();
       busy = ValueNotifier<bool>(false);
       loggedIn = ValueNotifier<bool>(false);
@@ -53,6 +55,33 @@ void main() {
       expect(json['busy'], isFalse);
       expect(json['loggedIn'], isFalse);
       expect(json['hasParsedResult'], isFalse);
+      expect(
+        json['downloadSettings']['onlyHighestQualityPerResolution'],
+        isTrue,
+      );
+    });
+
+    test('POST /api/settings/quality 正常切换画质设置', () async {
+      final req1 = await client.postUrl(
+        Uri.parse('http://127.0.0.1:$testPort/api/settings/quality'),
+      );
+      req1.headers.contentType = ContentType.json;
+      req1.write(jsonEncode({'onlyHighestQualityPerResolution': false}));
+      final resp1 = await req1.close();
+      expect(resp1.statusCode, HttpStatus.ok);
+      final json1 = jsonDecode(await utf8.decodeStream(resp1)) as Map;
+      expect(json1['success'], isTrue);
+      expect(json1['onlyHighestQualityPerResolution'], isFalse);
+      expect(DownloadSettingsStore.onlyHighestQualityPerResolution, isFalse);
+
+      // 参数错误时返回 400
+      final req2 = await client.postUrl(
+        Uri.parse('http://127.0.0.1:$testPort/api/settings/quality'),
+      );
+      req2.headers.contentType = ContentType.json;
+      req2.write(jsonEncode({'invalidParam': 123}));
+      final resp2 = await req2.close();
+      expect(resp2.statusCode, HttpStatus.badRequest);
     });
 
     test('GET /api/logs 与 POST /api/logs/clear 正常读取与清空日志', () async {
@@ -109,7 +138,7 @@ void main() {
       final resp = await req.close();
       expect(resp.statusCode, HttpStatus.badRequest);
       final json = jsonDecode(await utf8.decodeStream(resp)) as Map;
-      expect(json['error'], contains('尚未成功解析作品'));
+      expect(json['error'], contains('当前无可用解析结果'));
     });
 
     test('POST /api/eval 缺少 script 参数返回 400', () async {
@@ -121,7 +150,7 @@ void main() {
       final resp = await req.close();
       expect(resp.statusCode, HttpStatus.badRequest);
       final json = jsonDecode(await utf8.decodeStream(resp)) as Map;
-      expect(json['error'], contains('缺少 script 参数'));
+      expect(json['error'], contains('缺少必要参数: script'));
     });
 
     test('POST /api/eval Sniffer 未注入时返回 503', () async {
@@ -133,7 +162,7 @@ void main() {
       final resp = await req.close();
       expect(resp.statusCode, HttpStatus.serviceUnavailable);
       final json = jsonDecode(await utf8.decodeStream(resp)) as Map;
-      expect(json['error'], contains('Sniffer 服务未初始化'));
+      expect(json['error'], contains('嗅探器未注入'));
     });
   });
 }

@@ -43,9 +43,16 @@ switch ($Action.ToLower()) {
         $resp | ConvertTo-Json -Depth 5
     }
 
+    "quality" {
+        $enabled = if ($Arg1 -eq "off" -or $Arg1 -eq "false" -or $Arg1 -eq "0") { $false } else { $true }
+        $body = @{ onlyHighestQualityPerResolution = $enabled } | ConvertTo-Json
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/settings/quality" -Method Post -Body $body -ContentType "application/json; charset=utf-8"
+        Write-Host "[AgentBridge] [成功] 仅显示同分辨率最高画质: $($resp.onlyHighestQualityPerResolution)"
+    }
+
     "parse" {
         if (-not $Arg1) {
-            throw "请提供要解析的抖音作品链接或分享文本，例如: .gent_cmd.bat parse 'https://v.douyin.com/...'"
+            throw "请提供要解析的抖音作品链接或分享文本，例如: .\tool\agent_cmd.bat parse 'https://v.douyin.com/...'"
         }
         Write-Host "[AgentBridge] 正在请求解析: $Arg1 ..."
         $body = @{ text = $Arg1 } | ConvertTo-Json
@@ -73,7 +80,8 @@ switch ($Action.ToLower()) {
     }
 
     "logs" {
-        $resp = Invoke-RestMethod -Uri "$baseUrl/api/logs" -Method Get
+        $tail = if ($Arg1) { "?tail=$Arg1" } else { "" }
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/logs$tail" -Method Get
         Write-Host "=== 应用运行日志 (共 $($resp.count) 条) ==="
         $resp.logs | ForEach-Object { Write-Host $_ }
     }
@@ -99,6 +107,6 @@ switch ($Action.ToLower()) {
 
     default {
         Write-Host "未知指令: $Action"
-        Write-Host "支持的指令: setup, status, parse, download, logs, clear-logs, cancel, eval"
+        Write-Host "支持的指令: setup, status, quality [on|off], parse, download, logs, clear-logs, cancel, eval"
     }
 }

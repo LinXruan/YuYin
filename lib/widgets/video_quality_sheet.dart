@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/media_item.dart';
+import '../utils/download_settings_store.dart';
 
 /// 普通视频画质选择面板：展示每个档位的分辨率、码率和文件大小。
 class VideoQualitySheet extends StatelessWidget {
@@ -13,11 +14,13 @@ class VideoQualitySheet extends StatelessWidget {
     BuildContext context,
     List<MediaItem> videoQualities,
   ) {
+    // 依据设置中的“仅显示同分辨率下最高画质”进行智能过滤
+    final filtered = DownloadSettingsStore.filterQualities(videoQualities);
     return showModalBottomSheet<MediaItem>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => VideoQualitySheet(videoQualities: videoQualities),
+      builder: (_) => VideoQualitySheet(videoQualities: filtered),
     );
   }
 
