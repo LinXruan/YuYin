@@ -236,4 +236,24 @@ void main() {
 
     expect(find.text('长按进入选择模式'), findsNothing);
   });
+
+  testWidgets('历史卡片封面缩略图使用 BoxFit.contain 确保不拉伸不压缩', (tester) async {
+    await HistoryStore.addRecord(
+      HistoryItem(
+        id: '1',
+        url: 'https://v.douyin.com/1/',
+        fullDesc: '包含封面的作品',
+        coverUrl: 'https://p3-pc.douyinpic.com/tos-cn-p-0015/cover.jpeg',
+      ),
+    );
+
+    await tester.pumpWidget(buildTestWidget());
+    await tester.pump();
+
+    final imageFinder = find.byType(Image);
+    expect(imageFinder, findsOneWidget);
+    final imageWidget = tester.widget<Image>(imageFinder);
+    expect(imageWidget.fit, BoxFit.contain);
+    expect(imageWidget.alignment, Alignment.center);
+  });
 }

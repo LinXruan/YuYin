@@ -264,6 +264,9 @@ const String kDouyinSniffJs = r'''
         if (pInfo && pInfo.video && pInfo.video.cover && Array.isArray(pInfo.video.cover.url_list) && pInfo.video.cover.url_list.length) {
           return clean(pInfo.video.cover.url_list[0]);
         }
+        if (pInfo && pInfo.video && pInfo.video.origin_cover && Array.isArray(pInfo.video.origin_cover.url_list) && pInfo.video.origin_cover.url_list.length) {
+          return clean(pInfo.video.origin_cover.url_list[0]);
+        }
       }
       var domVideos = document.getElementsByTagName('video');
       for (var i = 0; i < domVideos.length; i++) {

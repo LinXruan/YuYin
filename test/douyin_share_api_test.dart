@@ -235,6 +235,44 @@ void main() {
       expect(result.coverUrl, 'https://p3-pc.douyinpic.com/tos-cn-p-0015/cover1.jpeg');
     });
 
+    test('视频作品优先捕获自定义封面 cover 并排斥视频地址', () {
+      final root = {
+        'loaderData': {
+          'video_(id)/page': {
+            'videoInfoRes': {
+              'item_list': [
+                {
+                  'aweme_id': '889',
+                  'desc': '封面测试作品',
+                  'video': {
+                    'cover': {
+                      'url_list': [
+                        'https://p3-pc.douyinpic.com/tos-cn-p-0015/creator_custom_cover.jpeg',
+                      ],
+                    },
+                    'origin_cover': {
+                      'url_list': [
+                        'https://p3-pc.douyinpic.com/tos-cn-p-0015/raw_zero_frame_black.jpeg',
+                      ],
+                    },
+                    'play_addr': {
+                      'url_list': ['https://cdn.example.com/video.mp4'],
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      };
+      final result = DouyinShareApi.parseShareHtml(_htmlFor(root), '889');
+      expect(result, isNotNull);
+      expect(
+        result!.coverUrl,
+        'https://p3-pc.douyinpic.com/tos-cn-p-0015/creator_custom_cover.jpeg',
+      );
+    });
+
     test('目标作品不是第一项时优先匹配 aweme_id', () {
       final root = {
         'loaderData': {

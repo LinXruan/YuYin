@@ -627,7 +627,8 @@ class _HistoryCard extends StatelessWidget {
                     height: size,
                     cacheWidth: 160,
                     cacheHeight: 160,
-                    fit: BoxFit.cover,
+                    fit: BoxFit.contain,
+                    alignment: Alignment.center,
                     headers: const {
                       'Referer': 'https://www.douyin.com/',
                       'User-Agent': DouyinSniffer.desktopUserAgent,
