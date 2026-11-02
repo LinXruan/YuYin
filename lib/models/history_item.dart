@@ -6,12 +6,13 @@ class HistoryItem {
     this.rawInput = '',
     required this.fullDesc,
     this.title,
-    this.coverUrl,
+    String? coverUrl,
     this.isImagePost = false,
     this.mediaSummary = '',
     this.itemCount = 1,
     DateTime? createdAt,
-  }) : createdAt = createdAt ?? DateTime.now();
+  })  : coverUrl = (coverUrl != null && !isVideoUrl(coverUrl)) ? coverUrl : null,
+        createdAt = createdAt ?? DateTime.now();
 
   /// 记录唯一标识（通常为作品短链或原始链接）
   final String id;
@@ -88,6 +89,19 @@ class HistoryItem {
         'itemCount': itemCount,
         'createdAt': createdAt.toIso8601String(),
       };
+
+  /// 判断一个 URL 是否为纯视频流链接（严禁作为封面缩略图）
+  static bool isVideoUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return false;
+    final lower = url.trim().toLowerCase();
+    return lower.contains('.mp4') ||
+        lower.contains('.mov') ||
+        lower.contains('.flv') ||
+        lower.contains('.m3u8') ||
+        lower.contains('video_id=') ||
+        lower.contains('/aweme/v1/play') ||
+        lower.contains('/playwm/');
+  }
 
   factory HistoryItem.fromJson(Map<String, dynamic> json) {
     return HistoryItem(

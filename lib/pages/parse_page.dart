@@ -225,14 +225,18 @@ class _ParsePageState extends State<ParsePage> {
               ? result.title!.trim()
               : (UrlParser.extractShareText(_inputController.text) ?? _inputController.text));
 
-      String? historyCover;
+      String? historyCover = (result.coverUrl?.trim().isNotEmpty ?? false)
+          ? result.coverUrl!.trim()
+          : null;
+      if (historyCover == null) {
       for (final it in result.items) {
         if (it.type == MediaType.image && it.url.isNotEmpty) {
           historyCover = it.url;
           break;
         }
       }
-      historyCover ??= (result.items.isNotEmpty ? result.items.first.url : null);
+      }
+      // 严格禁止将视频文件直链作为封面兜底，保持纯正图片直链或 null
 
       final summaryTags = <String>[];
       if (result.videoCount > 0) summaryTags.add(result.isImagePost ? '实况' : '视频');

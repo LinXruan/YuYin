@@ -72,6 +72,13 @@ void main() {
     expect(find.text('关闭'), findsOneWidget);
     expect(find.text('不再显示'), findsOneWidget);
 
+    // PLAN_43: 提示栏单行对齐校验，文案与右侧按钮严格处于同一水平线（dy 差值在 5px 内）
+    final promptTextY = tester.getCenter(find.text('长按进入选择模式')).dy;
+    final closeBtnY = tester.getCenter(find.text('关闭')).dy;
+    final neverShowBtnY = tester.getCenter(find.text('不再显示')).dy;
+    expect((promptTextY - closeBtnY).abs() < 5.0, isTrue);
+    expect((promptTextY - neverShowBtnY).abs() < 5.0, isTrue);
+
     // 点击提示栏右侧【关闭】按钮可以关闭该提示
     await tester.tap(find.text('关闭'));
     await tester.pumpAndSettle();

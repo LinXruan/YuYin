@@ -212,6 +212,7 @@ class DouyinSniffer {
             taskId,
             title: cached.title,
             desc: cached.desc,
+            coverUrl: cached.coverUrl,
           ),
         );
       } else {
@@ -376,6 +377,7 @@ class DouyinSniffer {
               taskId,
               title: result.title,
               desc: result.desc,
+              coverUrl: result.coverUrl,
             ),
           );
         } else {
@@ -418,6 +420,7 @@ class DouyinSniffer {
           taskId,
           title: pending.title,
           desc: pending.desc,
+          coverUrl: pending.coverUrl,
         ),
       );
     });
@@ -640,11 +643,13 @@ class DouyinSniffer {
       final items = parseChannelItems(data['items']);
       if (items.isNotEmpty) {
         final desc = data['desc']?.toString();
+        final coverUrl = data['coverUrl']?.toString();
         _finishWithItems(
           items,
           data['isImagePost'] == true,
           _taskId,
           desc: desc?.trim().isNotEmpty == true ? desc!.trim() : null,
+          coverUrl: coverUrl?.trim().isNotEmpty == true ? coverUrl!.trim() : null,
         );
       }
     } catch (e) {
@@ -674,6 +679,7 @@ class DouyinSniffer {
     int taskId, {
     String? title,
     String? desc,
+    String? coverUrl,
   }) async {
     if (taskId != _taskId) return;
     final completer = _completer;
@@ -708,6 +714,7 @@ class DouyinSniffer {
       isImagePost: isImagePost,
       title: title,
       desc: desc,
+      coverUrl: coverUrl,
     );
     final audioPart =
         result.audioCount > 0 ? '、${result.audioCount} 首配乐音频' : '';

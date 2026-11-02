@@ -4,7 +4,7 @@ const String kDouyinSniffJs = r'''
   // Dart 轮询重复注入，结果与日志状态必须挂到 window 上共享
   var S = window.__dyState || (window.__dyState = {
     sent: false, lastUrl: '', logs: {}, videoHintSent: false, degraded: false,
-    desc: '', scannedPaceIdx: 0
+    desc: '', coverUrl: '', scannedPaceIdx: 0
   });
   // 记录本次嗅探的起始时间；页面地址变化时重新计时
   if (!window.__dyStartTime || window.__dyStartHref !== location.href) {
@@ -240,7 +240,39 @@ const String kDouyinSniffJs = r'''
     return '';
   }
   // 按 url 去重后一次性回传（彻底废除 title 逻辑，专攻真实作品 desc）
-  function sendItems(items, isImagePost, customDesc) {
+  // 提取作品封面图（优先高清封面，严禁提取视频流）
+  function pickCover(node, video) {
+    var v = video || (node && node.video);
+    if (v) {
+      if (v.cover && Array.isArray(v.cover.url_list) && v.cover.url_list.length) return clean(v.cover.url_list[0]);
+      if (v.origin_cover && Array.isArray(v.origin_cover.url_list) && v.origin_cover.url_list.length) return clean(v.origin_cover.url_list[0]);
+      if (v.dynamic_cover && Array.isArray(v.dynamic_cover.url_list) && v.dynamic_cover.url_list.length) return clean(v.dynamic_cover.url_list[0]);
+      if (typeof v.poster === 'string' && v.poster) return clean(v.poster);
+    }
+    if (node) {
+      if (node.cover && Array.isArray(node.cover.url_list) && node.cover.url_list.length) return clean(node.cover.url_list[0]);
+      if (node.origin_cover && Array.isArray(node.origin_cover.url_list) && node.origin_cover.url_list.length) return clean(node.origin_cover.url_list[0]);
+      if (Array.isArray(node.images) && node.images.length && node.images[0] && Array.isArray(node.images[0].url_list) && node.images[0].url_list.length) {
+        return clean(node.images[0].url_list[0]);
+      }
+    }
+    try {
+      var p = window.player;
+      if (p && p.config) {
+        if (typeof p.config.poster === 'string' && p.config.poster) return clean(p.config.poster);
+        var pInfo = p.config.awemeInfo;
+        if (pInfo && pInfo.video && pInfo.video.cover && Array.isArray(pInfo.video.cover.url_list) && pInfo.video.cover.url_list.length) {
+          return clean(pInfo.video.cover.url_list[0]);
+        }
+      }
+      var domVideos = document.getElementsByTagName('video');
+      for (var i = 0; i < domVideos.length; i++) {
+        if (domVideos[i].poster) return clean(domVideos[i].poster);
+      }
+    } catch (e) {}
+    return '';
+  }
+  function sendItems(items, isImagePost, customDesc, customCover) {
     if (S.sent || !items || !items.length) return false;
     var unique = [], seen = {};
     for (var i = 0; i < items.length; i++) {
@@ -258,6 +290,12 @@ const String kDouyinSniffJs = r'''
     if (!unique.length || !window.DouyinChannel) return false;
     try {
       var finalDesc = customDesc || S.desc || '';
+      var finalCover = customCover || S.coverUrl || '';
+      if (!finalCover && isImagePost && unique.length) {
+        for (var k = 0; k < unique.length; k++) {
+          if (unique[k].mediaType === 'image') { finalCover = unique[k].url; break; }
+        }
+      }
       if (finalDesc) {
         log('捕获作品文案: ' + (finalDesc.length > 25 ? finalDesc.substring(0, 25) + '...' : finalDesc));
       }
@@ -267,7 +305,8 @@ const String kDouyinSniffJs = r'''
         type: 'result',
         isImagePost: !!isImagePost,
         items: unique,
-        desc: finalDesc
+        desc: finalDesc,
+        coverUrl: finalCover
       }));
       S.sent = true;
       return true;
@@ -282,9 +321,9 @@ const String kDouyinSniffJs = r'''
   }
   // 普通视频发送策略：完整档位立即发；
   // 主页面降级结果等待 12 秒，分享页发现基础流立即发
-  function sendVideoItems(items, customDesc) {
+  function sendVideoItems(items, customDesc, customCover) {
     if (!items || !items.length) return false;
-    if (hasCompleteQuality(items)) return sendItems(items, false, customDesc);
+    if (hasCompleteQuality(items)) return sendItems(items, false, customDesc, customCover);
 
     S.degraded = true;
     var sharePage = isSharePage();
@@ -309,7 +348,7 @@ const String kDouyinSniffJs = r'''
       return false;
     }
     if (sharePage) log('分享页发现基础视频流，立即回传');
-    return sendItems(items, false, customDesc);
+    return sendItems(items, false, customDesc, customCover);
   }
   // 单地址兜底：图文页不启用，避免误抓实况视频或背景音乐
   function reportSingle(raw, trusted, w, h) {
@@ -318,7 +357,8 @@ const String kDouyinSniffJs = r'''
     if (S.targetId && pid && pid !== S.targetId) return;
     var url = clean(raw);
     if (!url || url === S.lastUrl || (!trusted && !isMediaUrl(url))) return;
-    if (sendVideoItems([{ url: url, mediaType: 'video', resolution: resText(w, h) }], S.desc || '')) S.lastUrl = url;
+    var postCover = pickCover(null, null) || S.coverUrl || '';
+    if (sendVideoItems([{ url: url, mediaType: 'video', resolution: resText(w, h) }], S.desc || '', postCover)) S.lastUrl = url;
   }
   // 网络钩子：确保即使被外部 SecSDK/Axios 覆盖后仍能动态重新挂载
   function hookNetwork() {
@@ -437,13 +477,17 @@ const String kDouyinSniffJs = r'''
           log('捕获图文配乐音频');
         }
         var postDesc = node.desc || (node.share_info && node.share_info.share_desc) || S.desc || '';
-        if (items.length && sendItems(items, true, postDesc)) return;
+        var postCover = pickCover(node, null) || S.coverUrl || '';
+        if (postCover && !S.coverUrl) S.coverUrl = postCover;
+        if (items.length && sendItems(items, true, postDesc, postCover)) return;
       } else if (video) {
         var tiers = collectVideos(video);
         var postDesc = node.desc || (node.share_info && node.share_info.share_desc) || S.desc || '';
         if (tiers.length) {
           log('scanTree 发现视频档位: ' + tiers.length + ' 档');
-          if (sendVideoItems(tiers, postDesc)) return;
+          var postCover = pickCover(node, video) || S.coverUrl || '';
+          if (postCover && !S.coverUrl) S.coverUrl = postCover;
+          if (sendVideoItems(tiers, postDesc, postCover)) return;
         }
       }
       for (var key in node) {
@@ -466,7 +510,9 @@ const String kDouyinSniffJs = r'''
       var tiers = collectVideos(v);
       if (tiers.length) {
         log('scanPlayerData 发现播放器档位: ' + tiers.length + ' 档');
-        return sendVideoItems(tiers, postDesc);
+        var postCover = pickCover(info, v) || S.coverUrl || '';
+        if (postCover && !S.coverUrl) S.coverUrl = postCover;
+        return sendVideoItems(tiers, postDesc, postCover);
       }
       return false;
     } catch (e) { return false; }
@@ -553,7 +599,7 @@ const String kDouyinSniffJs = r'''
   hookNetwork();
   tryExtractNow();
   window.__douyinSnifferReset = function () {
-    S.sent = false; S.lastUrl = ''; S.logs = {}; S.targetId = ''; S.desc = '';
+    S.sent = false; S.lastUrl = ''; S.logs = {}; S.targetId = ''; S.desc = ''; S.coverUrl = '';
     S.videoHintSent = false; S.degraded = false; S.scannedPaceIdx = 0;
     window.__dyStartTime = Date.now();
     window.__dyStartHref = location.href;

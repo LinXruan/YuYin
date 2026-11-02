@@ -204,6 +204,37 @@ void main() {
       expect(result!.desc, '这是作品文案内容');
     });
 
+    test('视频作品正确捕获封面 coverUrl 并排斥视频地址', () {
+      final root = {
+        'loaderData': {
+          'video_(id)/page': {
+            'videoInfoRes': {
+              'item_list': [
+                {
+                  'aweme_id': '888',
+                  'desc': '封面测试作品',
+                  'video': {
+                    'cover': {
+                      'url_list': [
+                        'https://p3-pc.douyinpic.com/tos-cn-p-0015/cover1.jpeg',
+                      ],
+                    },
+                    'play_addr': {
+                      'url_list': ['https://cdn.example.com/video.mp4'],
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      };
+      final result = DouyinShareApi.parseShareHtml(_htmlFor(root), '888');
+      expect(result, isNotNull);
+      expect(result!.isImagePost, isFalse);
+      expect(result.coverUrl, 'https://p3-pc.douyinpic.com/tos-cn-p-0015/cover1.jpeg');
+    });
+
     test('目标作品不是第一项时优先匹配 aweme_id', () {
       final root = {
         'loaderData': {

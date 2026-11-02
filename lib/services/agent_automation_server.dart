@@ -200,14 +200,18 @@ class AgentAutomationServer {
 
       // 成功解析后自动计入历史记录
       if (result.items.isNotEmpty) {
-        String? coverUrl;
+        String? coverUrl = (result.coverUrl?.trim().isNotEmpty ?? false)
+            ? result.coverUrl!.trim()
+            : null;
+        if (coverUrl == null) {
         for (final it in result.items) {
           if (it.type == MediaType.image && it.url.isNotEmpty) {
             coverUrl = it.url;
             break;
           }
         }
-        coverUrl ??= (result.items.isNotEmpty ? result.items.first.url : null);
+        }
+        // 严格禁止将视频文件直链作为封面兜底，保持纯正图片直链或 null
 
         final summaryTags = <String>[];
         if (result.videoCount > 0) {

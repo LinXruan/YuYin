@@ -121,6 +121,7 @@ class SniffResult {
     required this.isImagePost,
     this.title,
     this.desc,
+    this.coverUrl,
   });
 
   final List<MediaItem> items;
@@ -134,6 +135,9 @@ class SniffResult {
 
   /// 作品文案描述（若为空则为 null）
   final String? desc;
+
+  /// 作品封面缩略图网络地址（若存在）
+  final String? coverUrl;
 
   /// 视频数量（含实况图视频）
   int get videoCount =>

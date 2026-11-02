@@ -28,12 +28,14 @@ class DouyinShareResult {
     required this.isImagePost,
     this.title,
     this.desc,
+    this.coverUrl,
   });
 
   final List<MediaItem> items;
   final bool isImagePost;
   final String? title;
   final String? desc;
+  final String? coverUrl;
 
   /// 视频数量（含实况图视频）
   int get videoCount =>
@@ -359,6 +361,10 @@ class DouyinShareApi {
         return DouyinShareResult(
           items: items,
           isImagePost: true,
+          coverUrl: pickCoverUrl(wrapped, item) ??
+              (items.any((it) => it.type == MediaType.image)
+                  ? items.firstWhere((it) => it.type == MediaType.image).url
+                  : null),
           desc: desc,
         );
       }
@@ -371,6 +377,7 @@ class DouyinShareApi {
         return DouyinShareResult(
           items: tiers,
           isImagePost: false,
+          coverUrl: pickCoverUrl(wrapped, item),
           desc: desc,
         );
       }
@@ -465,6 +472,65 @@ class DouyinShareApi {
   }
 
   /// 静态图：优先 jpeg/jpg，否则取 url_list 最后一项
+  /// 提取作品封面网络地址（优先提取高清封面图，严禁提取视频流）
+  static String? pickCoverUrl(Map<String, dynamic> wrapped, [Map<String, dynamic>? item]) {
+    final rawVideo = wrapped['video'] ?? item?['video'];
+    if (rawVideo is Map) {
+      final video = _asStringMap(rawVideo) ?? const {};
+      for (final key in ['cover', 'origin_cover', 'dynamic_cover']) {
+        final c = video[key];
+        if (c is Map) {
+          final url = _pickImageUrlList(c['url_list']);
+          if (url.isNotEmpty) return cleanUrl(url);
+        }
+      }
+      final poster = video['poster'];
+      if (poster is String && poster.trim().isNotEmpty) {
+        return cleanUrl(poster);
+      }
+    }
+
+    for (final source in [wrapped, item]) {
+      if (source == null) continue;
+      for (final key in ['cover', 'origin_cover', 'dynamic_cover']) {
+        final c = source[key];
+        if (c is Map) {
+          final url = _pickImageUrlList(c['url_list']);
+          if (url.isNotEmpty) return cleanUrl(url);
+        }
+      }
+    }
+
+    final images = _imagesOf(wrapped) ?? (item != null ? _imagesOf(item) : null);
+    if (images != null && images.isNotEmpty) {
+      final first = images.first;
+      if (first is Map) {
+        final img = _asStringMap(first);
+        if (img != null) {
+          final url = pickImageUrl(img);
+          if (url.isNotEmpty) return url;
+        }
+      }
+    }
+    return null;
+  }
+
+  static String _pickImageUrlList(Object? list) {
+    if (list is! List || list.isEmpty) return '';
+    for (final raw in list) {
+      final url = raw?.toString() ?? '';
+      final lower = url.toLowerCase();
+      if (lower.contains('.jpeg') ||
+          lower.contains('.jpg') ||
+          lower.contains('.webp') ||
+          lower.contains('.png') ||
+          lower.contains('tos-cn-p-')) {
+        return url;
+      }
+    }
+    return list.first?.toString() ?? '';
+  }
+
   static String pickImageUrl(Map<String, dynamic> img) {
     final list = img['url_list'];
     if (list is! List || list.isEmpty) return '';

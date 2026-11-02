@@ -64,6 +64,39 @@ void main() {
       expect(restored.createdAt, item.createdAt);
     });
 
+    test('isVideoUrl 精确识别视频流地址并排斥合法图片', () {
+      expect(HistoryItem.isVideoUrl('https://example.com/play.mp4'), isTrue);
+      expect(HistoryItem.isVideoUrl('https://example.com/play.mov'), isTrue);
+      expect(HistoryItem.isVideoUrl('https://example.com/live.flv'), isTrue);
+      expect(HistoryItem.isVideoUrl('https://iesdouyin.com/aweme/v1/play/?video_id=123'), isTrue);
+      expect(HistoryItem.isVideoUrl('https://iesdouyin.com/aweme/v1/playwm/?video_id=123'), isTrue);
+
+      expect(HistoryItem.isVideoUrl('https://p3.douyinpic.com/cover.jpeg'), isFalse);
+      expect(HistoryItem.isVideoUrl('https://p3.douyinpic.com/img.png'), isFalse);
+      expect(HistoryItem.isVideoUrl('https://p3.douyinpic.com/tos-cn-p-0015/thumb.webp'), isFalse);
+      expect(HistoryItem.isVideoUrl(null), isFalse);
+      expect(HistoryItem.isVideoUrl(''), isFalse);
+    });
+
+    test('构造函数与 fromJson 自动净化错误传入的视频流 coverUrl 为 null', () {
+      final item = HistoryItem(
+        id: 'bad_cover_id',
+        url: 'https://v.douyin.com/bad/',
+        fullDesc: '误存视频直链作为封面的条目',
+        coverUrl: 'https://iesdouyin.com/aweme/v1/play/?video_id=v0300fg10000',
+      );
+      expect(item.coverUrl, isNull);
+
+      final json = {
+        'id': 'legacy_dirty_id',
+        'url': 'https://v.douyin.com/dirty/',
+        'fullDesc': '旧版脏数据测试',
+        'coverUrl': 'https://cdn.example.com/video.mp4',
+      };
+      final parsed = HistoryItem.fromJson(json);
+      expect(parsed.coverUrl, isNull);
+    });
+
     test('formattedTime 绝对不包含“抖音”二字，并按时间差友好展示', () {
       final now = DateTime.now();
 

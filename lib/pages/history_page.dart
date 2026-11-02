@@ -341,78 +341,69 @@ class _HistoryPageState extends State<HistoryPage> {
       padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: borderColor, width: 1.0),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Row(
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Icon(
-                    Icons.tips_and_updates_outlined,
-                    size: 20,
-                    color: iconColor,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    '长按进入选择模式',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: textColor,
-                      fontWeight: FontWeight.w500,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ],
+            Icon(
+              Icons.tips_and_updates_outlined,
+              size: 18,
+              color: iconColor,
             ),
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () {
-                    setState(() => _sessionDismissed = true);
-                  },
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    foregroundColor: isDark
-                        ? const Color(0xFFD4C2C6)
-                        : theme.colorScheme.onSurfaceVariant,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                  ),
-                  child: const Text('关闭'),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '长按进入选择模式',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: textColor,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
                 ),
-                const SizedBox(width: 4),
-                TextButton(
-                  onPressed: () async {
-                    setState(() => _permanentlyDismissed = true);
-                    await HistoryStore.setPromptDismissed(true);
-                  },
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    foregroundColor: isDark
-                        ? const Color(0xFFFFB0C8)
-                        : theme.colorScheme.primary,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                  ),
-                  child: const Text('不再显示'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() => _sessionDismissed = true);
+              },
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                foregroundColor: isDark
+                    ? const Color(0xFFD4C2C6)
+                    : theme.colorScheme.onSurfaceVariant,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
                 ),
-              ],
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text('关闭'),
+            ),
+            const SizedBox(width: 4),
+            TextButton(
+              onPressed: () async {
+                setState(() => _permanentlyDismissed = true);
+                await HistoryStore.setPromptDismissed(true);
+              },
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                foregroundColor: isDark
+                    ? const Color(0xFFFFB0C8)
+                    : theme.colorScheme.primary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text('不再显示'),
             ),
           ],
         ),
@@ -613,10 +604,12 @@ class _HistoryCard extends StatelessWidget {
     );
   }
 
-  /// 封面缩略图构建：支持网络图片渲染与错误占位
+  /// 封面缩略图构建：支持网络图片渲染与错误占位（cacheWidth 节约内存并防止重复加载）
   Widget _buildThumbnail(ThemeData theme) {
     const size = 80.0;
-    final hasCover = item.coverUrl != null && item.coverUrl!.isNotEmpty;
+    final hasCover = item.coverUrl != null &&
+        item.coverUrl!.isNotEmpty &&
+        !HistoryItem.isVideoUrl(item.coverUrl);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
@@ -625,60 +618,98 @@ class _HistoryCard extends StatelessWidget {
         height: size,
         color: Colors.black.withValues(alpha: 0.85),
         child: hasCover
-            ? Image.network(
-                item.coverUrl!,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                headers: const {
-                  'Referer': 'https://www.douyin.com/',
-                  'User-Agent': DouyinSniffer.desktopUserAgent,
-                },
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) return child;
-                  return Center(
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        value: progress.expectedTotalBytes != null
-                            ? progress.cumulativeBytesLoaded /
-                                progress.expectedTotalBytes!
-                            : null,
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    item.coverUrl!,
+                    width: size,
+                    height: size,
+                    cacheWidth: 160,
+                    cacheHeight: 160,
+                    fit: BoxFit.cover,
+                    headers: const {
+                      'Referer': 'https://www.douyin.com/',
+                      'User-Agent': DouyinSniffer.desktopUserAgent,
+                    },
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return Center(
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            value: progress.expectedTotalBytes != null
+                                ? progress.cumulativeBytesLoaded /
+                                    progress.expectedTotalBytes!
+                                : null,
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) =>
+                        _buildFallbackThumbnail(theme),
+                  ),
+                  if (!item.isImagePost)
+                    Positioned(
+                      right: 4,
+                      bottom: 4,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Icon(
+                          Icons.play_arrow_rounded,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) =>
-                    _buildFallbackThumbnail(theme),
+                ],
               )
             : _buildFallbackThumbnail(theme),
       ),
     );
   }
 
-  /// 兜底缩略图（黑底白色标题小字，参考素材图）
+  /// 兜底缩略图（根据媒体类型渲染专属矢量图标与文案，避免重复请求并保持视觉优雅）
   Widget _buildFallbackThumbnail(ThemeData theme) {
+    final isVideo = !item.isImagePost;
     final display = item.fullDesc.isNotEmpty
         ? item.fullDesc
         : (item.title?.isNotEmpty == true ? item.title! : '作品');
 
     return Container(
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       color: const Color(0xFF1E1E1E),
       alignment: Alignment.center,
-      child: Text(
-        display,
-        maxLines: 3,
-        overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: Colors.white70,
-          fontSize: 10,
-          fontWeight: FontWeight.w500,
-          height: 1.2,
-        ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            isVideo
+                ? Icons.movie_creation_outlined
+                : Icons.photo_library_outlined,
+            size: 20,
+            color: Colors.white54,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            display,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w500,
+              height: 1.15,
+            ),
+          ),
+        ],
       ),
     );
   }
