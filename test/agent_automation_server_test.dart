@@ -111,5 +111,29 @@ void main() {
       final json = jsonDecode(await utf8.decodeStream(resp)) as Map;
       expect(json['error'], contains('尚未成功解析作品'));
     });
+
+    test('POST /api/eval 缺少 script 参数返回 400', () async {
+      final req = await client.postUrl(
+        Uri.parse('http://127.0.0.1:$testPort/api/eval'),
+      );
+      req.headers.contentType = ContentType.json;
+      req.write(jsonEncode({'script': ''}));
+      final resp = await req.close();
+      expect(resp.statusCode, HttpStatus.badRequest);
+      final json = jsonDecode(await utf8.decodeStream(resp)) as Map;
+      expect(json['error'], contains('缺少 script 参数'));
+    });
+
+    test('POST /api/eval Sniffer 未注入时返回 503', () async {
+      final req = await client.postUrl(
+        Uri.parse('http://127.0.0.1:$testPort/api/eval'),
+      );
+      req.headers.contentType = ContentType.json;
+      req.write(jsonEncode({'script': '1 + 1'}));
+      final resp = await req.close();
+      expect(resp.statusCode, HttpStatus.serviceUnavailable);
+      final json = jsonDecode(await utf8.decodeStream(resp)) as Map;
+      expect(json['error'], contains('Sniffer 服务未初始化'));
+    });
   });
 }

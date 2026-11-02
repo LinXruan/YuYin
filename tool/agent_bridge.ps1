@@ -88,8 +88,17 @@ switch ($Action.ToLower()) {
         Write-Host "[AgentBridge] [成功] 已取消当前任务"
     }
 
+    "eval" {
+        if (-not $Arg1) {
+            throw "请提供要执行的 JS 脚本，例如: .\tool\agent_cmd.bat eval 'location.href'"
+        }
+        $body = @{ script = $Arg1 } | ConvertTo-Json
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/eval" -Method Post -Body $body -ContentType "application/json; charset=utf-8"
+        Write-Host $resp.result
+    }
+
     default {
         Write-Host "未知指令: $Action"
-        Write-Host "支持的指令: setup, status, parse, download, logs, clear-logs, cancel"
+        Write-Host "支持的指令: setup, status, parse, download, logs, clear-logs, cancel, eval"
     }
 }

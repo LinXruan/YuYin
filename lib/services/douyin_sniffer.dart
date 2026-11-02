@@ -24,7 +24,7 @@ class DouyinSniffer {
 
   // 主任务与 A/B/C 兜底的时间预算
   static const Duration _kTaskTimeout = Duration(seconds: 30);
-  static const Duration _kInjectInterval = Duration(milliseconds: 1200);
+  static const Duration _kInjectInterval = Duration(milliseconds: 800);
   static const Duration _kNoteFallbackDelay = Duration(seconds: 3);
   static const Duration _kVideoFallbackDelay = Duration(seconds: 8);
   static const Duration _kLateFallbackAt = Duration(seconds: 18);
@@ -83,10 +83,12 @@ class DouyinSniffer {
   /// JS 调试日志回调，由主界面设置
   void Function(String message)? onLog;
 
-  /// 同时写入 logcat 和调试页日志，确保复制日志包含失败原因
+  /// 同时写入 logcat 和调试页日志，带相对启动时间
   void _log(String message) {
-    debugPrint('[JS-Sniffer] $message');
-    onLog?.call(message);
+    final ms = DateTime.now().difference(_taskStartedAt).inMilliseconds;
+    final formatted = '[+${(ms / 1000).toStringAsFixed(2)}s] $message';
+    debugPrint('[JS-Sniffer] $formatted');
+    onLog?.call(formatted);
   }
 
   DouyinSniffer() {
@@ -428,8 +430,8 @@ class DouyinSniffer {
         unawaited(_startWebViewShareFallback(awemeId, taskId));
         return;
       }
-      if (_degradedVideoSeen) {
-        // 已确认是视频：不立即切走，改为约 18 秒的迟到兜底
+      if (_degradedVideoSeen || _workPageKind == DouyinWorkPage.video) {
+        // 已确认是视频页面：不立即切走，给予主页面桌面版完整提取时间，改为约 18 秒的迟到兜底
         _scheduleLateWebViewFallback(awemeId, taskId);
       } else {
         unawaited(_startWebViewShareFallback(awemeId, taskId));

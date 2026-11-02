@@ -6,12 +6,16 @@
 
 ## 1. 模拟器环境与应用生命周期
 
-### 1.1 模拟器基本配置
+### 1.1 模拟器基本配置与窗口启动
 - **AVD 名称**：`Medium_Phone_API_37.0`（WHPX 加速，Play Store x86_64 架构）。
-- **启动命令**：
+- **启动命令（带桌面交互窗口，推荐）**：
   ```cmd
-  %LOCALAPPDATA%\Android\Sdk\emulator\emulator.exe -avd Medium_Phone_API_37.0 -memory 3072
+  .\tool\start_emulator.bat
   ```
+  > [!TIP]
+  > **为何使用 `start_emulator.bat`**：
+  > 该脚本调用 Windows `start` 命令以独立 GUI 进程拉起模拟器，确保在用户的交互桌面正常显示手机外观窗口与屏幕，方便直观观察界面变化、动效与弹窗。
+  > （注：若直接在后台 Shell 管道中调用 `emulator.exe`，进程会被系统作为无头服务挂载，导致桌面上看不到窗口）。
 - **等待引导就绪**：
   ```bash
   adb wait-for-device
@@ -26,7 +30,7 @@
   .\tool\build_debug_apk.bat
 
   # 2. 覆盖安装至模拟器（严禁卸载旧版或清除数据）
-  adb install -r build\app\outputs\flutter-apk\YuYin_1.2.7_debug.apk
+  adb install -r build\app\outputs\flutter-apk\YuYin_1.3.3_debug.apk
   ```
 - **启动应用（唤醒前台）**：
   ```bash
@@ -39,7 +43,7 @@
 
 ### 1.3 宿主机环境与会话注意事项
 - **内存保护**：宿主机物理内存为 16GB，Gradle 配置为 `-Xmx8G`。**在执行全量 Release 构建时切勿同时运行模拟器**，防止宿主机内存溢出。
-- **Agent 沙盒会话限制**：AI Agent 若在非交互 Session 中直接拉起模拟器子进程，可能无法投射 Qt 窗口到用户交互桌面。因此**优先由用户在桌面端预先启动模拟器**，Agent 通过 ADB 与 HTTP 端口进行无头驱动。
+- **窗口与无头模式一致性**：无论模拟器是以可见桌面窗口（`.\tool\start_emulator.bat`）运行，还是以无头后台进程运行，底层均加载同一个 AVD 镜像（`Medium_Phone_API_37.0`）、数据分区与网络端口（`adb`、`tcp:9527`），**对 Agent 的 Debug、接口调用与自动化测试完全没有任何区别或负面影响**。调出桌面窗口可以让开发者与 Agent 更加直观地协同开发。
 
 ---
 
@@ -61,9 +65,10 @@
 | `.\tool\agent_cmd.bat parse "<text>"` | 链接或口令文本 | 触发后台 WebView 嗅探，返回文案、资源总数及媒体档位列表 | 终端打印格式化表格（类型、分辨率、码率等） |
 | `.\tool\agent_cmd.bat download all` | `all` | 下载当前已解析出的全部资源 | 按智能语义化命名保存至相册，输出落地文件名 |
 | `.\tool\agent_cmd.bat download 0,1` | 逗号分隔索引 | 仅下载指定序号项（如第 0、1 项） | 仅保存指定选中项 |
-| `.\tool\agent_cmd.bat logs` | 无 | 获取应用内全部运行与嗅探日志（无需过滤 logcat） | 输出完整的 `[解析]` 过程日志与下载结果 |
+| `.\tool\agent_cmd.bat logs [n]` | 可选数字 `n` (如 `20`) | 获取应用日志。提供 `n` 时仅展示最新 `n` 条（防止撑爆上下文） | 输出最近过程日志与保存结果 |
 | `.\tool\agent_cmd.bat clear-logs` | 无 | 清空应用内当前日志缓存 | `[AgentBridge] [成功] 日志已清空` |
 | `.\tool\agent_cmd.bat cancel` | 无 | 终止当前正在进行的嗅探解析或下载任务 | 停止定时器并加载空页面 |
+| `.\tool\agent_cmd.bat eval "<script>"` | JS 脚本表达式 | 向后台嗅探 WebView 注入并同步执行 JS，返回执行结果 | 终端输出 JS 表达式求值结果 |
 
 ### 2.2 底层 REST API 规范 (Port 9527)
 
@@ -74,9 +79,10 @@
 | `/api/status` | `GET` | 无 | `{"app":"余音","version":"...","busy":false,"loggedIn":false,"hasParsedResult":true,...}` | 应用全局状态 |
 | `/api/parse` | `POST` | `{"text":"<url_or_token>"}` | `{"desc":"...","isImagePost":true,"totalItems":8,"items":[...]}` | 嗅探解析作品 |
 | `/api/download` | `POST` | `{"indices":"all"}` 或 `{"indices":[0,1]}` | `{"downloadedCount":2,"savedTypes":["image"],"expectedFiles":["..._1.jpg"]}` | 下载资源落盘 |
-| `/api/logs` | `GET` | 无 | `{"count":12,"logs":["正在提取短链...","[解析] 捕获作品文案..."]}` | 结构化日志流 |
+| `/api/logs` | `GET` | 无 (支持 `?tail=20` 或 `?limit=50`) | `{"total":120,"count":20,"logs":["..."]}` | 结构化日志流 (支持尾部/限额截取) |
 | `/api/logs/clear`| `POST` | 无 | `{"success":true,"message":"Logs cleared"}` | 清空日志缓存 |
 | `/api/cancel` | `POST` | 无 | `{"success":true,"message":"Task cancelled"}` | 取消活动任务 |
+| `/api/eval` | `POST` | `{"script":"<js_expression>"}` | `{"success":true,"result":"..."}` | 注入执行 JS 脚本 |
 
 ---
 
@@ -85,7 +91,11 @@
 在完成代码修改后，遵循以下流水线进行快速、可靠的闭环验证：
 
 ```cmd
+:: 0. 启动模拟器（桌面显示手机窗口）
+.\tool\start_emulator.bat
+
 :: 1. 确保模拟器在线并唤醒应用
+adb wait-for-device
 adb shell monkey -p com.debug.yuyin -c android.intent.category.LAUNCHER 1
 
 :: 2. 建立端口映射并确认就绪
@@ -104,8 +114,8 @@ adb shell monkey -p com.debug.yuyin -c android.intent.category.LAUNCHER 1
 adb shell ls -la /sdcard/Pictures/YuYin/
 adb shell ls -la /sdcard/Movies/YuYin/
 
-:: 7. 获取应用内全量过程日志
-.\tool\agent_cmd.bat logs
+:: 7. 获取应用内过程日志（推荐加上条数如 20，避免日志过长）
+.\tool\agent_cmd.bat logs 20
 ```
 
 ---
