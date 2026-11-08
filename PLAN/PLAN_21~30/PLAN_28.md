@@ -9,7 +9,7 @@
 
 ### 1. 核心需求点
 1. **作品标题（Title）优先捕获**：
-   - 深入嗅探流程，从主 WebView 注入脚本、iesdouyin 分享页 API、播放器配置等源头解析作品的标题（`item_title` / `title`）；
+   - 深入捕获流程，从主 WebView 注入脚本、iesdouyin 分享页 API、播放器配置等源头解析作品的标题（`item_title` / `title`）；
 2. **文案（Desc）优雅兜底捕获**：
    - 针对绝大多数没有独立标题的抖音作品，无缝回退提取作品文案描述（`desc` / `share_title`）；
    - 若标题与文案均为空，安全回退到时间戳前缀保底，确保写入永远成功。
@@ -127,7 +127,7 @@ final fileName = '$cleanBaseName$suffix.$ext';
    - `DouyinShareResult` 增加 `title` 与 `desc` 字段；
    - `parseItem` 解析并提取 `title` 与 `desc`。
 4. **`lib/services/js_script_builder.dart`** [修改]：
-   - JS 嗅探脚本中的 `scanTree`、`scanPlayerData`、`reportSingle` 提取 `item_title`、`title`、`desc`、DOM 元数据并挂载到回传的 `result` 消息中。
+   - JS 捕获脚本中的 `scanTree`、`scanPlayerData`、`reportSingle` 提取 `item_title`、`title`、`desc`、DOM 元数据并挂载到回传的 `result` 消息中。
 5. **`lib/services/douyin_sniffer.dart`** [修改]：
    - 接收 JS 回传的 `title` 与 `desc`，传递至 `SniffResult`；分享页兜底同理。
 6. **`lib/services/video_downloader.dart`** [修改]：

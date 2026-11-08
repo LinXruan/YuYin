@@ -9,7 +9,7 @@
 2. **下次解析触发误判**：若用户登录后未主动开启抖音的“保存登录”选项，在随后的解析流程中，软件会**错误地判定用户已失效并强制清空登录态**；
 3. **实测结论**：
    - 用户实测确认：**登录判断已彻底成功**，解除误杀后未开启“保存登录”也能完全稳定解析高画质；
-   - 抖音官方的“保存登录信息”仅用于用户在退出登录后方便再次登录，对后台嗅探解析**毫无影响、完全没有必要作为前置条件**；
+   - 抖音官方的“保存登录信息”仅用于用户在退出登录后方便再次登录，对后台捕获解析**毫无影响、完全没有必要作为前置条件**；
    - 因此，彻底移除“保存登录信息”的相关探测、状态模型及多余弹窗，保持系统纯粹敏捷。
 
 ### 2. 底层根因剖析 (Root Cause)
@@ -17,7 +17,7 @@
 - **浏览器安全机制限制**：现代主流网站（包括抖音）中，核心登录凭证（如 `sessionid`、`sessionid_ss`）均由服务端强制设置了 `HttpOnly` 标识。**JavaScript 的 `document.cookie` 根本无法读取到带 HttpOnly 的 Cookie**；
 - **“保存登录”的作用机制**：
   - 当用户**未点击**“保存登录”时：抖音仅将凭证保存在底层的 HttpOnly 会话 Cookie 中；在作品页面上，JS 的 `document.cookie` 不会暴露明文 `sessionid`；
-  - 实际上，Android 原生 WebView 在发起网络请求或嗅探加载时，**会自动在 HTTP Header 中携带完整的 HttpOnly Cookie**，平台早已识别为已登录并能正常吐出高清视频；
+  - 实际上，Android 原生 WebView 在发起网络请求或捕获加载时，**会自动在 HTTP Header 中携带完整的 HttpOnly Cookie**，平台早已识别为已登录并能正常吐出高清视频；
   - 但原软件却因为 `document.cookie` 字符串里没有明文 `sessionid`，误判为“登录失效”，直接强行清空了登录态；
   - 而当用户**打开“保存登录”**时：抖音在前端写入了额外可读标记或持久化 Cookie，恰好使得 `result.cookie` 包含对应字符串，逃过了误判。
 
@@ -38,7 +38,7 @@ flowchart TD
     end
 
     subgraph ParsePage_Flow["ParsePage 稳定解析流 (彻底解除误杀)"]
-        ParseReq["用户点击【解析作品】"] --> Sniffer["嗅探视频直链 (带原生 WebView 完整 Session)"]
+        ParseReq["用户点击【解析作品】"] --> Sniffer["捕获视频直链 (带原生 WebView 完整 Session)"]
         Sniffer --> SniffResult["获得作品结果 (无需破坏登录态)"]
         SniffResult --> SafeDone["稳定解析与画质选择<br/>彻底杜绝未开保存登录被误清空"]
     end

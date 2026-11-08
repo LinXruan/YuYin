@@ -34,8 +34,8 @@ flowchart TD
         ShareAPI["分享页 API 接口<br/>(iesdouyin.com/share/...)"]
     end
 
-    subgraph Sniffer["2. 嗅探层精准捕获 (Sniffer Layer)"]
-        JSSniffer["JS 嗅探引擎 (scanTree)<br/>【彻底废弃 title 逻辑】<br/>仅在核心资源节点 (images/video)<br/>提取真实 node.desc"]
+    subgraph Sniffer["2. 捕获层精准捕获 (Sniffer Layer)"]
+        JSSniffer["JS 捕获引擎 (scanTree)<br/>【彻底废弃 title 逻辑】<br/>仅在核心资源节点 (images/video)<br/>提取真实 node.desc"]
         APISniffer["DouyinShareApi<br/>直接提取 item['desc']"]
         CmdFallback["UrlParser.extractShareText<br/>清洗口令套话与标签提取纯文案"]
     end
@@ -61,7 +61,7 @@ flowchart TD
     Formatter --> FinalFiles
 ```
 
-### 1. JS 嗅探引擎改造 (`lib/services/js_script_builder.dart`)
+### 1. JS 捕获引擎改造 (`lib/services/js_script_builder.dart`)
 - **彻底废除 `title`、`item_title`、`document.title`、`meta[property="og:title"]` 的读取**；
 - 废弃 `S.title`，仅保留 `S.desc`；
 - **严格限定文案提取时机**：
@@ -144,7 +144,7 @@ flowchart TD
      - 落盘验证：单资源严格不加 `_1` 序号后缀，成功生成 `CS2现役狙击手你不得....jpg`！
    - [x] **用例 3（纯 URL 解析，无口令文本包装）**：
      - 输入：`https://v.douyin.com/ZJFzYtfrvcE/`
-     - 结果：主 WebView JS 嗅探核心节点直接精准捕获 `Gemini 4 Carbon来了...`，证明核心节点文案提取机制完备。
+     - 结果：主 WebView JS 捕获核心节点直接精准捕获 `Gemini 4 Carbon来了...`，证明核心节点文案提取机制完备。
 5. **日志检查**：
    - [x] 运行 `agent_cmd.bat logs`，确认解析和文案日志干净规范（`[解析] 捕获作品文案: xxx`，`[解析] 解析成功...`）。
 

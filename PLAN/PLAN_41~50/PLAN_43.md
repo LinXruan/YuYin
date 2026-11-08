@@ -14,7 +14,7 @@
      - 历史页卡片在渲染缩略图时使用 `Image.network(item.coverUrl)`，Flutter 尝试将几 MB 到几十 MB 的完整 MP4 视频流作为图片解码，必然解码失败触发 `errorBuilder` 回退到文字黑框；
      - 更严重的是：用户每次点击卡片或长按进入“选择模式”时，`setState` 重绘触发，由于视频流链接无法被图片缓存（ImageCache）有效命中，导致**列表中所有视频的历史卡片同时再次发起 HTTP GET 重新下载完整视频流**，造成严重带宽浪费、界面卡顿与发热。
    - **重构目标**：
-     - 在 Web 嗅探脚本（`js_script_builder.dart`）与分享页解析（`douyin_share_api.dart`）中全面提取作品的**真实封面图（Cover URL）**（无论是视频还是图文）；
+     - 在 Web 捕获脚本（`js_script_builder.dart`）与分享页解析（`douyin_share_api.dart`）中全面提取作品的**真实封面图（Cover URL）**（无论是视频还是图文）；
      - `SniffResult` 与 `DouyinShareResult` 统一注入 `coverUrl` 字段；
      - 历史记录入库与历史卡片构建时，严格拦截并清除视频流地址，确保 `coverUrl` 仅存放合法图片直链；
      - 升级历史缩略图组件：配置 `cacheWidth / cacheHeight` 限制显存，配置网络图片加载器与类型标识微标，无封面时使用优雅的媒体类型占位替代。
@@ -26,7 +26,7 @@
 ```mermaid
 flowchart TD
     subgraph DataExtraction["多源封面捕获机制 (Cover Extraction)"]
-        SourceWeb["Web 嗅探 (JS 注入)"] -->|scanTree / scanPlayerData / DOM poster| JSCover["提取 video.cover / origin_cover / poster"]
+        SourceWeb["Web 捕获 (JS 注入)"] -->|scanTree / scanPlayerData / DOM poster| JSCover["提取 video.cover / origin_cover / poster"]
         SourceShare["分享页 API (HTML / _ROUTER_DATA)"] -->|parseItem / pickCoverUrl| APICover["提取 video.cover.url_list / origin_cover"]
         JSCover --> SniffRes["SniffResult(coverUrl: ...)"]
         APICover --> ShareRes["DouyinShareResult(coverUrl: ...)"]
@@ -62,7 +62,7 @@ flowchart TD
   2. 查找 `item.cover.url_list`；
   3. 过滤并返回清洗后的首个合法图片 URL（以 `.jpeg` / `.jpg` / `.webp` / `.png` 优先或包含 `tos-cn-p-` 资源路径）；
   4. 对于图文作品，优先取首张图片的直链。
-- **Web 嗅探 JS (`js_script_builder.dart`)**：
+- **Web 捕获 JS (`js_script_builder.dart`)**：
   1. 在 `scanTree` 中解析 `node.video` 时提取 `cover` / `origin_cover` / `dynamic_cover`；
   2. 在 `scanPlayerData` 中从 `window.player.config.awemeInfo.video.cover` 或 `config.poster` 提取；
   3. 从 `<video poster="...">` DOM 节点提取；
@@ -89,8 +89,8 @@ flowchart TD
 | 3 | `GEMINI.md` / `CLAUDE.md` | MODIFY | 维护守则版本同步更新为 `1.4.1+151` |
 | 4 | `lib/models/media_item.dart` | MODIFY | `SniffResult` 增加 `coverUrl` 字段 |
 | 5 | `lib/services/douyin_share_api.dart` | MODIFY | `DouyinShareResult` 增加 `coverUrl` 字段，实现 `pickCoverUrl` 提取算法 |
-| 6 | `lib/services/js_script_builder.dart` | MODIFY | Web 嗅探脚本注入封面与 poster 捕获，回传 `coverUrl` |
-| 7 | `lib/services/douyin_sniffer.dart` | MODIFY | 嗅探器接收 JS `coverUrl` 并向结果注入 |
+| 6 | `lib/services/js_script_builder.dart` | MODIFY | Web 捕获脚本注入封面与 poster 捕获，回传 `coverUrl` |
+| 7 | `lib/services/douyin_sniffer.dart` | MODIFY | 捕获器接收 JS `coverUrl` 并向结果注入 |
 | 8 | `lib/models/history_item.dart` | MODIFY | 增加视频链接安全过滤，`fromJson` 自动清洗脏数据 |
 | 9 | `lib/pages/parse_page.dart` | MODIFY | 废除视频流兜底封面漏洞，安全注入作品真实封面 |
 | 10 | `lib/services/agent_automation_server.dart` | MODIFY | 自动化控制台安全注入封面 |

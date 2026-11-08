@@ -107,6 +107,13 @@ switch ($Action.ToLower()) {
         Write-Host "[AgentBridge] [成功] 历史记录已清空"
     }
 
+    "mock-login" {
+        $enabled = if ($Arg1 -eq "off" -or $Arg1 -eq "false" -or $Arg1 -eq "0") { $false } else { $true }
+        $body = @{ loggedIn = $enabled } | ConvertTo-Json
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/login/mock" -Method Post -Body $body -ContentType "application/json; charset=utf-8"
+        Write-Host "[AgentBridge] [成功] 模拟登录状态: $($resp.loggedIn)"
+    }
+
     "cancel" {
         $resp = Invoke-RestMethod -Uri "$baseUrl/api/cancel" -Method Post
         Write-Host "[AgentBridge] [成功] 已取消当前任务"
@@ -123,6 +130,6 @@ switch ($Action.ToLower()) {
 
     default {
         Write-Host "未知指令: $Action"
-        Write-Host "支持的指令: setup, status, quality [on|off], parse, download, logs, clear-logs, history [query], clear-history, cancel, eval"
+        Write-Host "支持的指令: setup, status, quality [on|off], mock-login [on|off], parse, download, logs, clear-logs, history [query], clear-history, cancel, eval"
     }
 }

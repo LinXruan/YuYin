@@ -6,7 +6,7 @@
 **目标**：更新开发守则，并防止 JS 轮询在完整 `bit_rate` 列表加载完成前被兜底逻辑提前截胡。
 
 1. 修改 `lib/services/js_script_builder.dart`：
-   - **记录首次注入时间戳**：在 `window` 上记录当前网页嗅探的起始时间 `if (!window.__dyStartTime) window.__dyStartTime = Date.now();`（注意：如果检测到 `location.href` 发生变化，重置 `__dyStartTime = Date.now()`）。
+   - **记录首次注入时间戳**：在 `window` 上记录当前网页捕获的起始时间 `if (!window.__dyStartTime) window.__dyStartTime = Date.now();`（注意：如果检测到 `location.href` 发生变化，重置 `__dyStartTime = Date.now()`）。
    - **同时兼容两种画质列表结构**：在提取视频多档位时，除了读取 JSON 树中的 `video.bit_rate` 数组外，额外兼容读取 `window.player?.config?.awemeInfo?.video?.bitRateList`（如有），确保拿到完整的清晰度、码率（`bit_rate` / `bitRate`）和大小（`data_size` / `dataSize`）。
    - **核心修复——推迟兜底逻辑（防抢跑）**：
      - 当判定为普通视频（非图文）时，将提取结果分为两类：**“完整画质结果”**（成功从 `bit_rate` / `bitRateList` 提取到带分辨率和码率的档位）和 **“降级兜底结果”**（仅从单一 `play_addr` 或 DOM `<video>` 标签抓到的无码率、未知画质地址）。

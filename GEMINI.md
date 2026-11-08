@@ -9,7 +9,7 @@
 ## 1. 项目概况
 
 - **应用**：余音（YuYin），Android 端抖音无水印视频 / 图集 / 实况图下载工具。
-- **包名 / 版本**：debug 版 `com.debug.yuyin`，release 版 `com.release.yuyin`；版本 `1.4.1+154`（以 `pubspec.yaml` 和 `lib/app_info.dart` 为准）。
+- **包名 / 版本**：debug 版 `com.debug.yuyin`，release 版 `com.release.yuyin`；版本 `1.4.4+155`（以 `pubspec.yaml` 和 `lib/app_info.dart` 为准）。
 - **技术栈**：Flutter 3.47.6 / Dart 3.13.5，Material 3，仅 Android（忽略 Web / Windows）。
 - **依赖**：`webview_flutter`、`dio`、`path_provider`、`gal`；不引入第三方状态管理。
 - **现状**：解析、登录、画质/图集选择、下载、调试日志、关于页、历史记录与全文模糊搜索均已完成。
@@ -43,7 +43,7 @@
 - `lib/pages/parse_page.dart`：解析流程；取消画质 / 图片选择时调用 `sniffer.cancelActiveTask()`。
 - `lib/services/douyin_sniffer.dart`：
   - 一个 `WebViewController` 只能挂载一个 `WebViewWidget`；
-  - 任务完成后 `_isTaskActive` 守卫会阻止页面跳转重新开启嗅探；
+  - 任务完成后 `_isTaskActive` 守卫会阻止页面跳转重新开启捕获；
   - 日志接收 `_acceptLogs` 与结果接收 `_acceptMessages` 分离；取消任务时两者都关闭；
   - 分享页图片结果进入 3 秒宽限期，等待主页面 RSC 补充实况视频；`_stopTimers()` 清理候选与宽限定时器；
   - `cancelActiveTask()` 会停止定时器与分享页请求，并加载 `about:blank`。

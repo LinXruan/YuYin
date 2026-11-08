@@ -211,5 +211,35 @@ void main() {
       expect(resp3.statusCode, HttpStatus.ok);
       expect(HistoryStore.records, isEmpty);
     });
+
+    test('POST /api/login/mock 正常模拟设置与清除登录态', () async {
+      final client = HttpClient();
+
+      // 1. 设置登录
+      final req1 = await client.postUrl(
+        Uri.parse('http://127.0.0.1:$testPort/api/login/mock'),
+      );
+      req1.headers.contentType = ContentType.json;
+      req1.write(jsonEncode({'loggedIn': true}));
+      final resp1 = await req1.close();
+      expect(resp1.statusCode, HttpStatus.ok);
+      final json1 = jsonDecode(await utf8.decodeStream(resp1)) as Map;
+      expect(json1['success'], isTrue);
+      expect(json1['loggedIn'], isTrue);
+      expect(loggedIn.value, isTrue);
+
+      // 2. 清除登录
+      final req2 = await client.postUrl(
+        Uri.parse('http://127.0.0.1:$testPort/api/login/mock'),
+      );
+      req2.headers.contentType = ContentType.json;
+      req2.write(jsonEncode({'loggedIn': false}));
+      final resp2 = await req2.close();
+      expect(resp2.statusCode, HttpStatus.ok);
+      final json2 = jsonDecode(await utf8.decodeStream(resp2)) as Map;
+      expect(json2['success'], isTrue);
+      expect(json2['loggedIn'], isFalse);
+      expect(loggedIn.value, isFalse);
+    });
   });
 }

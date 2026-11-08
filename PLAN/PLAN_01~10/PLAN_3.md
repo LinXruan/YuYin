@@ -35,7 +35,7 @@
 
 ---
 
-## Step 17：升级嗅探服务以返回多媒体列表 (`lib/services/douyin_sniffer.dart`)
+## Step 17：升级捕获服务以返回多媒体列表 (`lib/services/douyin_sniffer.dart`)
 **目标**：将 `DouyinSniffer` 的返回值从单一 URL 升级为 `SniffResult`（包含多个 `MediaItem` 和 `Cookie`）。
 
 1. 修改 `lib/services/douyin_sniffer.dart`：

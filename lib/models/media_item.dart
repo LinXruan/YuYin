@@ -113,7 +113,7 @@ class MediaItem {
   }
 }
 
-/// 嗅探结果：多媒体资源列表、标题/文案与 WebView 当前 Cookie
+/// 捕获结果：多媒体资源列表、标题/文案与 WebView 当前 Cookie
 class SniffResult {
   const SniffResult({
     required this.items,

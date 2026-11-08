@@ -12,7 +12,7 @@ PLAN_8 已完成三 Tab UI 重构，版本 110。真机反馈与美化需求如�
 6. 点击“完成返回”后，按钮自动变成“我的主页”，点击可再次进入登录页；
 7. 解析页底部新增一行文字“本地、解析、隐私”；
 8. 调试页日志支持长按选中复制；
-9. 删除调试页“显示后台嗅探网页”整个功能；
+9. 删除调试页“显示后台捕获网页”整个功能；
 10. App 图标与启动页换成“关于”页里的音符图标。
 
 ## 问题 1：单图/多图取消后仍继续解析
@@ -20,9 +20,9 @@ PLAN_8 已完成三 Tab UI 重构，版本 110。真机反馈与美化需求如�
 日志 `110_log/单图多图取消下载后依旧没停止解析.log` 显示：
 
 - 第 16 行已经“解析成功”，第 19 行用户“已取消下载”；
-- 但第 20–26 行仍继续出现 `__pace_f`、`命中作品接口`、`图集解析` 等嗅探日志。
+- 但第 20–26 行仍继续出现 `__pace_f`、`命中作品接口`、`图集解析` 等捕获日志。
 
-根因：`DouyinSniffer` 在任务完成后把 `_acceptMessages` 设为 false，但 WebView 分享页兜底会继续跳转到主页面；`onPageStarted` / `onPageFinished` **无条件**把 `_acceptMessages` 重新设为 true 并再次注入脚本，导致任务结束后页面每次跳转都重新开始嗅探/日志。视频主页面通常已稳定，所以表现正常。
+根因：`DouyinSniffer` 在任务完成后把 `_acceptMessages` 设为 false，但 WebView 分享页兜底会继续跳转到主页面；`onPageStarted` / `onPageFinished` **无条件**把 `_acceptMessages` 重新设为 true 并再次注入脚本，导致任务结束后页面每次跳转都重新开始捕获/日志。视频主页面通常已稳定，所以表现正常。
 
 修复方案：
 
@@ -69,7 +69,7 @@ PLAN_8 已完成三 Tab UI 重构，版本 110。真机反馈与美化需求如�
 
 ## 调试页精简与日志选择
 
-- 删除 `DebugWebViewHost`、`debugVisible`、OverlayEntry 以及调试页“显示后台嗅探网页”开关；
+- 删除 `DebugWebViewHost`、`debugVisible`、OverlayEntry 以及调试页“显示后台捕获网页”开关；
 - 后台 WebView 改为 AppShell 页面树内一个 **1x1、透明、IgnorePointer** 的常驻 `WebViewWidget`，切换 Tab、进入登录/调试页时都不卸载；
 - `LogPanel` 的 `Text` 改为 `SelectableText`，日志可长按选中并复制部分内容；
 - 调试页保留复制全部日志按钮，增加“长按日志可选中复制”的提示。

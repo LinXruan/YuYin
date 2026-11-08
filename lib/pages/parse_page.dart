@@ -17,7 +17,7 @@ import '../models/history_item.dart';
 import '../utils/history_store.dart';
 import '../widgets/video_quality_sheet.dart';
 
-/// 解析页：粘贴链接 -> 嗅探 -> 选择画质/图片 -> 下载
+/// 解析页：粘贴链接 -> 捕获 -> 选择画质/图片 -> 下载
 class ParsePage extends StatefulWidget {
   const ParsePage({
     super.key,
@@ -175,7 +175,7 @@ class _ParsePageState extends State<ParsePage> {
     });
   }
 
-  /// 主流程：提取短链 -> 嗅探 -> 选择资源 -> 下载选中项
+  /// 主流程：提取短链 -> 捕获 -> 选择资源 -> 下载选中项
   Future<void> _startParse() async {
     if (widget.busy.value) return;
     FocusScope.of(context).unfocus();
@@ -264,7 +264,7 @@ class _ParsePageState extends State<ParsePage> {
       final selected = await _chooseItems(result);
       if (!mounted) return;
       if (selected == null || selected.isEmpty) {
-        // 取消后立即停止后台嗅探和网页加载，避免日志继续刷
+        // 取消后立即停止后台捕获和网页加载，避免日志继续刷
         widget.sniffer.cancelActiveTask();
         widget.logs.add('已取消下载');
         return;
@@ -361,7 +361,7 @@ class _ParsePageState extends State<ParsePage> {
     if (error is TimeoutException) {
       final message = error.message;
       if (message != null && message.isNotEmpty) return message;
-      return '嗅探超时，请检查链接是否有效后重试';
+      return '捕获超时，请检查链接是否有效后重试';
     }
     if (error is DioException && error.response?.statusCode == 403) {
       return '视频服务器拒绝了请求（403），请稍后重试';
@@ -515,7 +515,7 @@ class StatusCard extends StatelessWidget {
 
   /// 智能状态文本解析器：
   /// - 尾部包含“已保存到”时，向前聚拢本次任务全部连续的保存路径提示；
-  /// - 其余过程态（提取短链、网页嗅探、下载进度等）严格单行返回最新一条状态。
+  /// - 其余过程态（提取短链、网页捕获、下载进度等）严格单行返回最新一条状态。
   static String resolveStatusText(List<String> logs) {
     if (logs.isEmpty) {
       return '就绪：粘贴抖音链接后点击“解析作品”';

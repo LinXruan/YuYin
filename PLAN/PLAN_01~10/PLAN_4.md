@@ -11,7 +11,7 @@
 **目标**：解决 10 张以上多图作品因等待图片加载阻塞 `onPageFinished` 及 JSON 树过大导致的超时问题。
 
 1. 修改 `lib/services/douyin_sniffer.dart`（保持小于 200 行）：
-   - **新增 Dart 端主动轮询注入**：不要只依赖 `onPageStarted` 和 `onPageFinished`（多图页面会因为加载 10+ 张大图导致 `onPageFinished` 延迟 20 秒以上，且重定向会冲掉首次注入的 JS）。在 `sniff` 开始后，启动一个 `Timer.periodic(const Duration(milliseconds: 1200))`，只要 `Completer` 尚未完成，就每隔 1.2 秒主动调用一次 `_controller.runJavaScript(kDouyinSniffJs)`，嗅探完成或超时后立即 `cancel()` 该定时器。
+   - **新增 Dart 端主动轮询注入**：不要只依赖 `onPageStarted` 和 `onPageFinished`（多图页面会因为加载 10+ 张大图导致 `onPageFinished` 延迟 20 秒以上，且重定向会冲掉首次注入的 JS）。在 `sniff` 开始后，启动一个 `Timer.periodic(const Duration(milliseconds: 1200))`，只要 `Completer` 尚未完成，就每隔 1.2 秒主动调用一次 `_controller.runJavaScript(kDouyinSniffJs)`，捕获完成或超时后立即 `cancel()` 该定时器。
    - 将总超时时间从 20 秒放宽至 30 秒。
 2. 修改 `lib/services/js_script_builder.dart`（保持小于 200 行）：
    - **幂等防重设计**：由于 Dart 每 1.2 秒会调用一次脚本，使用 `window.__dyHooked` 标志确保 XHR/Fetch 劫持只挂载一次，但每次调用都立即执行一次 `tryExtractNow()` 扫描当前页面数据。

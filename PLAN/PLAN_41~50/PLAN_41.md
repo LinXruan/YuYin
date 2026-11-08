@@ -3,7 +3,7 @@
 ## 一、需求背景与目标
 
 1. **历史记录核心业务**：
-   - 记录所有**成功解析**的抖音作品（无需真正点击下载，只要嗅探解析成功即自动收录）；
+   - 记录所有**成功解析**的抖音作品（无需真正点击下载，只要捕获解析成功即自动收录）；
    - 记录内容包含：作品完整文案（`fullDesc`）、解析链接（`url`）、封面图缩略图地址（`coverUrl`）、媒体标签（如“图集/音频/文案”或“视频/文案”）、创建时间戳（`createdAt`）；
    - 同一作品重复解析时更新最近访问时间并置顶；
 2. **界面与交互设计（参考素材图 `sources/148_素材/素材.jpg`）**：
@@ -90,7 +90,7 @@ classDiagram
 2. **[NEW] `lib/utils/history_store.dart`**：
    - 内存优先架构、添加/更新去重、批量删除、分词极速搜索与异步文件落盘；
 3. **[MODIFY] `lib/pages/parse_page.dart`**：
-   - 在嗅探成功返回 `SniffResult` 后，自动构建并调用 `HistoryStore.addRecord(...)`；
+   - 在捕获成功返回 `SniffResult` 后，自动构建并调用 `HistoryStore.addRecord(...)`；
    - 接收来自历史记录的点击填充回调或监听；
 4. **[MODIFY] `lib/pages/app_shell.dart`**：
    - 串联 Tab 切换与待填入 URL 状态流；

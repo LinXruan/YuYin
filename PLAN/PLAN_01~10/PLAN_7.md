@@ -9,13 +9,13 @@
 失败日志（`log/视频解析_失败.log`）关键片段：
 
 ```text
-[嗅探] 脚本已注入: https://www.douyin.com/video/7702166272024382746?previous_page=app_code_link
-[嗅探] 分享页兜底失败: 分享页未返回作品数据，可能触发风控
-[嗅探] 分享页兜底切换到 WebView: awemeId=7702166272024382746
-[嗅探] 已发现基础视频流，正在等待完整画质列表(bit_rate)...
-[嗅探] 脚本已注入: https://www.iesdouyin.com/share/video/7702166272024382746/
-[嗅探] 脚本已注入: chrome-error://chromewebdata/
-[嗅探] 分享页兜底未返回作品数据（可能触发风控）
+[捕获] 脚本已注入: https://www.douyin.com/video/7702166272024382746?previous_page=app_code_link
+[捕获] 分享页兜底失败: 分享页未返回作品数据，可能触发风控
+[捕获] 分享页兜底切换到 WebView: awemeId=7702166272024382746
+[捕获] 已发现基础视频流，正在等待完整画质列表(bit_rate)...
+[捕获] 脚本已注入: https://www.iesdouyin.com/share/video/7702166272024382746/
+[捕获] 脚本已注入: chrome-error://chromewebdata/
+[捕获] 分享页兜底未返回作品数据（可能触发风控）
 ```
 
 成功日志（`log/视频解析_成功.log`）显示：主页面第二次注入后命中详情接口，拿到 14 个清晰度档位，C 全程未启动。多图成功日志（`log/多图解析_成功.log`）显示：主页面注入 `/note/769755...`，C 切到分享页后 `_ROUTER_DATA` 里的 4 张图片立即命中。
@@ -114,7 +114,7 @@ onWebResourceError: _onWebResourceError,
 - 在 `DouyinSniffer` 记录 `_sourceUrl`（用户输入）和 `_awemePageUrl`（第一次带目标 awemeId 的主页面 URL）；
 - `home_page.dart` 的 `_copyLogs` 输出：
   - `原始链接: ...`
-  - `嗅探页面: ...`
+  - `捕获页面: ...`
   - `当前网页: ...`
 - 这样即使 WebView 后续被导航到分享页/深链，也能看到真正解析的是哪个页面。
 
@@ -126,7 +126,7 @@ onWebResourceError: _onWebResourceError,
   - 图文页：`分享页兜底失败: ...（3 秒后切换 WebView 兜底）`
   - 视频页：`视频页分享页兜底不可用，继续等待主 WebView`
 - C 的 12 秒超时文案改为中性的 `分享页兜底未返回作品数据，请稍后重试`，不要再写“可能触发风控”。
-- `home_page.dart` 的 `_friendlyError` 对 `TimeoutException` 优先返回 `error.message`，不要再把所有超时都显示成同一句“嗅探超时”。
+- `home_page.dart` 的 `_friendlyError` 对 `TimeoutException` 优先返回 `error.message`，不要再把所有超时都显示成同一句“捕获超时”。
 
 ### F. URL 工具与测试
 
@@ -170,7 +170,7 @@ onWebResourceError: _onWebResourceError,
 
 - `lib/pages/home_page.dart`：
   - `_friendlyError` 对 `TimeoutException` 返回 `error.message`；
-  - `_copyLogs` 输出原始链接、嗅探页面、当前网页。
+  - `_copyLogs` 输出原始链接、捕获页面、当前网页。
 - `flutter analyze` + `flutter test`。
 
 ### Step 39：真机验证与打包
@@ -184,7 +184,7 @@ onWebResourceError: _onWebResourceError,
 - 如能找到 `/video/` 图文作品，验证 8 秒后仍能通过 C 成功。
 - 短链回归：确认 `onNavigationRequest` 没有破坏 `v.douyin.com` 重定向。
 - 打开后台网页确认不再出现“网页无法打开”。
-- 复制日志确认包含原始链接/嗅探页面/当前网页。
+- 复制日志确认包含原始链接/捕获页面/当前网页。
 - `flutter build apk --debug`，安装到已连接真机。
 
 ## 涉及文件

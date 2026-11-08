@@ -51,7 +51,7 @@
 
 ### 为什么普通视频正常、多图超时
 
-- 视频地址会以 `.mp4` / `douyinvod` / `video/tos` 形式出现在 fetch/XHR 请求 URL、`<video src>` 或 `window.player` 数据里，能被现有嗅探捕获。
+- 视频地址会以 `.mp4` / `douyinvod` / `video/tos` 形式出现在 fetch/XHR 请求 URL、`<video src>` 或 `window.player` 数据里，能被现有捕获捕获。
 - 图片地址（`douyinpic` CDN）不会出现在媒体 URL 白名单里；图集唯一的载体是 JSON 响应体的 `images` 数组，而 fetch 钩子不读 body、XHR 又未必命中，页面全局也没有 iesdouyin 的 `_ROUTER_DATA`，于是 `scanTree()` 永远没有输入，最终 30 秒超时。
 
 ## 关键实测发现（影响方案）
@@ -180,7 +180,7 @@
 
 ## Step 33：首页日志前缀与完整回归（`home_page.dart`）
 
-1. `home_page.dart`：`[JS]` 前缀改为 `[嗅探]`，避免 Dart 侧兜底日志冒充 JS 日志；其余流程不变。
+1. `home_page.dart`：`[JS]` 前缀改为 `[捕获]`，避免 Dart 侧兜底日志冒充 JS 日志；其余流程不变。
 2. 运行 `flutter analyze` 和 `flutter test`。
 3. 真机回归：
    - 普通视频 3 次：画质弹窗显示多个真实档位，下载正常。
@@ -196,7 +196,7 @@
 ## Step 34：首页一键复制日志 + 构建安装 APK
 
 1. 修改 `lib/pages/home_page.dart`：
-   - 在「显示后台嗅探网页（调试排错用）」开关右侧新增【复制日志】按钮，便于一键复制排查信息；
+   - 在「显示后台捕获网页（调试排错用）」开关右侧新增【复制日志】按钮，便于一键复制排查信息；
    - 点击后把**当前后台 WebView 地址 + 日志面板全部内容**写入系统剪贴板；
    - 复制成功弹出 SnackBar「日志已复制到剪贴板」；日志为空时提示「暂无可复制的日志」。
 2. 运行 `flutter analyze` 和 `flutter test`。
@@ -218,7 +218,7 @@
 - `lib/services/douyin_share_api.dart`（新建）：Dio 分享页请求 + 纯解析函数。
 - `lib/services/js_script_builder.dart`：fetch JSON 扫描、目标 awemeId 锚定、白名单、日志。
 - `lib/services/douyin_sniffer.dart`：URL 跟踪、并行兜底、WebView 分享页兜底、taskId/完成幂等。
-- `lib/pages/home_page.dart`：日志前缀 `[JS]` → `[嗅探]`；新增【复制日志】按钮。
+- `lib/pages/home_page.dart`：日志前缀 `[JS]` → `[捕获]`；新增【复制日志】按钮。
 - `test/url_parser_test.dart`：awemeId 用例。
 - `test/douyin_share_api_test.dart`（新建）：解析 fixture。
 - `lib/models/media_item.dart`：不改。

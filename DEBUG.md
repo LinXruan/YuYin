@@ -82,15 +82,15 @@
 | :--- | :--- | :--- | :--- |
 | `.\tool\agent_cmd.bat setup` | 无 | 自动探测设备并建立 `tcp:9527` 端口映射，检查服务连通性 | `[AgentBridge] [在线] 应用控制台已连接: 余音 v<version>` |
 | `.\tool\agent_cmd.bat status` | 无 | 获取应用运行状态、忙碌标记、登录态与上次解析结果 | 返回结构化 JSON 元数据 |
-| `.\tool\agent_cmd.bat parse "<text>"` | 链接或口令文本 | 触发后台 WebView 嗅探，返回文案、资源总数及媒体档位列表 | 终端打印格式化表格（类型、分辨率、码率等） |
+| `.\tool\agent_cmd.bat parse "<text>"` | 链接或口令文本 | 触发后台 WebView 捕获，返回文案、资源总数及媒体档位列表 | 终端打印格式化表格（类型、分辨率、码率等） |
 | `.\tool\agent_cmd.bat download all` | `all` | 下载当前已解析出的全部资源 | 按智能语义化命名保存至相册，输出落地文件名 |
 | `.\tool\agent_cmd.bat download 0,1` | 逗号分隔索引 | 仅下载指定序号项（如第 0、1 项） | 仅保存指定选中项 |
 | `.\tool\agent_cmd.bat logs [n]` | 可选数字 `n` (如 `20`) | 获取应用日志。提供 `n` 时仅展示最新 `n` 条（防止撑爆上下文） | 输出最近过程日志与保存结果 |
 | `.\tool\agent_cmd.bat clear-logs` | 无 | 清空应用内当前日志缓存 | `[AgentBridge] [成功] 日志已清空` |
 | `.\tool\agent_cmd.bat history [query]` | 可选搜索词 | 查看历史记录，支持关键词模糊搜索 | 终端输出历史记录表格（标题、媒体摘要、时间） |
 | `.\tool\agent_cmd.bat clear-history` | 无 | 清空应用内所有历史记录 | `[AgentBridge] [成功] 历史记录已清空` |
-| `.\tool\agent_cmd.bat cancel` | 无 | 终止当前正在进行的嗅探解析或下载任务 | 停止定时器并加载空页面 |
-| `.\tool\agent_cmd.bat eval "<script>"` | JS 脚本表达式 | 向后台嗅探 WebView 注入并同步执行 JS，返回执行结果 | 终端输出 JS 表达式求值结果 |
+| `.\tool\agent_cmd.bat cancel` | 无 | 终止当前正在进行的捕获解析或下载任务 | 停止定时器并加载空页面 |
+| `.\tool\agent_cmd.bat eval "<script>"` | JS 脚本表达式 | 向后台捕获 WebView 注入并同步执行 JS，返回执行结果 | 终端输出 JS 表达式求值结果 |
 
 ### 2.2 底层 REST API 规范 (Port 9527)
 
@@ -99,7 +99,7 @@
 | 端点 | 方法 | 请求体 | 响应格式 (JSON) | 说明 |
 | :--- | :--- | :--- | :--- | :--- |
 | `/api/status` | `GET` | 无 | `{"app":"余音","version":"...","busy":false,"loggedIn":false,"hasParsedResult":true,...}` | 应用全局状态 |
-| `/api/parse` | `POST` | `{"text":"<url_or_token>"}` | `{"desc":"...","isImagePost":true,"totalItems":8,"items":[...]}` | 嗅探解析作品 |
+| `/api/parse` | `POST` | `{"text":"<url_or_token>"}` | `{"desc":"...","isImagePost":true,"totalItems":8,"items":[...]}` | 捕获解析作品 |
 | `/api/download` | `POST` | `{"indices":"all"}` 或 `{"indices":[0,1]}` | `{"downloadedCount":2,"savedTypes":["image"],"expectedFiles":["..._1.jpg"]}` | 下载资源落盘 |
 | `/api/logs` | `GET` | 无 (支持 `?tail=20` 或 `?limit=50`) | `{"total":120,"count":20,"logs":["..."]}` | 结构化日志流 (支持尾部/限额截取) |
 | `/api/logs/clear`| `POST` | 无 | `{"success":true,"message":"Logs cleared"}` | 清空日志缓存 |
@@ -128,7 +128,7 @@ adb shell monkey -p com.debug.yuyin -c android.intent.category.LAUNCHER 1
 :: 3. 清理上一轮日志缓存
 .\tool\agent_cmd.bat clear-logs
 
-:: 4. 发起嗅探解析
+:: 4. 发起捕获解析
 .\tool\agent_cmd.bat parse "<待测链接或分享口令>"
 
 :: 5. 执行资源下载测试
@@ -153,7 +153,7 @@ adb shell ls -la /sdcard/Movies/YuYin/
 # 清空日志缓冲区
 adb logcat -c
 
-# 抓取 Flutter 框架与 JS 嗅探层日志
+# 抓取 Flutter 框架与 JS 捕获层日志
 adb logcat -d | grep -E "flutter|JS-Sniffer|AgentBridge"
 ```
 

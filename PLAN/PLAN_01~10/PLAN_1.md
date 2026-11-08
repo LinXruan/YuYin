@@ -10,7 +10,7 @@
 ## 目标文件结构（预先固定，禁止随意更改路径）
 - `lib/main.dart`：App 入口与主题配置（小于 50 行）
 - `lib/utils/url_parser.dart`：从抖音分享口令中用正则提取短链接（小于 60 行）
-- `lib/services/js_script_builder.dart`：存放改造后的油猴核心嗅探 JS 脚本字符串（小于 150 行）
+- `lib/services/js_script_builder.dart`：存放改造后的油猴核心捕获 JS 脚本字符串（小于 150 行）
 - `lib/services/douyin_sniffer.dart`：封装隐藏的 `WebViewController`，负责加载网页、注入 JS 并通过 Channel 接收无水印视频直链（小于 180 行）
 - `lib/services/video_downloader.dart`：负责将视频直链下载到本地并存入系统相册（小于 120 行）
 - `lib/pages/home_page.dart`：主界面 UI（输入框、解析下载按钮、进度与状态日志展示）（小于 190 行）
@@ -48,7 +48,7 @@
 
 ### Step 4：移植油猴脚本为注入式 JS (`lib/services/js_script_builder.dart`)
 1. 创建 `lib/services/js_script_builder.dart`。
-2. 根据 Step 1 的分析结果，将 `抖音下载视频油猴脚本.js` 的核心嗅探逻辑封装为 Dart 字符串常量 `const String kDouyinSniffJs = r''' ... ''';`：
+2. 根据 Step 1 的分析结果，将 `抖音下载视频油猴脚本.js` 的核心捕获逻辑封装为 Dart 字符串常量 `const String kDouyinSniffJs = r''' ... ''';`：
    - 移除所有 `GM_*` 函数调用和多余的网页 DOM 按钮渲染代码。
    - 保留 XHR/Fetch 拦截逻辑或页面数据解析逻辑，并加上一个定时轮询兜底（每隔 800ms 检查一次页面数据或 `<video>` 标签源地址，确保不会漏抓）。
    - 若抓到的链接包含 `playwm`（有水印），自动替换为 `play`（无水印）。
@@ -56,7 +56,7 @@
 3. 运行 `flutter analyze`。
 4. **完成后停下汇报，等待指令进入 Step 5。**
 
-### Step 5：实现隐藏式 WebView 嗅探服务 (`lib/services/douyin_sniffer.dart`)
+### Step 5：实现隐藏式 WebView 捕获服务 (`lib/services/douyin_sniffer.dart`)
 1. 创建 `lib/services/douyin_sniffer.dart`。
 2. 封装 `DouyinSniffer` 类：
    - 初始化 `WebViewController`，开启 `JavaScriptMode.unrestricted`。
@@ -81,7 +81,7 @@
 1. 创建 `lib/pages/home_page.dart`（大约控制在 200 行以内）：
    - 顶部：多行文本输入框（支持一键粘贴剪贴板内容、一键清空）。
    - 中部：“解析并无水印下载”主按钮，以及下载进度条 `LinearProgressIndicator`。
-   - 底部：运行状态日志框（显示：“正在提取短链...” -> “正在后台加载网页嗅探...” -> “已捕获无水印地址，正在下载 45%...” -> “已保存！”）。
+   - 底部：运行状态日志框（显示：“正在提取短链...” -> “正在后台加载网页捕获...” -> “已捕获无水印地址，正在下载 45%...” -> “已保存！”）。
    - 界面最底部放一个宽高为 1 像素、透明度为 0 的 `SizedBox` 挂载 `WebViewWidget`（保证安卓系统不会因为 WebView 完全不可见而挂起 JS 执行）。
 2. 更新 `lib/main.dart` 指向 `HomePage`。
 3. 运行 `flutter analyze` 确保零警告零错误。
@@ -98,7 +98,7 @@
 ---
 
 ### Step 8：新增可视化“抖音网页登录与验证”页面 (`lib/pages/login_webview_page.dart`)
-**目标**：利用 Android `WebView` 全局自动共享 Cookie 的特性，提供一个可视化浏览器页面，供用户登录抖音账号（或手动滑块过验证码），登录后的 Cookie 会自动保存在本地并供后台嗅探器使用。
+**目标**：利用 Android `WebView` 全局自动共享 Cookie 的特性，提供一个可视化浏览器页面，供用户登录抖音账号（或手动滑块过验证码），登录后的 Cookie 会自动保存在本地并供后台捕获器使用。
 
 1. 新建 `lib/pages/login_webview_page.dart`（严格小于 150 行）：
    - 使用 `StatefulWidget` 创建 `LoginWebViewPage`。
@@ -117,7 +117,7 @@
 
 ---
 
-### Step 9：升级嗅探 JS 脚本以优先提取最高分辨率 (`lib/services/js_script_builder.dart`)
+### Step 9：升级捕获 JS 脚本以优先提取最高分辨率 (`lib/services/js_script_builder.dart`)
 **目标**：登录后抖音返回的数据包中，视频对象包含 `bit_rate` 数组（内含 1080P、720P、540P 等不同档位）。修改 JS 提取逻辑，确保优先挑选码率（`bit_rate`）最高或分辨率最大的无水印直链。
 
 1. 打开 `lib/services/js_script_builder.dart`（可同时参考根目录的 `抖音下载视频油猴脚本.js`）。
@@ -133,7 +133,7 @@
 ---
 
 ### Step 10：同步 Cookie 给下载器并支持预览验证 (`lib/services/douyin_sniffer.dart` & `lib/services/video_downloader.dart`)
-**目标**：部分高清 1080P/4K 视频直链在下载时还会校验 Cookie，且后台嗅探若遇到验证码需要提醒用户去登录页处理。
+**目标**：部分高清 1080P/4K 视频直链在下载时还会校验 Cookie，且后台捕获若遇到验证码需要提醒用户去登录页处理。
 
 1. 修改 `lib/services/douyin_sniffer.dart`：
    - 在注入 JS 抓到视频直链的同时，通过 `runJavaScriptReturningResult('document.cookie')` 获取当前 WebView 的最新 Cookie 字符串。

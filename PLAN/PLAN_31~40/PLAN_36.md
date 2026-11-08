@@ -12,13 +12,13 @@
 1. **速度极致优化**：彻底排查登录态下耗时瓶颈，将解析时间由 15 ~ 20 秒压缩至 1 ~ 3 秒内（秒级秒开）。
 2. **完整画质保证**：11 个清晰度档位（1080P、720P、540P等高低码率档位）全部完整捕获，无遗漏。
 3. **版本升级**：版本升级至 `1.3.4+144`（同步更新 `pubspec.yaml` 与 `lib/app_info.dart`）。
-4. **Agent 调试能力增强**：在 `AgentAutomationServer` 和 `agent_bridge.ps1` 中增加 `eval` 接口，支持向嗅探 WebView 注入并执行任意 JS 表达式，便于自动化测试与深度探测。
+4. **Agent 调试能力增强**：在 `AgentAutomationServer` 和 `agent_bridge.ps1` 中增加 `eval` 接口，支持向捕获 WebView 注入并执行任意 JS 表达式，便于自动化测试与深度探测。
 
 ---
 
 ## 二、根因分析 (Root Cause Analysis)
 
-经过对嗅探全链路（`js_script_builder.dart` 与 `douyin_sniffer.dart`）的代码审查，发现以下导致慢解析的关键瓶颈：
+经过对捕获全链路（`js_script_builder.dart` 与 `douyin_sniffer.dart`）的代码审查，发现以下导致慢解析的关键瓶颈：
 
 1. **`document.readyState !== 'loading'` 人为栅障延迟**：
    - 在 `tryExtractNow()` 中，`scanStatic()` 和 `scanPace()` 均被 `if (document.readyState !== 'loading')` 阻拦。
@@ -32,7 +32,7 @@
    - 同理，`scanStatic()` 仅在 `readyState` 改变时尝试最多两次，若首次执行时数据正在组装，后续便不再重试。
 
 3. **被迫退化等待播放器 Hydration 与 12 秒保底延时**：
-   - 由于静态数据和 RSC 扫描过早失效或被阻塞，嗅探器只能依赖网络捕获的基础流 URL 或 `scanPlayer()`。
+   - 由于静态数据和 RSC 扫描过早失效或被阻塞，捕获器只能依赖网络捕获的基础流 URL 或 `scanPlayer()`。
    - 而基础流缺少 `bit_rate` 码率档位，触发了 `Date.now() - startTime < 12000`（12 秒降级等待）；
    - 最终只能苦等 15 ~ 20 秒后 React 组件完全水合出 `window.player.config.awemeInfo`，才艰难提取出 11 档视频。
 
@@ -95,7 +95,7 @@ flowchart TD
    - 包括新增针对 `/api/eval` 接口健全性、缺参 400 校验与未初始化 503 校验的单测。
 3. **模拟器真机端基准演练**：
    - 测试样本：`sources/144_抖音口令_视频/口令.txt` (`https://v.douyin.com/AkMCQTVHI5I/`)；
-   - 嗅探解析结果：
+   - 捕获解析结果：
      - **完整捕获 11 个清晰度档位**（1080P `1080_1_1` 13.8MB、1080P `normal_1080_0` 13.3MB、720P、540P 等全量码率）；
      - 文案精准捕获：`难道真的是上分密码？#王汉桑 #王者荣耀`；
      - 彻底修复 SecSDK 覆盖 `XMLHttpRequest.prototype.open` 导致 API 响应漏抓的严重隐患，XHR 响应到达后仅 20ms 内即完成解析与回传；

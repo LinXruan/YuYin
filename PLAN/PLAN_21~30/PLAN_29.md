@@ -38,7 +38,7 @@ flowchart LR
         subgraph AppDebug["YuYin Debug 应用 (com.debug.yuyin)"]
             HttpSvr["AgentAutomationServer<br/>(127.0.0.1:9527)"]
             Shell["AppShell 控制器<br/>(Sniffer / Downloader / Logs)"]
-            Sniff["DouyinSniffer 嗅探引擎"]
+            Sniff["DouyinSniffer 捕获引擎"]
             Down["VideoDownloader 下载引擎"]
             Log["LogController 日志中心"]
         end

@@ -1,12 +1,12 @@
-/// 注入式嗅探脚本：支持重复注入，跨注入共享状态，兼容图文/实况图/普通视频。
+/// 注入式捕获脚本：支持重复注入，跨注入共享状态，兼容图文/实况图/普通视频。
 const String kDouyinSniffJs = r'''
 (function () {
   // Dart 轮询重复注入，结果与日志状态必须挂到 window 上共享
   var S = window.__dyState || (window.__dyState = {
     sent: false, lastUrl: '', logs: {}, videoHintSent: false, degraded: false,
-    desc: '', coverUrl: '', scannedPaceIdx: 0
+    desc: '', coverUrl: '', scannedPaceIdx: 0, loginReported: null, authProbed: false
   });
-  // 记录本次嗅探的起始时间；页面地址变化时重新计时
+  // 记录本次捕获的起始时间；页面地址变化时重新计时
   if (!window.__dyStartTime || window.__dyStartHref !== location.href) {
     window.__dyStartTime = Date.now();
     window.__dyStartHref = location.href;
@@ -14,6 +14,73 @@ const String kDouyinSniffJs = r'''
   function log(msg) {
     if (S.logs[msg]) return; S.logs[msg] = true;
     try { window.DouyinChannel && window.DouyinChannel.postMessage(JSON.stringify({ type: 'log', msg: msg })); } catch (e) {}
+  }
+  // 向 Flutter 回传远端登录状态（已登录 / 未登录）
+  function reportLoginState(isLoggedIn, reason) {
+    if (S.loginReported === isLoggedIn) return;
+    S.loginReported = isLoggedIn;
+    try {
+      if (window.DouyinChannel && window.DouyinChannel.postMessage) {
+        window.DouyinChannel.postMessage(JSON.stringify({
+          type: 'login_state',
+          loggedIn: !!isLoggedIn,
+          reason: reason || ''
+        }));
+      }
+    } catch (e) {}
+  }
+  // 探测视频播放页中的远端真实登录状态（DOM 状态 + 同源权威会话探测）
+  function checkLoginState() {
+    if (isSharePage()) return;
+    try {
+      // 1. DOM 组件检测：桌面端顶部登录按钮 vs 用户头像
+      var loginBtn = document.querySelector('.header-login-button, [data-e2e="header-login-button"]');
+      if (!loginBtn) {
+        var candidates = document.querySelectorAll('button, div[role="button"], div, span, a');
+        for (var i = 0; i < candidates.length; i++) {
+          var el = candidates[i];
+          if (el.children && el.children.length > 0) continue;
+          var txt = (el.textContent || '').trim();
+          if ((txt === '登录' || txt === 'Login') && el.offsetParent !== null) {
+            loginBtn = el;
+            break;
+          }
+        }
+      }
+      var userAvatar = document.querySelector('[data-e2e="user-avatar"], [data-e2e="user-profile"], a[href^="/user/self"]');
+      if (loginBtn && !userAvatar) {
+        reportLoginState(false, 'dom_login_button');
+      } else if (userAvatar && !loginBtn) {
+        reportLoginState(true, 'dom_user_avatar');
+      }
+    } catch (e) {}
+
+    // 2. 同源轻量探针（仅请求一次）：直接由服务端权威告知当前 Cookie 是否仍处于有效登录状态
+    if (!S.authProbed) {
+      S.authProbed = true;
+      try {
+        fetch('/passport/web/account/info/', { credentials: 'include' })
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            var d = (data && data.data) || data || {};
+            var errCode = d.error_code !== undefined ? d.error_code : data.error_code;
+            var desc = d.description || data.description || '';
+            if (errCode === 101 || errCode === 1 ||
+                (typeof desc === 'string' && (desc.indexOf('未登录') !== -1 ||
+                                              desc.indexOf('not login') !== -1 ||
+                                              desc.indexOf('会话过期') !== -1 ||
+                                              desc.indexOf('重新登录') !== -1))) {
+              reportLoginState(false, 'probe_passport_unlogged');
+            } else if (errCode === 0) {
+              var uid = d.user_id || d.userId || d.uid;
+              if (uid && String(uid).trim() !== '0' && /^\d{5,25}$/.test(String(uid).trim())) {
+                reportLoginState(true, 'probe_passport_valid');
+              }
+            }
+          })
+          .catch(function () {});
+      } catch (e) {}
+    }
   }
   // 当前页面目标作品 ID（/video、/note、/slides、modal_id）
   function getTargetAwemeId() {
@@ -346,7 +413,8 @@ const String kDouyinSniffJs = r'''
     }
 
     // 主页面降级等待 12 秒；与 Dart 侧 18 秒迟到兜底、30 秒主超时独立，修改需同步检查
-    if (!sharePage && Date.now() - (window.__dyStartTime || 0) < 12000) {
+    // 若已确定远端未登录，无需死等完整画质列表，直接回传基础视频流！
+    if (!sharePage && S.loginReported !== false && Date.now() - (window.__dyStartTime || 0) < 12000) {
       log('已发现基础视频流，正在等待完整画质列表(bit_rate)...');
       return false;
     }
@@ -593,6 +661,7 @@ const String kDouyinSniffJs = r'''
     } catch (e) {}
   }
   function tryExtractNow() {
+    checkLoginState();
     if (S.sent) return;
     scanStatic(); if (S.sent) return;
     scanPace(); if (S.sent) return;
@@ -604,6 +673,7 @@ const String kDouyinSniffJs = r'''
   window.__douyinSnifferReset = function () {
     S.sent = false; S.lastUrl = ''; S.logs = {}; S.targetId = ''; S.desc = ''; S.coverUrl = '';
     S.videoHintSent = false; S.degraded = false; S.scannedPaceIdx = 0;
+    S.loginReported = null; S.authProbed = false;
     window.__dyStartTime = Date.now();
     window.__dyStartHref = location.href;
   };

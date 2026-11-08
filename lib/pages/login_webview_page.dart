@@ -33,7 +33,7 @@ class _LoginWebViewPageState extends State<LoginWebViewPage> {
   @override
   void initState() {
     super.initState();
-    // UA 必须与后台嗅探器完全一致，确保登录态无缝共享
+    // UA 必须与后台捕获器完全一致，确保登录态无缝共享
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setUserAgent(DouyinSniffer.desktopUserAgent)

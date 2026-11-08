@@ -87,4 +87,29 @@ void main() {
       );
     });
   });
+
+  group('loginStateDetection', () {
+    test('正确解析 Channel 回传的 login_state 消息', () {
+      expect(
+        DouyinSniffer.parseChannelLoginState({
+          'type': 'login_state',
+          'loggedIn': false,
+          'reason': 'dom_login_button',
+        }),
+        isFalse,
+      );
+
+      expect(
+        DouyinSniffer.parseChannelLoginState({
+          'type': 'login_state',
+          'loggedIn': true,
+          'reason': 'probe_passport_valid',
+        }),
+        isTrue,
+      );
+
+      expect(DouyinSniffer.parseChannelLoginState({'type': 'result'}), isNull);
+      expect(DouyinSniffer.parseChannelLoginState('bad'), isNull);
+    });
+  });
 }

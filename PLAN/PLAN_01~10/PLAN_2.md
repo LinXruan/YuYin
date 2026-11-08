@@ -16,7 +16,7 @@
 2. 修改 `lib/services/douyin_sniffer.dart`：
    - 区分 Channel 收到的消息类型：如果是 `type == 'log'`，调用 `debugPrint('[JS-Sniffer] $msg')` 并回调给界面日志框；如果是解析到的视频地址，则正常完成 `Completer`。
 3. 修改 `lib/pages/home_page.dart`：
-   - 增加一个布尔状态 `_showDebugWebView = false` 和一个 `SwitchListTile`（标题：“显示后台嗅探网页（调试排错用）”）。
+   - 增加一个布尔状态 `_showDebugWebView = false` 和一个 `SwitchListTile`（标题：“显示后台捕获网页（调试排错用）”）。
    - 当 `_showDebugWebView` 为 `false` 时，底部挂载 `WebViewWidget` 的容器保持 1x1 像素透明；当为 `true` 时，将其高度设为 `300`、透明度设为 `1.0` 并加上边框，方便用户直观看到后台网页是否卡在验证码或加载失败。
 4. 运行 `flutter analyze` 和 `flutter test` 确保零错误。
 5. **完成后立即停下并汇报，等待用户指令进入 Step 12。**

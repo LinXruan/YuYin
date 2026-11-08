@@ -12,6 +12,7 @@ import '../utils/download_settings_store.dart';
 import '../utils/file_name_formatter.dart';
 import '../utils/history_store.dart';
 import '../utils/log_controller.dart';
+import '../utils/login_state_store.dart';
 import '../utils/save_location_store.dart';
 import '../utils/url_parser.dart';
 import 'douyin_sniffer.dart';
@@ -100,6 +101,8 @@ class AgentAutomationServer {
         await _handleGetHistory(request);
       } else if (path == '/api/history/clear' && request.method == 'POST') {
         await _handleClearHistory(request);
+      } else if (path == '/api/login/mock' && request.method == 'POST') {
+        await _handleMockLogin(request);
       } else {
         _sendJson(
           request,
@@ -141,6 +144,7 @@ class AgentAutomationServer {
       'version': appVersion,
       'busy': busy.value,
       'loggedIn': loggedIn.value,
+      'snifferLoggedIn': sniffer?.isUserLoggedIn ?? false,
       'hasParsedResult': result != null,
       'lastInput': _lastRawInput,
       'lastResult': lastResultJson,
@@ -153,7 +157,7 @@ class AgentAutomationServer {
     });
   }
 
-  /// POST /api/parse：执行作品嗅探解析
+  /// POST /api/parse：执行作品捕获解析
   Future<void> _handleParse(HttpRequest request) async {
     if (busy.value) {
       _sendJson(
@@ -192,7 +196,7 @@ class AgentAutomationServer {
     try {
       final currentSniffer = sniffer;
       if (currentSniffer == null) {
-        throw StateError('嗅探服务未初始化');
+        throw StateError('捕获服务未初始化');
       }
       final result = await currentSniffer.sniffVideoUrl(url);
       _lastResult = result;
@@ -409,7 +413,7 @@ class AgentAutomationServer {
     _sendJson(request, HttpStatus.ok, {'success': true});
   }
 
-  /// POST /api/eval：向嗅探 WebView 注入并执行 JS 脚本
+  /// POST /api/eval：向捕获 WebView 注入并执行 JS 脚本
   Future<void> _handleEval(HttpRequest request) async {
     final body = await _readJsonBody(request);
     final script = body['script']?.toString();
@@ -490,6 +494,26 @@ class AgentAutomationServer {
     _sendJson(request, HttpStatus.ok, {
       'success': true,
       'message': '历史记录已清空',
+    });
+  }
+
+  /// POST /api/login/mock：动态模拟设置本地登录状态（用于自动化测试）
+  Future<void> _handleMockLogin(HttpRequest request) async {
+    final body = await _readJsonBody(request);
+    final mockLoggedIn = body['loggedIn'] == true;
+    if (mockLoggedIn) {
+      await LoginStateStore.markLoggedIn();
+      loggedIn.value = true;
+      logs.add('[AgentBridge] 已模拟设置为登录状态 (loggedIn=true)');
+    } else {
+      await LoginStateStore.clearLogin();
+      loggedIn.value = false;
+      logs.add('[AgentBridge] 已清除登录状态 (loggedIn=false)');
+    }
+    _sendJson(request, HttpStatus.ok, {
+      'success': true,
+      'loggedIn': loggedIn.value,
+      'message': '登录状态已更新为: ${loggedIn.value}',
     });
   }
 

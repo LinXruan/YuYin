@@ -100,7 +100,7 @@ class DebugPage extends StatelessWidget {
 
     final buffer = StringBuffer();
     if (sourceUrl.isNotEmpty) buffer.writeln('原始链接: $sourceUrl');
-    if (awemePageUrl.isNotEmpty) buffer.writeln('嗅探页面: $awemePageUrl');
+    if (awemePageUrl.isNotEmpty) buffer.writeln('捕获页面: $awemePageUrl');
     if (currentUrl.isNotEmpty) buffer.writeln('当前网页: $currentUrl');
     if (sourceUrl.isNotEmpty ||
         awemePageUrl.isNotEmpty ||

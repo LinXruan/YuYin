@@ -10,7 +10,7 @@ import '../utils/url_parser.dart';
 import 'douyin_share_api.dart';
 import 'js_script_builder.dart';
 
-/// 隐藏式 WebView 嗅探服务：抓取无水印视频/图文/实况图直链
+/// 隐藏式 WebView 捕获服务：抓取无水印视频/图文/实况图直链
 ///
 /// 三路结果来源：
 /// - A：主 WebView 注入 JS（主路径）；
@@ -87,9 +87,12 @@ class DouyinSniffer {
   /// 登录状态回调，由主界面设置
   bool Function()? isLoggedIn;
 
+  /// 远端登录状态变化感知回调（用于在远端被动失效时通知主界面同步状态并清除本地凭证）
+  void Function(bool loggedIn)? onLoginStateDetected;
+
   bool _isLoggedIn = false;
 
-  /// 当前嗅探任务执行时检测到的登录状态
+  /// 当前捕获任务执行时检测到的登录状态
   bool get isUserLoggedIn => _isLoggedIn;
 
   /// 写入终端调试日志与界面共享日志（界面日志保持纯净，终端 Debug 模式保留耗时标记）
@@ -114,7 +117,7 @@ class DouyinSniffer {
           onNavigationRequest: _onNavigationRequest,
           onWebResourceError: _onWebResourceError,
           onPageStarted: (url) {
-            // 任务结束后页面仍可能继续跳转，不能再重新开启嗅探
+            // 任务结束后页面仍可能继续跳转，不能再重新开启捕获
             if (!_isTaskActive) return;
             if (!UrlParser.isAllowedNavigationUrl(url)) {
               _logNonWebPage(url);
@@ -197,7 +200,12 @@ class DouyinSniffer {
         _isLoggedIn = false;
       }
     }
-    _log('开始解析 (task#$taskId, 登录状态: ${_isLoggedIn ? '已登录' : '未登录'}): $shareUrl');
+    if (kDebugMode) {
+      _log('开始解析 (task#$taskId, 登录状态: ${_isLoggedIn ? '已登录' : '未登录'}): $shareUrl');
+    } else {
+      final loginTag = _isLoggedIn ? ' (已登录)' : '';
+      _log('开始解析$loginTag: $shareUrl');
+    }
 
     _timeoutTimer?.cancel();
     _timeoutTimer = Timer(_kTaskTimeout, () {
@@ -244,13 +252,13 @@ class DouyinSniffer {
       _log('设置桌面 UA 失败: $e');
     }
 
-    // 重置上一个页面内的嗅探状态，再加载新链接
+    // 重置上一个页面内的捕获状态，再加载新链接
     try {
       await _controller.runJavaScript(
         'window.__douyinSnifferReset && window.__douyinSnifferReset();',
       );
     } catch (e) {
-      _log('重置嗅探状态失败: $e');
+      _log('重置捕获状态失败: $e');
     }
 
     final uri = Uri.tryParse(shareUrl);
@@ -369,7 +377,11 @@ class DouyinSniffer {
         _scheduleImageFallback(result, taskId);
       } else if (result.items.isNotEmpty) {
         if (!_isLoggedIn) {
-          _log('未登录状态：分享页已获取无水印视频，极速完成解析');
+          if (kDebugMode) {
+            _log('未登录状态：分享页已获取无水印视频，极速完成解析');
+          } else {
+            _log('分享页已获取无水印视频，完成解析');
+          }
           unawaited(
             _finishWithItems(
               result.items,
@@ -627,6 +639,12 @@ class DouyinSniffer {
 
       // hint/result 只在当前任务等待结果期间接收
       if (!_acceptMessages || !_isTaskActive) return;
+      if (data['type'] == 'login_state') {
+        final remoteLoggedIn = data['loggedIn'] == true;
+        final reason = data['reason']?.toString() ?? '';
+        _handleLoginStateDetected(remoteLoggedIn, reason, _taskId);
+        return;
+      }
       if (data['type'] == 'hint') {
         if (data['kind'] == 'video-waiting') {
           final hintId = data['awemeId']?.toString() ?? '';
@@ -655,6 +673,60 @@ class DouyinSniffer {
     } catch (e) {
       _log('解析 Channel 消息失败: $e');
     }
+  }
+
+  /// 处理从当前页面捕获到的远端登录状态：未登录时立即中断多画质等待并自适应降级
+  void _handleLoginStateDetected(
+    bool remoteLoggedIn,
+    String reason,
+    int taskId,
+  ) {
+    if (taskId != _taskId || !_isTaskActive) return;
+
+    if (!remoteLoggedIn) {
+      if (kDebugMode) {
+        _log('检测到远端登录状态: 未登录 (原因: $reason)');
+      }
+      final wasLoggedIn = _isLoggedIn;
+      _isLoggedIn = false;
+
+      if (wasLoggedIn) {
+        onLoginStateDetected?.call(false);
+        // 若之前分享页兜底已经拿到了无水印视频（此前被暂存等待完整画质），立即结束解析！
+        final cached = _shareVideoFallback;
+        if (cached != null && cached.items.isNotEmpty) {
+          if (kDebugMode) {
+            _log('远端未登录：立即使用已就绪的分享页视频极速完成解析');
+          } else {
+            _log('分享页已获取无水印视频，完成解析');
+          }
+          unawaited(
+            _finishWithItems(
+              cached.items,
+              false,
+              taskId,
+              title: cached.title,
+              desc: cached.desc,
+              coverUrl: cached.coverUrl,
+            ),
+          );
+        }
+      }
+    } else {
+      if (kDebugMode) {
+        _log('检测到远端登录状态: 已登录 (原因: $reason)');
+      }
+      _isLoggedIn = true;
+      onLoginStateDetected?.call(true);
+    }
+  }
+
+  /// 解析 Channel 中的 login_state 消息（纯函数，便于测试）
+  @visibleForTesting
+  static bool? parseChannelLoginState(Object? rawData) {
+    if (rawData is! Map) return null;
+    if (rawData['type'] != 'login_state') return null;
+    return rawData['loggedIn'] == true;
   }
 
   /// 把 Channel result 消息里的 items 数组转成媒体列表（纯函数，便于测试）
@@ -828,12 +900,12 @@ class DouyinSniffer {
     } catch (e) {
       if (!_loggedInjectFailure) {
         _loggedInjectFailure = true;
-        _log('注入嗅探脚本失败: $e');
+        _log('注入捕获脚本失败: $e');
       }
     }
   }
 
-  /// 用户取消下载/选择后，立即停止后台嗅探与网页加载
+  /// 用户取消下载/选择后，立即停止后台捕获与网页加载
   void cancelActiveTask() {
     _taskId++;
     _acceptMessages = false;
@@ -859,6 +931,6 @@ class DouyinSniffer {
     _taskId++;
     _acceptMessages = false;
     _acceptLogs = false;
-    _finishWithError(StateError('嗅探服务已释放'));
+    _finishWithError(StateError('捕获服务已释放'));
   }
 }

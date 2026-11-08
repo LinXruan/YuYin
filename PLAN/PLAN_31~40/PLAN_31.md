@@ -1,11 +1,11 @@
-# PLAN_31：图文作品配乐音频嗅探与全流程下载链路构建（v1.3.0+139）
+# PLAN_31：图文作品配乐音频捕获与全流程下载链路构建（v1.3.0+139）
 
 ## 一、需求背景与目标
 
 在抖音生态中，图文作品（包含单图、多图图集以及实况图）通常搭配有创作者精心挑选的背景音乐（BGM / 配乐音频）。
 目前应用仅支持图文中的静态图片与实况图视频的下载，缺少配乐音频的解析与下载能力。
 
-本次需求旨在打通**图文作品配乐音频的嗅探、解析、交互勾选、智能命名、分类存储与日志呈现全链路**，将版本升级至 **`1.3.0+139`**，并将音频功能无缝接入 3 个核心接口。
+本次需求旨在打通**图文作品配乐音频的捕获、解析、交互勾选、智能命名、分类存储与日志呈现全链路**，将版本升级至 **`1.3.0+139`**，并将音频功能无缝接入 3 个核心接口。
 
 ### 1. 核心目标与 3 个接口对接要求
 1. **接口 1：音频下载后自动智能命名**
@@ -20,7 +20,7 @@
 3. **接口 3：音频保存后在解析页日志的显示**
    - 下载完成后，解析页实时日志追加输出：`音频已保存到/Music/YuYin/`；
    - 状态面板（`StatusCard`）识别并完整显示多资源保存路径；
-   - 嗅探成功时日志同步呈现配乐信息（如：`解析成功：共发现 1 张图片、0 个视频、1 首配乐音频`）。
+   - 捕获成功时日志同步呈现配乐信息（如：`解析成功：共发现 1 张图片、0 个视频、1 首配乐音频`）。
 
 ---
 
@@ -28,8 +28,8 @@
 
 ```mermaid
 flowchart TD
-    subgraph Capture["1. 嗅探与提取层"]
-        SrcA["主 WebView JS 嗅探<br/>(node.video.play_addr / node.music)"]
+    subgraph Capture["1. 捕获与提取层"]
+        SrcA["主 WebView JS 捕获<br/>(node.video.play_addr / node.music)"]
         SrcB["分享页 API 兜底<br/>(item.video.play_addr / item.music)"]
         SrcC["Network Fetch 媒体拦截兜底"]
     end
@@ -55,13 +55,13 @@ flowchart TD
     UI --> Download
 ```
 
-### 1. 嗅探层核心机理
+### 1. 捕获层核心机理
 - **抖音图文作品配乐的底层存储规律**：
   在抖音平台数据中，图文作品（`note`）的背景音乐不仅存在于 `music` 节点，**同时被包装在作品顶层的 `video.play_addr`（`url_list` / `uri`）中下发**，其真实格式为 `audio/mp4`（M4A 封装），时长与创作者选取的 BGM 严格一致。
 - **提取与清洗策略**：
   - 在 `DouyinShareApi.parseItem` 中：当识别到 `isImagePost` 时，提取 `video['play_addr']` 或 `music['play_url']`，构造 `MediaType.audio` 的 `MediaItem`；
   - 在 `js_script_builder.dart` 中：当识别到 `hasImages` 时，调用 `pickAudioUrl(node)` 提取音频直链并追加至 `items`；
-  - 嗅探结果汇总：`audioCount = items.where((it) => it.type == MediaType.audio).length`。
+  - 捕获结果汇总：`audioCount = items.where((it) => it.type == MediaType.audio).length`。
 
 ### 2. 用户交互选择体验
 - 在 `ImagePreviewSheet` 中，当 `items` 含有 `MediaType.audio` 时：
@@ -128,7 +128,7 @@ flowchart TD
 
 ### 1. 静态检查与单元测试
 - lutter analyze：**0 issues found**。
-- lutter test：**全项目 124 项测试全部绿灯通过**（覆盖图文配乐直链嗅探提取、同批单/多项不加序号命名规则、Cookie 兜底重试等）。
+- lutter test：**全项目 124 项测试全部绿灯通过**（覆盖图文配乐直链捕获提取、同批单/多项不加序号命名规则、Cookie 兜底重试等）。
 
 ### 2. 端到端样本测试（sources/139_抖音口令_单图+音频/）
 - **解析验证**：
@@ -153,7 +153,7 @@ flowchart TD
   - 音频落盘：/sdcard/Music/YuYin/donk就是会刷数据的ni....m4a
 - **音频时长对比验证**：
   - 样本音频时长：**152.818 秒 (2.55 分钟)**
-  - 嗅探落盘音频时长：**152.818 秒 (2.55 分钟)**
+  - 捕获落盘音频时长：**152.818 秒 (2.55 分钟)**
   - 时长差值：**0.000 秒**（毫秒级严格一致）。
 
 ### 3. 多图图集兼容性回归测试（sources/138_抖音口令/多图.txt）

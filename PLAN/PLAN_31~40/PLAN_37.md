@@ -70,7 +70,7 @@ sequenceDiagram
 ## 三、解决方案与架构设计
 
 1. **登录感知与决策分支（`DouyinSniffer`）**：
-   - 嗅探器接入登录状态检测（通过 `LoginStateStore` 或外部状态回调），在任务开始时确定 `_isLoggedIn`。
+   - 捕获器接入登录状态检测（通过 `LoginStateStore` 或外部状态回调），在任务开始时确定 `_isLoggedIn`。
    - 当 `_isLoggedIn == false`（未登录）时：
      - 一旦 `_runShareFallback` 成功返回视频结果，**立即以该结果完成任务（`_finishWithItems`）**，无需任何无谓等待！
      - 耗时直接从 30 秒压缩到 **0.7 ~ 1.5 秒**。
