@@ -68,15 +68,25 @@ class HistoryStore {
     }
   }
 
-  /// 添加一条成功解析的历史记录（若已存在则更新时间并置顶）
+  /// 添加一条成功解析的历史记录（若已存在则更新时间并置顶，保留已保存状态）
   static Future<void> addRecord(HistoryItem item) async {
     // 1. 去重检查：根据 id 或有效 url
-    _records.removeWhere(
+    final existingIndex = _records.indexWhere(
       (old) => old.id == item.id || (old.url.isNotEmpty && old.url == item.url),
     );
 
+    var toInsert = item;
+    if (existingIndex != -1) {
+      final existing = _records[existingIndex];
+      // 若已有记录且已经保存过，新解析保留已保存状态
+      if (existing.isSaved && !item.isSaved) {
+        toInsert = item.copyWith(isSaved: true);
+      }
+      _records.removeAt(existingIndex);
+    }
+
     // 2. 置顶最新记录
-    _records.insert(0, item);
+    _records.insert(0, toInsert);
 
     // 3. 超额截断
     if (_records.length > maxHistoryCount) {
@@ -85,6 +95,21 @@ class HistoryStore {
 
     recordsNotifier.value = List.unmodifiable(_records);
     await _save();
+  }
+
+  /// 标记指定历史记录的保存状态（true=已保存到本地，false=仅解析）
+  static Future<void> markSaved(String id, [bool isSaved = true]) async {
+    final index = _records.indexWhere(
+      (item) => item.id == id || (item.url.isNotEmpty && item.url == id),
+    );
+    if (index != -1) {
+      final current = _records[index];
+      if (current.isSaved != isSaved) {
+        _records[index] = current.copyWith(isSaved: isSaved);
+        recordsNotifier.value = List.unmodifiable(_records);
+        await _save();
+      }
+    }
   }
 
   /// 删除单条历史记录
@@ -118,12 +143,18 @@ class HistoryStore {
 
   /// 纯内存极速分词搜索（毫秒级耗时，避免数据库磁盘扫描与主线程卡顿）
   ///
+  /// [onlySaved] 为 true 时，仅筛选已保存至本地的记录；
   /// 匹配作品【完整文案】与【标题】，不受 UI 截断展示影响；
   /// 支持空格多关键词逻辑 AND 检索（例如输入 "猪 漫画"）。
-  static List<HistoryItem> search(String query) {
+  static List<HistoryItem> search(String query, {bool onlySaved = false}) {
+    var list = _records;
+    if (onlySaved) {
+      list = list.where((item) => item.isSaved).toList();
+    }
+
     final cleanQuery = query.trim().toLowerCase();
     if (cleanQuery.isEmpty) {
-      return List.unmodifiable(_records);
+      return List.unmodifiable(list);
     }
 
     final tokens = cleanQuery
@@ -131,10 +162,10 @@ class HistoryStore {
         .where((t) => t.isNotEmpty)
         .toList();
     if (tokens.isEmpty) {
-      return List.unmodifiable(_records);
+      return List.unmodifiable(list);
     }
 
-    return _records.where((item) {
+    return list.where((item) {
       final fullText = '${item.fullDesc} ${item.title ?? ''}'.toLowerCase();
       // 所有关键词均需命中完整文案
       return tokens.every((token) => fullText.contains(token));

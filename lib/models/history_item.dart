@@ -11,6 +11,7 @@ class HistoryItem {
     this.mediaSummary = '',
     this.itemCount = 1,
     DateTime? createdAt,
+    this.isSaved = false,
   })  : coverUrl = (coverUrl != null && !isVideoUrl(coverUrl)) ? coverUrl : null,
         createdAt = createdAt ?? DateTime.now();
 
@@ -43,6 +44,9 @@ class HistoryItem {
 
   /// 解析成功的时间戳
   final DateTime createdAt;
+
+  /// 是否已下载保存至本地存储（false=仅解析，true=已保存）
+  final bool isSaved;
 
   /// 人性化相对/绝对时间展示（严格不显示“抖音”两个字）
   String get formattedTime {
@@ -88,7 +92,36 @@ class HistoryItem {
         'mediaSummary': mediaSummary,
         'itemCount': itemCount,
         'createdAt': createdAt.toIso8601String(),
+        'isSaved': isSaved,
       };
+
+  HistoryItem copyWith({
+    String? id,
+    String? url,
+    String? rawInput,
+    String? fullDesc,
+    String? title,
+    String? coverUrl,
+    bool? isImagePost,
+    String? mediaSummary,
+    int? itemCount,
+    DateTime? createdAt,
+    bool? isSaved,
+  }) {
+    return HistoryItem(
+      id: id ?? this.id,
+      url: url ?? this.url,
+      rawInput: rawInput ?? this.rawInput,
+      fullDesc: fullDesc ?? this.fullDesc,
+      title: title ?? this.title,
+      coverUrl: coverUrl ?? this.coverUrl,
+      isImagePost: isImagePost ?? this.isImagePost,
+      mediaSummary: mediaSummary ?? this.mediaSummary,
+      itemCount: itemCount ?? this.itemCount,
+      createdAt: createdAt ?? this.createdAt,
+      isSaved: isSaved ?? this.isSaved,
+    );
+  }
 
   /// 判断一个 URL 是否为纯视频流链接（严禁作为封面缩略图）
   static bool isVideoUrl(String? url) {
@@ -117,6 +150,7 @@ class HistoryItem {
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
           : DateTime.now(),
+      isSaved: json['isSaved'] == true,
     );
   }
 }

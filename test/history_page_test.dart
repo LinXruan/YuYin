@@ -182,31 +182,30 @@ void main() {
     expect(find.byType(Checkbox), findsNothing);
     expect(find.text('全选'), findsOneWidget);
     expect(find.text('完成'), findsNothing); // PLAN_42: “完成”按钮已删除
-    expect(find.text('删除(1)'), findsOneWidget);
+    expect(find.text('删除选中项 (1)'), findsOneWidget);
 
     // 2. 测试通过 Android 返回键（PopScope）退出多选模式
     final dynamic widgetsAppState = tester.state(find.byType(WidgetsApp));
     await widgetsAppState.didPopRoute();
     await tester.pumpAndSettle();
 
-    // 验证：已退出多选模式，顶栏恢复为无按钮状态
+    // 验证：已退出多选模式，顶栏恢复为无全选状态
     expect(find.text('全选'), findsNothing);
-    expect(find.text('删除'), findsNothing);
     expect(find.text('清空'), findsNothing);
 
     // 3. 再次长按重新进入多选模式
     await tester.longPress(find.text('测试条目一').first);
     await tester.pumpAndSettle();
-    expect(find.text('删除(1)'), findsOneWidget);
+    expect(find.text('删除选中项 (1)'), findsOneWidget);
 
     // 4. 点击“全选”
     await tester.tap(find.text('全选'));
     await tester.pumpAndSettle();
-    expect(find.text('删除(3)'), findsOneWidget);
+    expect(find.text('删除选中项 (3)'), findsOneWidget);
     expect(find.text('取消全选'), findsOneWidget);
 
-    // 5. 点击“删除(3)”弹出确认弹窗
-    await tester.tap(find.text('删除(3)'));
+    // 5. 点击“删除选中项 (3)”弹出确认弹窗
+    await tester.tap(find.text('删除选中项 (3)'));
     await tester.pumpAndSettle();
 
     expect(find.text('确认删除'), findsOneWidget);
@@ -255,5 +254,98 @@ void main() {
     final imageWidget = tester.widget<Image>(imageFinder);
     expect(imageWidget.fit, BoxFit.cover);
     expect(imageWidget.alignment, Alignment.center);
+  });
+
+  testWidgets('PLAN_46: “已保存”与“已解析”筛选功能、多选联动排除未保存项、全选与筛选联动', (tester) async {
+    // 准备测试数据：条目 1 为已保存，条目 2 为未保存，条目 3 为已保存
+    await HistoryStore.addRecord(
+      HistoryItem(
+        id: '1',
+        url: 'https://v.douyin.com/1/',
+        fullDesc: '已保存的作品1',
+        isSaved: true,
+      ),
+    );
+    await HistoryStore.addRecord(
+      HistoryItem(
+        id: '2',
+        url: 'https://v.douyin.com/2/',
+        fullDesc: '未保存的作品2',
+        isSaved: false,
+      ),
+    );
+    await HistoryStore.addRecord(
+      HistoryItem(
+        id: '3',
+        url: 'https://v.douyin.com/3/',
+        fullDesc: '已保存的作品3',
+        isSaved: true,
+      ),
+    );
+
+    await tester.pumpWidget(buildTestWidget());
+    await tester.pumpAndSettle();
+
+    // 初始状态：展示全部 3 条记录，右上角存在“已保存”筛选按钮
+    expect(find.text('已保存的作品1'), findsWidgets);
+    expect(find.text('未保存的作品2'), findsWidgets);
+    expect(find.text('已保存的作品3'), findsWidgets);
+    expect(find.text('已保存'), findsWidgets);
+
+    // 1. 点击右上角“已保存”按钮进行筛选
+    await tester.tap(find.text('已保存').first);
+    await tester.pumpAndSettle();
+
+    // 验证：仅剩下“已保存的作品1”和“已保存的作品3”，未保存的条目2被隐藏
+    expect(find.text('已保存的作品1'), findsWidgets);
+    expect(find.text('已保存的作品3'), findsWidgets);
+    expect(find.text('未保存的作品2'), findsNothing);
+
+    // 再次点击取消筛选，恢复全部展示
+    await tester.tap(find.text('已保存').first);
+    await tester.pumpAndSettle();
+    expect(find.text('未保存的作品2'), findsWidgets);
+
+    // 2. 长按“未保存的作品2”进入多选模式
+    await tester.longPress(find.text('未保存的作品2').first);
+    await tester.pumpAndSettle();
+
+    // 验证：顶栏显示“全选”与“已保存”，且“已保存”在“全选”右侧
+    expect(find.text('全选'), findsOneWidget);
+    expect(find.text('已保存'), findsWidgets);
+    final selectAllPos = tester.getCenter(find.text('全选'));
+    final savedBtnPos = tester.getCenter(find.text('已保存').first);
+    expect(savedBtnPos.dx > selectAllPos.dx, isTrue);
+
+    // 当前已选中未保存作品2，底栏显示“删除选中项 (1)”
+    expect(find.text('删除选中项 (1)'), findsOneWidget);
+
+    // 单击“已保存的作品1”加入选中
+    await tester.tap(find.text('已保存的作品1').first);
+    await tester.pumpAndSettle();
+    expect(find.text('删除选中项 (2)'), findsOneWidget);
+
+    // 3. 核心需求：在多选模式下点击“已保存”筛选，自动排除所有“未保存到本地”的记录
+    await tester.tap(find.text('已保存').first);
+    await tester.pumpAndSettle();
+
+    // 验证：未保存作品2被排除，仅剩下已保存作品1被选中，删除项计数变为 (1)
+    expect(find.text('未保存的作品2'), findsNothing);
+    expect(find.text('删除选中项 (1)'), findsOneWidget);
+
+    // 4. 全选联动：在“已保存”筛选下点击“全选”
+    // 当前展示项为 作品1 与 作品3，仅作品1被选中，因此未全选
+    await tester.tap(find.text('全选'));
+    await tester.pumpAndSettle();
+
+    // 验证：作品1和作品3均被选中，计数变为 (2)，全选按钮变为“取消全选”
+    expect(find.text('删除选中项 (2)'), findsOneWidget);
+    expect(find.text('取消全选'), findsOneWidget);
+
+    // 点击“取消全选”
+    await tester.tap(find.text('取消全选'));
+    await tester.pumpAndSettle();
+    expect(find.text('删除选中项 (0)'), findsOneWidget);
+    expect(find.text('全选'), findsOneWidget);
   });
 }

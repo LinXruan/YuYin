@@ -285,6 +285,9 @@ class _ParsePageState extends State<ParsePage> {
         onProgress: _updateBatchProgress,
       );
       if (!mounted) return;
+      if (savedTypes.isNotEmpty) {
+        HistoryStore.markSaved(url, true);
+      }
       if (savedTypes.contains(MediaType.image)) {
         widget.logs.add('图片已保存到${SaveLocationStore.getDisplayPath(MediaType.image)}');
       }

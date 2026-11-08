@@ -27,6 +27,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   bool _isSelectionMode = false;
   final Set<String> _selectedIds = <String>{};
+  bool _filterOnlySaved = false;
   bool _sessionDismissed = false;
   bool _permanentlyDismissed = false;
 
@@ -85,12 +86,36 @@ class _HistoryPageState extends State<HistoryPage> {
     });
   }
 
+  bool _isAllSelected(List<HistoryItem> items) {
+    if (items.isEmpty) return false;
+    return items.every((i) => _selectedIds.contains(i.id));
+  }
+
   void _toggleSelectAll(List<HistoryItem> items) {
+    if (items.isEmpty) return;
     setState(() {
-      if (_selectedIds.length == items.length) {
-        _selectedIds.clear();
+      if (_isAllSelected(items)) {
+        for (final item in items) {
+          _selectedIds.remove(item.id);
+        }
       } else {
-        _selectedIds.addAll(items.map((i) => i.id));
+        for (final item in items) {
+          _selectedIds.add(item.id);
+        }
+      }
+    });
+  }
+
+  void _toggleFilterOnlySaved() {
+    setState(() {
+      _filterOnlySaved = !_filterOnlySaved;
+      if (_filterOnlySaved) {
+        // 用户勾选了“未保存到本地”的记录时，若切换“已保存”筛选，自动排除所有未保存记录
+        final savedIds = HistoryStore.records
+            .where((item) => item.isSaved)
+            .map((item) => item.id)
+            .toSet();
+        _selectedIds.removeWhere((id) => !savedIds.contains(id));
       }
     });
   }
@@ -139,8 +164,10 @@ class _HistoryPageState extends State<HistoryPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final displayedItems = HistoryStore.search(_searchQuery);
+    final displayedItems =
+        HistoryStore.search(_searchQuery, onlySaved: _filterOnlySaved);
     final hasAnyRecord = HistoryStore.records.isNotEmpty;
+    final allSelected = _isAllSelected(displayedItems);
 
     return PopScope(
       canPop: !_isSelectionMode,
@@ -158,8 +185,18 @@ class _HistoryPageState extends State<HistoryPage> {
                 padding: const EdgeInsets.fromLTRB(20, 12, 16, 8),
                 child: Row(
                   children: [
+                    if (_isSelectionMode) ...[
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 22),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: _exitSelectionMode,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     Text(
-                      '历史',
+                      _isSelectionMode ? '已选 ${_selectedIds.length} 项' : '历史',
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.5,
@@ -167,26 +204,24 @@ class _HistoryPageState extends State<HistoryPage> {
                     ),
                     const Spacer(),
                     if (hasAnyRecord && _isSelectionMode) ...[
-                      // 多选模式：全选 / 删除
-                      _PillButton(
-                        icon: Icons.select_all_rounded,
-                        label: _selectedIds.length == displayedItems.length
-                            ? '取消全选'
-                            : '全选',
-                        onTap: () => _toggleSelectAll(displayedItems),
+                      // 多选模式：全选（紧贴已保存按钮左侧，样式与边框高光对齐保存页）
+                      _HistoryFilterButton(
+                        label: allSelected ? '取消全选' : '全选',
+                        isSelected: allSelected,
+                        hasItems: displayedItems.isNotEmpty,
+                        onTap: displayedItems.isNotEmpty
+                            ? () => _toggleSelectAll(displayedItems)
+                            : () {},
                       ),
                       const SizedBox(width: 8),
-                      _PillButton(
-                        icon: Icons.delete_outline_rounded,
-                        label: _selectedIds.isEmpty
-                            ? '删除'
-                            : '删除(${_selectedIds.length})',
-                        isDestructive: _selectedIds.isNotEmpty,
-                        onTap: _selectedIds.isNotEmpty
-                            ? _confirmDeleteSelected
-                            : null,
-                      ),
                     ],
+                    if (hasAnyRecord)
+                      // 已保存筛选切换按钮
+                      _HistoryFilterButton(
+                        label: '已保存',
+                        isSelected: _filterOnlySaved,
+                        onTap: _toggleFilterOnlySaved,
+                      ),
                   ],
                 ),
               ),
@@ -315,6 +350,26 @@ class _HistoryPageState extends State<HistoryPage> {
                       },
                     ),
             ),
+
+            // 4. 多选模式底部大删除按钮（对齐保存页面底端保存按钮样式）
+            if (_isSelectionMode)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: theme.colorScheme.error,
+                      foregroundColor: theme.colorScheme.onError,
+                    ),
+                    onPressed: _selectedIds.isEmpty
+                        ? null
+                        : _confirmDeleteSelected,
+                    icon: const Icon(Icons.delete_outline_rounded),
+                    label: Text('删除选中项 (${_selectedIds.length})'),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -412,6 +467,24 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Widget _buildEmptyState(ThemeData theme, bool hasAnyRecord) {
+    final String title;
+    final String subtitle;
+    final IconData icon;
+
+    if (!hasAnyRecord) {
+      title = '暂无历史记录';
+      subtitle = '成功解析的作品会自动记录在这里，点一下即可重新载入';
+      icon = Icons.history_rounded;
+    } else if (_filterOnlySaved) {
+      title = '暂无已保存的记录';
+      subtitle = '下载并保存资源后会自动归类到这里';
+      icon = Icons.bookmark_border_rounded;
+    } else {
+      title = '未找到匹配的作品文案';
+      subtitle = '换个文案关键词试试看';
+      icon = Icons.search_off_rounded;
+    }
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -419,24 +492,20 @@ class _HistoryPageState extends State<HistoryPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              hasAnyRecord
-                  ? Icons.search_off_rounded
-                  : Icons.history_rounded,
+              icon,
               size: 64,
               color: theme.colorScheme.outline.withValues(alpha: 0.6),
             ),
             const SizedBox(height: 16),
             Text(
-              hasAnyRecord ? '未找到匹配的作品文案' : '暂无历史记录',
+              title,
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              hasAnyRecord
-                  ? '换个文案关键词试试看'
-                  : '成功解析的作品会自动记录在这里，点一下即可重新载入',
+              subtitle,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -449,55 +518,78 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 }
 
-/// 顶部胶囊操作按钮
-class _PillButton extends StatelessWidget {
-  const _PillButton({
-    required this.icon,
+/// 顶部分类与全选筛选切换按钮（对齐保存页“图片/实况/音频” _CategoryFilterButton 样式与边框高光）
+class _HistoryFilterButton extends StatelessWidget {
+  const _HistoryFilterButton({
     required this.label,
+    required this.isSelected,
     required this.onTap,
-    this.isDestructive = false,
+    this.hasItems = true,
   });
 
-  final IconData icon;
   final String label;
-  final VoidCallback? onTap;
-  final bool isDestructive;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final bool hasItems;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final bgColor = isDestructive
-        ? theme.colorScheme.errorContainer
-        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7);
+    if (!hasItems) {
+      // 缺少对应资源或列表为空：蒙灰不可点击
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+        decoration: BoxDecoration(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.04)
+              : Colors.black.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.25),
+            width: 1.0,
+          ),
+        ),
+        child: Text(
+          label,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.28),
+          ),
+        ),
+      );
+    }
 
-    final fgColor = isDestructive
-        ? theme.colorScheme.onErrorContainer
-        : (isDark ? Colors.white : Colors.black87);
+    // 选中态高亮边框与微底色
+    final borderColor = isSelected
+        ? theme.colorScheme.primary
+        : theme.colorScheme.outlineVariant;
+    final backgroundColor = isSelected
+        ? theme.colorScheme.primary.withValues(alpha: isDark ? 0.18 : 0.10)
+        : Colors.transparent;
+    final textColor = isSelected
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
 
-    return Material(
-      color: bgColor,
+    return InkWell(
+      onTap: onTap,
       borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 15, color: fgColor),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: fgColor,
-                ),
-              ),
-            ],
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: borderColor,
+            width: isSelected ? 2.0 : 1.0,
+          ),
+        ),
+        child: Text(
+          label,
+          style: theme.textTheme.labelMedium?.copyWith(
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: textColor,
           ),
         ),
       ),
@@ -585,13 +677,39 @@ class _HistoryCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
 
-                      // 3. 媒体标签摘要（如“图集/音频/文案”或“视频/文案”）
-                      Text(
-                        item.mediaSummary,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: theme.colorScheme.outline,
-                        ),
+                      // 3. 媒体标签摘要与已保存状态标记
+                      Row(
+                        children: [
+                          Text(
+                            item.mediaSummary,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: theme.colorScheme.outline,
+                            ),
+                          ),
+                          if (item.isSaved) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 1.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primaryContainer
+                                    .withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '已保存',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),

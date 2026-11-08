@@ -39,6 +39,7 @@ class AgentAutomationServer {
   HttpServer? _server;
   SniffResult? _lastResult;
   String? _lastRawInput;
+  String? _lastParsedUrl;
   CancelToken? _activeDownloadToken;
 
   /// 启动本地 HTTP 自动化服务
@@ -201,6 +202,7 @@ class AgentAutomationServer {
       final result = await currentSniffer.sniffVideoUrl(url);
       _lastResult = result;
       _lastRawInput = text;
+      _lastParsedUrl = url;
 
       // 成功解析后自动计入历史记录
       if (result.items.isNotEmpty) {
@@ -348,6 +350,10 @@ class AgentAutomationServer {
           // 下载进度内部更新
         },
       );
+
+      if (savedTypes.isNotEmpty && _lastParsedUrl != null) {
+        HistoryStore.markSaved(_lastParsedUrl!, true);
+      }
 
       // 计算保存路径展示
       final savedLocations = <String, String>{};

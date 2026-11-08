@@ -377,5 +377,36 @@ void main() {
       expect(HistoryStore.records[0].id, 'persist_2'); // 最新的在前面
       expect(HistoryStore.records[1].id, 'persist_1');
     });
+
+    test('PLAN_46: markSaved 与 isSaved 状态持久化及重析继承', () async {
+      final item = HistoryItem(
+        id: 'test_url_1',
+        url: 'https://v.douyin.com/u1/',
+        fullDesc: '文案1',
+        isSaved: false,
+      );
+      await HistoryStore.addRecord(item);
+      expect(HistoryStore.records.first.isSaved, isFalse);
+
+      // 标记为已保存
+      await HistoryStore.markSaved('test_url_1', true);
+      expect(HistoryStore.records.first.isSaved, isTrue);
+
+      // search onlySaved 过滤
+      expect(HistoryStore.search('', onlySaved: true).length, 1);
+      expect(HistoryStore.search('', onlySaved: false).length, 1);
+
+      // 重新解析同一 URL，由于旧记录已保存，新 addRecord 自动继承已保存状态
+      await HistoryStore.addRecord(
+        HistoryItem(
+          id: 'test_url_1',
+          url: 'https://v.douyin.com/u1/',
+          fullDesc: '更新后的文案1',
+          isSaved: false,
+        ),
+      );
+      expect(HistoryStore.records.first.isSaved, isTrue);
+      expect(HistoryStore.records.first.fullDesc, '更新后的文案1');
+    });
   });
 }
