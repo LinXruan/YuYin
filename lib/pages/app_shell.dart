@@ -41,7 +41,6 @@ class _AppShellState extends State<AppShell> {
   AgentAutomationServer? _automationServer;
 
   int _index = 0;
-  late final PageController _pageController;
   Timer? _autoCheckUpdateTimer;
 
   static const List<String> _titles = ['余音', '历史', '设置'];
@@ -49,7 +48,6 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: _index);
     // 仅在 Debug 模式下启动 Agent 自动化本地控制台服务（Release 模式物理隔离）
     if (kDebugMode) {
       _automationServer = AgentAutomationServer(
@@ -134,7 +132,6 @@ class _AppShellState extends State<AppShell> {
   @override
   void dispose() {
     _autoCheckUpdateTimer?.cancel();
-    _pageController.dispose();
     _automationServer?.stop();
     _sniffer.onLog = null;
     _sniffer.onLoginStateDetected = null;
@@ -199,18 +196,6 @@ class _AppShellState extends State<AppShell> {
   void _selectTab(int index) {
     if (index == _index) return;
     setState(() => _index = index);
-    if (_pageController.hasClients) {
-      _pageController.animateToPage(
-        index,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOutCubic,
-      );
-    }
-  }
-
-  void _onPageChanged(int index) {
-    if (index == _index) return;
-    setState(() => _index = index);
   }
 
   @override
@@ -270,9 +255,8 @@ class _AppShellState extends State<AppShell> {
             ),
       body: Stack(
         children: [
-          PageView(
-            controller: _pageController,
-            onPageChanged: _onPageChanged,
+          IndexedStack(
+            index: _index,
             children: [
               ParsePage(
                 sniffer: _sniffer,
@@ -283,13 +267,17 @@ class _AppShellState extends State<AppShell> {
                 externalUrlNotifier: _pendingInputUrl,
                 onTapAccount: () => _onAccountTap(_loggedIn.value),
                 // 解析出结果、准备弹选择面板前，确保用户看到的是解析页
-                onRequestParseTab: () => _selectTab(0),
+                onRequestParseTab: () {
+                  if (mounted && _index != 0) setState(() => _index = 0);
+                },
               ),
               HistoryPage(
                 onSelectRecord: (record) {
                   _pendingInputUrl.value = null;
                   _pendingInputUrl.value = record.url;
-                  _selectTab(0);
+                  if (mounted && _index != 0) {
+                    setState(() => _index = 0);
+                  }
                 },
               ),
               SettingsPage(logs: _logs, sniffer: _sniffer),
