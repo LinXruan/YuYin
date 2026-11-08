@@ -9,6 +9,7 @@ import '../services/video_downloader.dart';
 import '../utils/log_controller.dart';
 import '../utils/login_state_store.dart';
 import '../utils/network_detector.dart';
+import '../utils/app_update_store.dart';
 import 'history_page.dart';
 import 'login_webview_page.dart';
 import 'parse_page.dart';
@@ -258,24 +259,117 @@ class _AppShellState extends State<AppShell> {
           ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: _selectTab,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.download_outlined),
-            selectedIcon: Icon(Icons.download),
-            label: '解析',
+      bottomNavigationBar: ValueListenableBuilder<AppUpdateStatus>(
+        valueListenable: AppUpdateStore.statusNotifier,
+        builder: (context, updateStatus, _) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 底部导航栏上方的悬浮应用内更新进度条
+              if (updateStatus.isDownloading)
+                _buildUpdateProgressBar(context, updateStatus),
+              NavigationBar(
+                selectedIndex: _index,
+                onDestinationSelected: _selectTab,
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.download_outlined),
+                    selectedIcon: Icon(Icons.download),
+                    label: '解析',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.history_outlined),
+                    selectedIcon: Icon(Icons.history),
+                    label: '历史',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.settings_outlined),
+                    selectedIcon: Icon(Icons.settings),
+                    label: '设置',
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// 底部更新下载浮动条
+  Widget _buildUpdateProgressBar(BuildContext context, AppUpdateStatus status) {
+    final theme = Theme.of(context);
+    final percent = (status.progress * 100).toInt();
+    final versionStr = status.version != null ? ' v${status.version}' : '';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.95),
+        border: Border(
+          top: BorderSide(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+            width: 1.0,
           ),
-          NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history),
-            label: '历史',
+          bottom: BorderSide(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+            width: 0.5,
           ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: '设置',
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.download_rounded,
+            size: 20,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '正在下载新版本$versionStr',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                    Text(
+                      '$percent%',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: status.progress > 0 ? status.progress : null,
+                    minHeight: 5,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                    valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.close_rounded, size: 20),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            tooltip: '取消下载',
+            onPressed: AppUpdateStore.cancelDownload,
           ),
         ],
       ),

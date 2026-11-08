@@ -14,6 +14,8 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.MediaStore
+import android.provider.Settings
+import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -30,6 +32,10 @@ class MainActivity : FlutterActivity() {
     private var audioMethodChannel: MethodChannel? = null
     private val appChannel = "com.debug.yuyin/app"
     private val storageChannel = "com.debug.yuyin/storage"
+    private val installerChannel = "com.debug.yuyin/app_installer"
+
+    private val requestCodeInstallPermission = 2002
+    private var pendingApkPathForInstall: String? = null
 
     private val requestCodePickDirectory = 2001
     private var pendingDirPickerResult: MethodChannel.Result? = null
@@ -74,6 +80,38 @@ class MainActivity : FlutterActivity() {
                         } else {
                             result.error("INVALID_URL", "URL is empty", null)
                         }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        // 2.5 应用更新与安装通道
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, installerChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getCpuAbi" -> {
+                        val abis = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            Build.SUPPORTED_ABIS.toList()
+                        } else {
+                            listOf(Build.CPU_ABI)
+                        }
+                        result.success(abis)
+                    }
+                    "checkInstallPermission" -> {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            result.success(packageManager.canRequestPackageInstalls())
+                        } else {
+                            result.success(true)
+                        }
+                    }
+                    "installApk" -> {
+                        val filePath = call.argument<String>("filePath")
+                        if (filePath.isNullOrBlank()) {
+                            result.error("INVALID_PATH", "APK path is empty", null)
+                            return@setMethodCallHandler
+                        }
+                        val success = triggerInstallApk(filePath)
+                        result.success(success)
                     }
                     else -> result.notImplemented()
                 }
@@ -288,8 +326,29 @@ class MainActivity : FlutterActivity() {
         super.onDestroy()
     }
 
+    override fun onResume() {
+        super.onResume()
+        // 若从安装未知应用权限设置页返回且已有暂存安装包，自动续装不断流
+        val pendingPath = pendingApkPathForInstall
+        if (pendingPath != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (packageManager.canRequestPackageInstalls()) {
+                pendingApkPathForInstall = null
+                triggerInstallApk(pendingPath)
+            }
+        }
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == requestCodeInstallPermission) {
+            val pendingPath = pendingApkPathForInstall
+            if (pendingPath != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && packageManager.canRequestPackageInstalls()) {
+                    pendingApkPathForInstall = null
+                    triggerInstallApk(pendingPath)
+                }
+            }
+        }
         if (requestCode == requestCodePickDirectory) {
             val cb = pendingDirPickerResult
             pendingDirPickerResult = null
@@ -478,5 +537,42 @@ class MainActivity : FlutterActivity() {
             else -> R.drawable.launch_background
         }
         window.setBackgroundDrawableResource(backgroundRes)
+    }
+
+    private fun triggerInstallApk(filePath: String): Boolean {
+        try {
+            val apkFile = File(filePath)
+            if (!apkFile.exists()) return false
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (!packageManager.canRequestPackageInstalls()) {
+                    pendingApkPathForInstall = filePath
+                    val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                        data = Uri.parse("package:$packageName")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivityForResult(intent, requestCodeInstallPermission)
+                    return false
+                }
+            }
+
+            pendingApkPathForInstall = null
+            val apkUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                FileProvider.getUriForFile(this, "$packageName.fileprovider", apkFile)
+            } else {
+                Uri.fromFile(apkFile)
+            }
+
+            val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(apkUri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(installIntent)
+            return true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        }
     }
 }

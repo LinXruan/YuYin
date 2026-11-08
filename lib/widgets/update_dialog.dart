@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app_info.dart';
+import '../services/app_installer.dart';
 import '../services/update_checker.dart';
+import '../utils/app_update_store.dart';
 import '../utils/url_launcher_util.dart';
 
 /// 更新提示与发布说明弹窗
@@ -11,16 +13,22 @@ class UpdateDialog extends StatelessWidget {
   const UpdateDialog({
     super.key,
     required this.info,
+    this.localApk,
   });
 
   final UpdateReleaseInfo info;
+  final LocalApkInfo? localApk;
 
   /// 便捷展示对话框方法
-  static Future<void> show(BuildContext context, UpdateReleaseInfo info) {
+  static Future<void> show(
+    BuildContext context,
+    UpdateReleaseInfo info, {
+    LocalApkInfo? localApk,
+  }) {
     return showDialog<void>(
       context: context,
       barrierDismissible: true,
-      builder: (_) => UpdateDialog(info: info),
+      builder: (_) => UpdateDialog(info: info, localApk: localApk),
     );
   }
 
@@ -35,6 +43,8 @@ class UpdateDialog extends StatelessWidget {
     final titleIcon = info.hasUpdate
         ? Icon(Icons.system_update_rounded, color: theme.colorScheme.primary)
         : const Icon(Icons.check_circle_rounded, color: Colors.green);
+
+    final hasLocalInstallable = localApk != null;
 
     return AlertDialog(
       title: Row(
@@ -98,18 +108,50 @@ class UpdateDialog extends StatelessWidget {
           ],
         ),
       ),
+      actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('关闭'),
-        ),
-        FilledButton.icon(
-          onPressed: () {
-            Navigator.of(context).pop();
-            UrlLauncherUtil.openUrl(context, info.htmlUrl);
-          },
-          icon: const Icon(Icons.open_in_new_rounded, size: 16),
-          label: Text(info.hasUpdate ? '前往 GitHub 下载' : '查看 Release'),
+        Row(
+          mainAxisAlignment: info.hasUpdate
+              ? MainAxisAlignment.spaceBetween
+              : MainAxisAlignment.start,
+          children: [
+            // 左侧：查看 Release 按钮（无背景色，仅前景色/轮廓）
+            TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                UrlLauncherUtil.openUrl(context, info.htmlUrl);
+              },
+              icon: const Icon(Icons.open_in_new_rounded, size: 16),
+              label: const Text('查看 Release'),
+              style: TextButton.styleFrom(
+                foregroundColor: theme.colorScheme.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+            ),
+
+            // 右侧：若有新版本且本地无包则显示“更新”，若本地已有该版本安装包则显示“安装”；已是最新版则不显示任何关闭/好的按钮
+            if (info.hasUpdate)
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  if (hasLocalInstallable) {
+                    AppInstaller.installApk(localApk!.file.path);
+                  } else {
+                    AppUpdateStore.startDownload(info);
+                  }
+                },
+                icon: Icon(
+                  hasLocalInstallable
+                      ? Icons.install_mobile_rounded
+                      : Icons.download_rounded,
+                  size: 16,
+                ),
+                label: Text(hasLocalInstallable ? '安装' : '更新'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+              ),
+          ],
         ),
       ],
     );

@@ -12,6 +12,8 @@ class UpdateReleaseInfo {
     required this.releaseNotes,
     required this.publishedAt,
     required this.hasUpdate,
+    this.v8aDownloadUrl,
+    this.universalDownloadUrl,
   });
 
   /// 最新发布的版本号（例如 1.2.4）
@@ -28,6 +30,26 @@ class UpdateReleaseInfo {
 
   /// 是否有新版本可用（最新版本 > 当前运行版本）
   final bool hasUpdate;
+
+  /// v8a 轻量架构安装包直链 (若有)
+  final String? v8aDownloadUrl;
+
+  /// Universal 全架构通用安装包直链 (若有)
+  final String? universalDownloadUrl;
+
+  /// 获取指定架构的首选下载链接
+  String getDownloadUrl({bool preferArm64 = true}) {
+    if (preferArm64 && v8aDownloadUrl != null && v8aDownloadUrl!.isNotEmpty) {
+      return v8aDownloadUrl!;
+    }
+    if (universalDownloadUrl != null && universalDownloadUrl!.isNotEmpty) {
+      return universalDownloadUrl!;
+    }
+    // 默认按照标准化命名规则生成直链
+    final tag = version;
+    final arch = preferArm64 ? 'v8a' : 'Universal';
+    return 'https://github.com/LinXruan/YuYin/releases/download/$tag/YuYin_${tag}_$arch.apk';
+  }
 }
 
 /// 检查更新返回结果
@@ -248,12 +270,32 @@ class UpdateChecker {
         .first;
     final hasUpdate = compareVersion(cleanTag, currentVersion) > 0;
 
+    // 解析 assets 直链
+    String? v8aUrl;
+    String? universalUrl;
+    final assets = data['assets'];
+    if (assets is List) {
+      for (final a in assets) {
+        if (a is Map) {
+          final name = a['name']?.toString() ?? '';
+          final url = a['browser_download_url']?.toString();
+          if (name.contains('v8a') && name.endsWith('.apk')) {
+            v8aUrl = url;
+          } else if (name.contains('Universal') && name.endsWith('.apk')) {
+            universalUrl = url;
+          }
+        }
+      }
+    }
+
     return UpdateReleaseInfo(
       version: cleanTag.isEmpty ? '未知' : cleanTag,
       htmlUrl: htmlUrl,
       releaseNotes: body.trim().isEmpty ? '暂无更新说明' : body.trim(),
       publishedAt: publishedAt,
       hasUpdate: hasUpdate,
+      v8aDownloadUrl: v8aUrl,
+      universalDownloadUrl: universalUrl,
     );
   }
 

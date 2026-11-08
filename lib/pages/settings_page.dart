@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_info.dart';
 import '../services/douyin_sniffer.dart';
 import '../services/update_checker.dart';
+import '../utils/app_update_store.dart';
 import '../utils/log_controller.dart';
 import '../utils/network_detector.dart';
 import '../utils/theme_store.dart';
@@ -116,7 +117,12 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
     if (result.info != null) {
-      UpdateDialog.show(context, result.info!);
+      // 检查更新成功后，先扫描本地是否已有与最新版本一致的 APK 安装包
+      final localApk = result.info!.hasUpdate
+          ? await AppUpdateStore.findMatchingApk(result.info!.version)
+          : null;
+      if (!mounted) return;
+      UpdateDialog.show(context, result.info!, localApk: localApk);
     }
   }
 

@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'pages/app_shell.dart';
+import 'utils/app_update_store.dart';
 import 'utils/download_settings_store.dart';
 import 'utils/history_store.dart';
 import 'utils/save_location_store.dart';
@@ -14,6 +17,7 @@ Future<void> main() async {
   await SelectionModeStore.init();
   await DownloadSettingsStore.init();
   await HistoryStore.init();
+  unawaited(AppUpdateStore.cleanOldApks());
   runApp(const YuYinApp());
 }
 
