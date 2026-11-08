@@ -1,5 +1,5 @@
 /// 抖音作品页面类型（只用于选择兜底策略，不代表作品内容）
-enum DouyinWorkPage { note, video, unknown }
+enum DouyinWorkPage { note, video, userHome, unknown }
 
 /// 抖音分享口令解析工具
 class UrlParser {
@@ -9,6 +9,35 @@ class UrlParser {
   static final RegExp _urlRegExp = RegExp(
     r'https?://[A-Za-z0-9\-._~:/?#\[\]@!$&()*+,;=%]+',
   );
+
+  /// 判断链接是否属于抖音用户主页链接（如 /user/MS4wLj... 或 /user/self）
+  static bool isUserHomeUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return false;
+    final uri = Uri.tryParse(url.trim());
+    if (uri == null) {
+      return RegExp(r'douyin\.com/user/([a-zA-Z0-9_\-]+)').hasMatch(url);
+    }
+    final host = uri.host.toLowerCase();
+    final isDouyin = host == 'douyin.com' || host.endsWith('.douyin.com');
+    if (!isDouyin) return false;
+    return uri.path.startsWith('/user/');
+  }
+
+  /// 从主页链接中提取用户 sec_uid（若为 self 则返回 self）
+  static String? extractSecUid(String? url) {
+    if (url == null || url.trim().isEmpty) return null;
+    final uri = Uri.tryParse(url.trim());
+    if (uri != null && uri.path.startsWith('/user/')) {
+      final segs = uri.pathSegments;
+      final idx = segs.indexOf('user');
+      if (idx != -1 && idx + 1 < segs.length) {
+        final sec = segs[idx + 1];
+        if (sec.isNotEmpty) return sec;
+      }
+    }
+    final match = RegExp(r'/user/([a-zA-Z0-9_\-]+)').firstMatch(url);
+    return match?.group(1);
+  }
 
   /// 从分享口令中提取第一个抖音链接，找不到则返回 null
   static String? extractDouyinUrl(String rawText) {
@@ -84,6 +113,7 @@ class UrlParser {
   /// 判断抖音作品页面类型：
   /// - douyin.com / iesdouyin.com 主机的 /note/、/slides/ → note
   /// - /video/ → video
+  /// - /user/ → userHome
   /// - 短链、modal_id、其他主机 → unknown
   static DouyinWorkPage classifyWorkPage(String? url) {
     if (url == null || url.isEmpty) return DouyinWorkPage.unknown;
@@ -98,6 +128,7 @@ class UrlParser {
     if (!isDouyinHost) return DouyinWorkPage.unknown;
 
     final path = uri.path;
+    if (path.startsWith('/user/')) return DouyinWorkPage.userHome;
     if (path.contains('/note/') || path.contains('/slides/')) {
       return DouyinWorkPage.note;
     }

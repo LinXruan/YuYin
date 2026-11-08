@@ -210,6 +210,52 @@ class _ParsePageState extends State<ParsePage>
       return;
     }
 
+    if (UrlParser.isUserHomeUrl(url)) {
+      bool isLogged = widget.loggedIn.value;
+      if (!isLogged) {
+        try {
+          isLogged = await LoginStateStore.isLoggedIn() &&
+              await LoginStateStore.checkWebViewCookieSession();
+          if (isLogged) widget.loggedIn.value = true;
+        } catch (_) {}
+      }
+
+      if (!isLogged) {
+        widget.logs.add('请登录再进行主页链接解析');
+        widget.busy.value = false;
+        _isParsing = false;
+        if (mounted) setState(() {});
+        return;
+      }
+
+      try {
+        widget.logs.add('正在捕获作者主页作品链接...');
+        final homeResult = await widget.sniffer.sniffUserHomeUrl(url);
+        if (!mounted || !_isParsing) return;
+        _isParsing = false;
+        if (mounted) setState(() {});
+
+        final author = homeResult.nickname.isNotEmpty ? homeResult.nickname : '未知作者';
+        widget.logs.add('[主页] 成功捕获作者【$author】共 ${homeResult.count} 条作品链接');
+        for (int i = 0; i < homeResult.workUrls.length; i++) {
+          widget.logs.add('  [${i + 1}] ${homeResult.workUrls[i]}');
+        }
+        widget.logs.add('主页作品捕获完成（当前仅支持作品链接提取）');
+      } catch (e) {
+        if (!mounted || !_isParsing) return;
+        _isParsing = false;
+        if (mounted) setState(() {});
+        widget.logs.add('主页解析失败: $e');
+      } finally {
+        if (mounted) {
+          widget.busy.value = false;
+          _isParsing = false;
+          setState(() {});
+        }
+      }
+      return;
+    }
+
     try {
       widget.logs.add('正在解析作品...');
       final result = await widget.sniffer.sniffVideoUrl(url);

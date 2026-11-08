@@ -39,6 +39,7 @@ class AgentAutomationServer {
 
   HttpServer? _server;
   SniffResult? _lastResult;
+  UserHomeResult? _lastUserHomeResult;
   String? _lastRawInput;
   String? _lastParsedUrl;
   CancelToken? _activeDownloadToken;
@@ -152,6 +153,7 @@ class AgentAutomationServer {
       'hasParsedResult': result != null,
       'lastInput': _lastRawInput,
       'lastResult': lastResultJson,
+      'lastUserHomeResult': _lastUserHomeResult?.toMap(),
       'logsCount': logs.logs.length,
       'downloadSettings': {
         'onlyHighestQualityPerResolution':
@@ -195,6 +197,55 @@ class AgentAutomationServer {
         HttpStatus.badRequest,
         {'error': '未识别到有效的抖音链接', 'code': 400, 'raw': text},
       );
+      return;
+    }
+
+    if (UrlParser.isUserHomeUrl(url)) {
+      if (!loggedIn.value) {
+        logs.reset('正在提取短链...');
+        logs.add('请登录再进行主页链接解析');
+        _sendJson(
+          request,
+          HttpStatus.forbidden,
+          {'error': '请登录再进行主页链接解析', 'code': 403, 'isUserHome': true},
+        );
+        return;
+      }
+
+      busy.value = true;
+      logs.reset('正在提取短链...');
+      logs.add('正在捕获作者主页作品链接...');
+      try {
+        final currentSniffer = sniffer;
+        if (currentSniffer == null) {
+          throw StateError('捕获服务未初始化');
+        }
+        final homeResult = await currentSniffer.sniffUserHomeUrl(url);
+        _lastUserHomeResult = homeResult;
+        _lastRawInput = text;
+        _lastParsedUrl = url;
+        final author =
+            homeResult.nickname.isNotEmpty ? homeResult.nickname : '未知作者';
+        logs.add('[主页] 成功捕获作者【$author】共 ${homeResult.count} 条作品链接');
+        for (int i = 0; i < homeResult.workUrls.length; i++) {
+          logs.add('  [${i + 1}] ${homeResult.workUrls[i]}');
+        }
+        logs.add('主页作品捕获完成（当前仅支持作品链接提取）');
+        _sendJson(request, HttpStatus.ok, {
+          'type': 'user_home',
+          'result': homeResult.toMap(),
+          'logs': logs.logs,
+        });
+      } catch (e) {
+        logs.add('主页解析失败: $e');
+        _sendJson(
+          request,
+          HttpStatus.internalServerError,
+          {'error': '$e', 'code': 500},
+        );
+      } finally {
+        busy.value = false;
+      }
       return;
     }
 

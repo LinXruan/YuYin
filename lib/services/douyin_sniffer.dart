@@ -38,6 +38,7 @@ class DouyinSniffer {
 
   late final WebViewController _controller;
   Completer<SniffResult>? _completer;
+  Completer<UserHomeResult>? _homeCompleter;
   Timer? _timeoutTimer;
   Timer? _injectTimer;
 
@@ -77,8 +78,12 @@ class DouyinSniffer {
 
   /// 当前是否仍在等待解析结果；任务完成后不再重新注入脚本或接收结果
   bool get _isTaskActive {
+    if (_disposed) return false;
     final completer = _completer;
-    return !_disposed && completer != null && !completer.isCompleted;
+    if (completer != null && !completer.isCompleted) return true;
+    final homeCompleter = _homeCompleter;
+    if (homeCompleter != null && !homeCompleter.isCompleted) return true;
+    return false;
   }
 
   /// JS 调试日志回调，由主界面设置
@@ -657,6 +662,27 @@ class DouyinSniffer {
         }
         return;
       }
+      if (data['type'] == 'user_home_result') {
+        final secUid = data['secUid']?.toString() ?? '';
+        final nickname = data['nickname']?.toString() ?? '';
+        final rawUrls = data['workUrls'];
+        final workUrls = <String>[];
+        if (rawUrls is List) {
+          for (final u in rawUrls) {
+            if (u != null) workUrls.add(u.toString());
+          }
+        }
+        final tabCount = int.tryParse(data['tabCount']?.toString() ?? '');
+        final homeResult = UserHomeResult(
+          secUid: secUid,
+          nickname: nickname,
+          workUrls: workUrls,
+          tabCount: tabCount,
+        );
+        _finishHomeWithResult(homeResult, _taskId);
+        return;
+      }
+
       if (data['type'] != 'result') return;
       final items = parseChannelItems(data['items']);
       if (items.isNotEmpty) {
@@ -880,6 +906,151 @@ class DouyinSniffer {
     }
   }
 
+  /// 主页作品捕获成功完成当前任务
+  void _finishHomeWithResult(UserHomeResult result, int taskId) {
+    if (taskId != _taskId) return;
+    final completer = _homeCompleter;
+    if (completer == null || completer.isCompleted) return;
+
+    _acceptMessages = false;
+    _acceptLogs = false;
+    _stopTimers();
+
+    final author = result.nickname.isNotEmpty ? result.nickname : '未知作者';
+    _log('主页捕获成功：作者【$author】，共 ${result.count} 条作品');
+    completer.complete(result);
+    if (identical(_homeCompleter, completer)) _homeCompleter = null;
+
+    unawaited(
+      _controller.loadRequest(Uri.parse('about:blank')).catchError((Object error) {
+        debugPrint('卸载网页释放内存失败: $error');
+      }),
+    );
+  }
+
+  /// 超时、取消或异常时结束当前主页任务
+  void _finishHomeWithError(Object error, {int? taskId}) {
+    if (taskId != null && taskId != _taskId) return;
+    _acceptMessages = false;
+    _acceptLogs = false;
+    final completer = _homeCompleter;
+    _homeCompleter = null;
+    _stopTimers();
+    if (completer == null || completer.isCompleted) return;
+    completer.completeError(error);
+  }
+
+  /// 加载主页链接并捕获作品列表，最长等待 30 秒
+  Future<UserHomeResult> sniffUserHomeUrl(String homeUrl) async {
+    _finishWithError(StateError('已有新的解析任务开始，旧任务已取消'));
+    _finishHomeWithError(StateError('已有新的解析任务开始，旧任务已取消'));
+
+    final taskId = ++_taskId;
+    final completer = Completer<UserHomeResult>();
+    _homeCompleter = completer;
+    _acceptMessages = false;
+    _acceptLogs = false;
+    _lastPageUrl = null;
+    _targetAwemeId = null;
+    _shareFallbackStarted = false;
+    _shareVideoFallback = null;
+    _pendingImageResult = null;
+    _imageGraceTimer?.cancel();
+    _imageGraceTimer = null;
+    _webviewShareFallback = false;
+    _workPageKind = DouyinWorkPage.userHome;
+    _degradedVideoSeen = false;
+    _shareFallbackFailed = false;
+    _sourceUrl = homeUrl;
+    _awemePageUrl = null;
+    _taskStartedAt = DateTime.now();
+    _blockedSchemes.clear();
+    _lastWebResourceError = null;
+    _loggedNonWebPage = false;
+    _loggedInjectFailure = false;
+    _loggedCaptchaFailure = false;
+    _lateFallbackTimer?.cancel();
+    _lateFallbackTimer = null;
+
+    if (isLoggedIn != null) {
+      _isLoggedIn = isLoggedIn!();
+    } else {
+      try {
+        final isSaved = await LoginStateStore.isLoggedIn();
+        _isLoggedIn =
+            isSaved && await LoginStateStore.checkWebViewCookieSession();
+      } catch (_) {
+        _isLoggedIn = false;
+      }
+    }
+
+    if (!_isLoggedIn) {
+      _log('请登录再进行主页链接解析');
+      final err = StateError('请登录再进行主页链接解析');
+      completer.completeError(err);
+      return completer.future;
+    }
+
+    _log('开始解析主页: $homeUrl');
+
+    _timeoutTimer?.cancel();
+    _timeoutTimer = Timer(_kTaskTimeout, () {
+      if (taskId != _taskId) return;
+      _finishHomeWithError(
+        TimeoutException('30 秒内未捕获到主页作品列表，请检查网络或主页链接有效性'),
+        taskId: taskId,
+      );
+    });
+
+    _injectTimer?.cancel();
+    _injectTimer = Timer.periodic(_kInjectInterval, (_) {
+      if (taskId != _taskId) {
+        _stopTimers();
+        return;
+      }
+      if (_homeCompleter?.isCompleted ?? true) {
+        _stopTimers();
+      } else {
+        _injectScript();
+      }
+    });
+
+    final uri = Uri.tryParse(homeUrl);
+    if (uri == null) {
+      _finishHomeWithError(
+        FormatException('无效的主页链接: $homeUrl'),
+        taskId: taskId,
+      );
+      return completer.future;
+    }
+
+    try {
+      await _controller.setUserAgent(desktopUserAgent);
+    } catch (e) {
+      _log('设置桌面 UA 失败: $e');
+    }
+
+    if (taskId != _taskId) return completer.future;
+
+    try {
+      await _controller.runJavaScript(
+        'window.__douyinSnifferReset && window.__douyinSnifferReset();',
+      );
+    } catch (_) {}
+
+    if (taskId != _taskId) return completer.future;
+
+    try {
+      await _controller.loadRequest(uri);
+    } catch (e) {
+      if (taskId == _taskId) {
+        _finishHomeWithError(e, taskId: taskId);
+      }
+    }
+
+    return completer.future;
+  }
+
   /// 超时、取消或异常时结束当前任务
   void _finishWithError(Object error, {int? taskId}) {
     // 过期任务不能停掉新任务的定时器或分享页请求
@@ -916,6 +1087,11 @@ class DouyinSniffer {
     if (completer != null && !completer.isCompleted) {
       completer.completeError(StateError('用户已取消解析'));
     }
+    final homeCompleter = _homeCompleter;
+    _homeCompleter = null;
+    if (homeCompleter != null && !homeCompleter.isCompleted) {
+      homeCompleter.completeError(StateError('用户已取消解析'));
+    }
     _stopTimers();
 
     // webview_flutter 没有 stopLoading，用 about:blank 终止当前页面加载
@@ -932,5 +1108,6 @@ class DouyinSniffer {
     _acceptMessages = false;
     _acceptLogs = false;
     _finishWithError(StateError('捕获服务已释放'));
+    _finishHomeWithError(StateError('捕获服务已释放'));
   }
 }

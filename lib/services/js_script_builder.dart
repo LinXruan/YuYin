@@ -3,9 +3,12 @@ const String kDouyinSniffJs = r'''
 (function () {
   // Dart 轮询重复注入，结果与日志状态必须挂到 window 上共享
   var S = window.__dyState || (window.__dyState = {
-    sent: false, lastUrl: '', logs: {}, videoHintSent: false, degraded: false,
+    sent: false, homeSent: false, lastUrl: '', logs: {}, videoHintSent: false, degraded: false,
     desc: '', coverUrl: '', scannedPaceIdx: 0, loginReported: null, authProbed: false
   });
+  function isUserPage() {
+    try { return location.pathname.indexOf('/user/') !== -1; } catch (e) { return false; }
+  }
   // 记录本次捕获的起始时间；页面地址变化时重新计时
   if (!window.__dyStartTime || window.__dyStartHref !== location.href) {
     window.__dyStartTime = Date.now();
@@ -357,6 +360,7 @@ const String kDouyinSniffJs = r'''
         gearName: items[i].gearName || ''
       });
     }
+    if (isUserPage()) return false;
     if (!unique.length || !window.DouyinChannel) return false;
     try {
       var finalDesc = customDesc || S.desc || '';
@@ -462,7 +466,11 @@ const String kDouyinSniffJs = r'''
                       if (S.sent) return;
                       var json = JSON.parse(text);
                       log('命中作品接口(fetch): ' + String(url).split('?')[0]);
-                      scanTree(json, awemeIdFromUrl(url));
+                      if (isUserPage()) {
+                        tryExtractFromAwemePostJson(json);
+                      } else {
+                        scanTree(json, awemeIdFromUrl(url));
+                      }
                     } catch (e) {}
                   }).catch(function () {});
                 } catch (e) {}
@@ -497,7 +505,11 @@ const String kDouyinSniffJs = r'''
                   }
                   if (json) {
                     log('命中作品接口(XHR): ' + strUrl.split('?')[0]);
-                    scanTree(json, awemeIdFromUrl(strUrl));
+                    if (isUserPage()) {
+                      tryExtractFromAwemePostJson(json);
+                    } else {
+                      scanTree(json, awemeIdFromUrl(strUrl));
+                    }
                   }
                 } catch (e) {}
               });
@@ -660,8 +672,115 @@ const String kDouyinSniffJs = r'''
       }
     } catch (e) {}
   }
+  // 从 /aweme/v1/web/aweme/post/ 接口响应快速提取主页作品
+  function tryExtractFromAwemePostJson(json) {
+    if (S.homeSent || !json || !isUserPage()) return;
+    var list = json.aweme_list;
+    if (!Array.isArray(list) || list.length === 0) return;
+    var validUrls = [];
+    var seen = {};
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i];
+      if (!item) continue;
+      var awemeId = item.aweme_id || item.item_id;
+      if (!awemeId) continue;
+      var awemeType = item.aweme_type;
+      var path = (awemeType === 68 || awemeType === 61 || item.images) ? 'note' : 'video';
+      var url = 'https://www.douyin.com/' + path + '/' + awemeId;
+      if (!seen[url]) {
+        seen[url] = true;
+        validUrls.push(url);
+      }
+    }
+    if (validUrls.length > 0) {
+      S.homeSent = true;
+      var nickname = '';
+      try {
+        if (list[0] && list[0].author) nickname = (list[0].author.nickname || '').trim();
+      } catch (e) {}
+      if (!nickname) {
+        var h1 = document.querySelector('h1');
+        if (h1) nickname = (h1.innerText || h1.textContent || '').trim();
+      }
+      var tabCount = 0;
+      try {
+        var countEl = document.querySelector('span[data-e2e="user-tab-count"]');
+        if (countEl) {
+          tabCount = parseInt((countEl.innerText || countEl.textContent || '0').trim(), 10) || 0;
+        }
+      } catch (e) {}
+      var secUid = '';
+      var m = location.pathname.match(/\/user\/([^\/?#]+)/);
+      if (m && m[1]) secUid = m[1];
+      log('主页接口(API)拦截成功: ' + validUrls.length + ' 条作品 (作者: ' + nickname + ')');
+      if (window.DouyinChannel && window.DouyinChannel.postMessage) {
+        window.DouyinChannel.postMessage(JSON.stringify({
+          type: 'user_home_result',
+          secUid: secUid,
+          nickname: nickname,
+          workUrls: validUrls,
+          tabCount: tabCount || validUrls.length,
+          count: validUrls.length
+        }));
+      }
+    }
+  }
+  // 扫描主页作品链接列表（DOM 层兜底与即时解析）
+  function scanUserHome() {
+    if (S.homeSent || !isUserPage()) return;
+    var container = document.querySelector('[data-e2e="user-post-list"]') || document.querySelector('ul[data-e2e="scroll-list"]');
+    if (!container) return;
+    var links = Array.from(container.querySelectorAll('a')).map(function (a) { return a.href || ''; });
+    var validUrls = [];
+    var seen = {};
+    for (var i = 0; i < links.length; i++) {
+      var h = links[i];
+      if (!h) continue;
+      var clean = h.split('?')[0].split('#')[0];
+      if (/\/(?:video|note|article)\/\d{10,25}/.test(clean)) {
+        if (!seen[clean]) {
+          seen[clean] = true;
+          validUrls.push(clean);
+        }
+      }
+    }
+    if (validUrls.length > 0) {
+      S.homeSent = true;
+      var nickname = '';
+      try {
+        var h1 = document.querySelector('h1');
+        if (h1) nickname = (h1.innerText || h1.textContent || '').trim();
+      } catch (e) {}
+      var tabCount = 0;
+      try {
+        var countEl = document.querySelector('span[data-e2e="user-tab-count"]');
+        if (countEl) {
+          tabCount = parseInt((countEl.innerText || countEl.textContent || '0').trim(), 10) || 0;
+        }
+      } catch (e) {}
+      var secUid = '';
+      var m = location.pathname.match(/\/user\/([^\/?#]+)/);
+      if (m && m[1]) secUid = m[1];
+      log('scanUserHome 成功捕获主页作品: ' + validUrls.length + ' 条 (作者: ' + nickname + ')');
+      if (window.DouyinChannel && window.DouyinChannel.postMessage) {
+        window.DouyinChannel.postMessage(JSON.stringify({
+          type: 'user_home_result',
+          secUid: secUid,
+          nickname: nickname,
+          workUrls: validUrls,
+          tabCount: tabCount || validUrls.length,
+          count: validUrls.length
+        }));
+      }
+    }
+  }
   function tryExtractNow() {
     checkLoginState();
+    if (isUserPage()) {
+      if (S.homeSent) return;
+      scanUserHome();
+      return;
+    }
     if (S.sent) return;
     scanStatic(); if (S.sent) return;
     scanPace(); if (S.sent) return;
@@ -671,9 +790,13 @@ const String kDouyinSniffJs = r'''
   hookNetwork();
   tryExtractNow();
   window.__douyinSnifferReset = function () {
-    S.sent = false; S.lastUrl = ''; S.logs = {}; S.targetId = ''; S.desc = ''; S.coverUrl = '';
+    S.sent = false; S.homeSent = false; S.lastUrl = ''; S.logs = {}; S.targetId = ''; S.desc = ''; S.coverUrl = '';
     S.videoHintSent = false; S.degraded = false; S.scannedPaceIdx = 0;
     S.loginReported = null; S.authProbed = false;
+    if (window.__dyHomeObserver) {
+      try { window.__dyHomeObserver.disconnect(); } catch (e) {}
+      window.__dyHomeObserver = null;
+    }
     window.__dyStartTime = Date.now();
     window.__dyStartHref = location.href;
   };

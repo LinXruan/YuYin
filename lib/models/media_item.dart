@@ -151,3 +151,37 @@ class SniffResult {
   int get audioCount =>
       items.where((item) => item.type == MediaType.audio).length;
 }
+
+
+/// 抖音用户主页作品捕获结果
+class UserHomeResult {
+  const UserHomeResult({
+    required this.secUid,
+    required this.nickname,
+    required this.workUrls,
+    this.tabCount,
+  });
+
+  /// 用户的 sec_uid 唯一标识
+  final String secUid;
+
+  /// 作者昵称
+  final String nickname;
+
+  /// 捕获到的所有作品链接列表（去重且按页面顺序）
+  final List<String> workUrls;
+
+  /// 页面 Tab 标注的作品总数（如无则为 null）
+  final int? tabCount;
+
+  /// 捕获到的作品数量
+  int get count => workUrls.length;
+
+  Map<String, dynamic> toMap() => {
+        'secUid': secUid,
+        'nickname': nickname,
+        'count': count,
+        'tabCount': tabCount,
+        'workUrls': workUrls,
+      };
+}
