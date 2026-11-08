@@ -25,6 +25,8 @@ class DouyinSniffer {
 
   // 主任务与 A/B/C 兜底的时间预算
   static const Duration _kTaskTimeout = Duration(seconds: 30);
+  static const Duration _kHomeInactivityTimeout = Duration(seconds: 25);
+  static const Duration _kHomeInitialTimeout = Duration(seconds: 40);
   static const Duration _kInjectInterval = Duration(milliseconds: 800);
   static const Duration _kNoteFallbackDelay = Duration(seconds: 3);
   static const Duration _kVideoFallbackDelay = Duration(seconds: 8);
@@ -638,7 +640,12 @@ class DouyinSniffer {
       if (data['type'] == 'log') {
         if (!_acceptLogs) return;
         final msg = data['msg']?.toString() ?? '';
-        if (msg.isNotEmpty) _log(msg);
+        if (msg.isNotEmpty) {
+          _log(msg);
+          if (msg.contains('正在加载作品')) {
+            _refreshHomeInactivityTimer(_taskId);
+          }
+        }
         return;
       }
 
@@ -940,6 +947,19 @@ class DouyinSniffer {
     completer.completeError(error);
   }
 
+  /// 主页滚动翻页期间，每次检测到作品进度推进即刷新超时定时器
+  void _refreshHomeInactivityTimer(int taskId) {
+    if (taskId != _taskId || _homeCompleter == null || _disposed) return;
+    _timeoutTimer?.cancel();
+    _timeoutTimer = Timer(_kHomeInactivityTimeout, () {
+      if (taskId != _taskId) return;
+      _finishHomeWithError(
+        TimeoutException('主页滚动加载作品超时（连续无新作品），请检查网络或稍后重试'),
+        taskId: taskId,
+      );
+    });
+  }
+
   /// 加载主页链接并捕获作品列表，最长等待 30 秒
   Future<UserHomeResult> sniffUserHomeUrl(String homeUrl) async {
     _finishWithError(StateError('已有新的解析任务开始，旧任务已取消'));
@@ -994,10 +1014,10 @@ class DouyinSniffer {
     _log('开始解析主页: $homeUrl');
 
     _timeoutTimer?.cancel();
-    _timeoutTimer = Timer(_kTaskTimeout, () {
+    _timeoutTimer = Timer(_kHomeInitialTimeout, () {
       if (taskId != _taskId) return;
       _finishHomeWithError(
-        TimeoutException('30 秒内未捕获到主页作品列表，请检查网络或主页链接有效性'),
+        TimeoutException('未捕获到主页作品列表，请检查网络或主页链接有效性'),
         taskId: taskId,
       );
     });
