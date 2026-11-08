@@ -86,9 +86,19 @@ class AppUpdateStore {
   }
 
   /// 获取存储更新安装包的专用目录
+  ///
+  /// 优先使用外部应用私有目录 `/storage/emulated/0/Android/data/<package_name>/files/updates/`
+  /// 保证在系统原生安装器调起时拥有极高兼容性，且与应用生命周期绑定。
+  /// 若外部存储不可用则安全回退至应用内部支持目录。
   static Future<Directory> getUpdatesDirectory() async {
     if (testUpdatesDir != null) return testUpdatesDir!;
-    final base = await getApplicationSupportDirectory();
+    Directory? base;
+    try {
+      base = await getExternalStorageDirectory();
+    } catch (_) {
+      base = null;
+    }
+    base ??= await getApplicationSupportDirectory();
     final dir = Directory('${base.path}/$updatesSubDir');
     if (!await dir.exists()) {
       await dir.create(recursive: true);

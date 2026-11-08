@@ -29,9 +29,13 @@ class SettingsPage extends StatefulWidget {
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> {
+class _SettingsPageState extends State<SettingsPage>
+    with AutomaticKeepAliveClientMixin {
   late final UpdateChecker _checker;
   bool _isChecking = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -128,6 +132,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
@@ -146,8 +151,8 @@ class _SettingsPageState extends State<SettingsPage> {
         const Divider(height: 1),
         ListTile(
           leading: const Icon(Icons.download_for_offline_outlined),
-          title: const Text('下载设置'),
-          subtitle: const Text('保存位置、视频画质选项过滤'),
+          title: const Text('下载与更新'),
+          subtitle: const Text('保存位置、画质过滤、自动检查更新'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(

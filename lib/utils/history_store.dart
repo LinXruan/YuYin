@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/history_item.dart';
+import 'history_thumbnail_cache.dart';
 
 /// 历史记录持久化与内存极速检索中心
 class HistoryStore {
@@ -95,6 +96,11 @@ class HistoryStore {
 
     recordsNotifier.value = List.unmodifiable(_records);
     await _save();
+
+    // 4. 后台静默离线缓存封面缩略图，避免弱网或断网时无法显示
+    if (toInsert.coverUrl != null && toInsert.coverUrl!.isNotEmpty) {
+      HistoryThumbnailCache.cacheThumbnail(toInsert.id, toInsert.coverUrl!);
+    }
   }
 
   /// 标记指定历史记录的保存状态（true=已保存到本地，false=仅解析）

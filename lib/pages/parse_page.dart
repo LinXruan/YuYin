@@ -44,7 +44,8 @@ class ParsePage extends StatefulWidget {
   State<ParsePage> createState() => _ParsePageState();
 }
 
-class _ParsePageState extends State<ParsePage> {
+class _ParsePageState extends State<ParsePage>
+    with AutomaticKeepAliveClientMixin {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _inputScrollController = ScrollController();
   final ValueNotifier<double?> _downloadProgress = ValueNotifier(null);
@@ -57,6 +58,9 @@ class _ParsePageState extends State<ParsePage> {
   double _thumbHeight = 40.0;
   bool _isParsing = false;
   bool _cancelLogged = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -374,6 +378,7 @@ class _ParsePageState extends State<ParsePage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final theme = Theme.of(context);
     return Column(
       children: [

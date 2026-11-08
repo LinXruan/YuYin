@@ -4,7 +4,7 @@ import '../utils/download_settings_store.dart';
 import '../utils/save_location_store.dart';
 import '../widgets/save_location_dialog.dart';
 
-/// 下载设置二级页面：合并管理保存位置与视频画质偏好
+/// 下载与更新二级设置页面：合并管理保存位置、视频画质偏好与自动更新检查
 class DownloadSettingsPage extends StatelessWidget {
   const DownloadSettingsPage({super.key});
 
@@ -12,7 +12,7 @@ class DownloadSettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('下载设置'),
+        title: const Text('下载与更新'),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -50,6 +50,25 @@ class DownloadSettingsPage extends StatelessWidget {
                 value: onlyHighest,
                 onChanged: (val) {
                   DownloadSettingsStore.setOnlyHighestQualityPerResolution(val);
+                },
+              );
+            },
+          ),
+          const Divider(height: 1),
+
+          // 3. 自动检查更新开关
+          ValueListenableBuilder<bool>(
+            valueListenable: DownloadSettingsStore.autoCheckUpdateNotifier,
+            builder: (context, autoCheck, _) {
+              return SwitchListTile(
+                secondary: const Icon(Icons.update_rounded),
+                title: const Text('自动检查更新'),
+                subtitle: const Text(
+                  '打开软件等候 2 秒后自动检测最新版本',
+                ),
+                value: autoCheck,
+                onChanged: (val) {
+                  DownloadSettingsStore.setAutoCheckUpdate(val);
                 },
               );
             },

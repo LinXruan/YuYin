@@ -18,37 +18,32 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 1. 验证标题
-    expect(find.text('下载设置'), findsOneWidget);
+    // 1. 验证标题已更新为“下载与更新”
+    expect(find.text('下载与更新'), findsOneWidget);
 
     // 2. 验证“自定义保存位置”入口
     expect(find.text('自定义保存位置'), findsOneWidget);
     expect(find.text('当前为默认路径'), findsOneWidget);
 
-    // 3. 验证“仅显示同分辨率下最高画质”开关
+    // 3. 验证开关项：包括“仅显示同分辨率下最高画质”与“自动检查更新”
     expect(find.text('仅显示同分辨率下最高画质'), findsOneWidget);
-    final switchFinder = find.byType(Switch);
-    expect(switchFinder, findsOneWidget);
+    expect(find.text('自动检查更新'), findsOneWidget);
+    expect(find.byType(Switch), findsNWidgets(2));
 
-    // 初始状态为 true
-    Switch switchWidget = tester.widget<Switch>(switchFinder);
-    expect(switchWidget.value, isTrue);
+    final qualitySwitchFinder = find.widgetWithText(SwitchListTile, '仅显示同分辨率下最高画质');
+    final updateSwitchFinder = find.widgetWithText(SwitchListTile, '自动检查更新');
+
     expect(DownloadSettingsStore.onlyHighestQualityPerResolution, isTrue);
+    expect(DownloadSettingsStore.autoCheckUpdate, isTrue);
 
-    // 4. 点击开关切换为 false
-    await tester.tap(switchFinder);
+    // 4. 点击画质开关切换为 false
+    await tester.tap(qualitySwitchFinder);
     await tester.pumpAndSettle();
-
-    switchWidget = tester.widget<Switch>(switchFinder);
-    expect(switchWidget.value, isFalse);
     expect(DownloadSettingsStore.onlyHighestQualityPerResolution, isFalse);
 
-    // 5. 再次点击切回 true
-    await tester.tap(switchFinder);
+    // 5. 点击自动检查更新开关切换为 false
+    await tester.tap(updateSwitchFinder);
     await tester.pumpAndSettle();
-
-    switchWidget = tester.widget<Switch>(switchFinder);
-    expect(switchWidget.value, isTrue);
-    expect(DownloadSettingsStore.onlyHighestQualityPerResolution, isTrue);
+    expect(DownloadSettingsStore.autoCheckUpdate, isFalse);
   });
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -5,11 +7,14 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../app_info.dart';
 import '../services/agent_automation_server.dart';
 import '../services/douyin_sniffer.dart';
+import '../services/update_checker.dart';
 import '../services/video_downloader.dart';
+import '../utils/app_update_store.dart';
+import '../utils/download_settings_store.dart';
 import '../utils/log_controller.dart';
 import '../utils/login_state_store.dart';
 import '../utils/network_detector.dart';
-import '../utils/app_update_store.dart';
+import '../widgets/update_dialog.dart';
 import 'history_page.dart';
 import 'login_webview_page.dart';
 import 'parse_page.dart';
@@ -36,12 +41,15 @@ class _AppShellState extends State<AppShell> {
   AgentAutomationServer? _automationServer;
 
   int _index = 0;
+  late final PageController _pageController;
+  Timer? _autoCheckUpdateTimer;
 
   static const List<String> _titles = ['余音', '历史', '设置'];
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: _index);
     // 仅在 Debug 模式下启动 Agent 自动化本地控制台服务（Release 模式物理隔离）
     if (kDebugMode) {
       _automationServer = AgentAutomationServer(
@@ -86,10 +94,47 @@ class _AppShellState extends State<AppShell> {
         await LoginStateStore.clearLogin();
       }
     });
+
+    // 启动 2 秒后自动静默检查更新（仅在有新版本时提醒用户）
+    _scheduleAutoCheckUpdate();
+  }
+
+  /// 启动 2 秒后执行自动检查更新逻辑
+  void _scheduleAutoCheckUpdate() {
+    _autoCheckUpdateTimer?.cancel();
+    _autoCheckUpdateTimer = Timer(const Duration(seconds: 2), () async {
+      if (!mounted) return;
+      // 1. 读取用户设置：是否开启自动检查更新
+      if (!DownloadSettingsStore.autoCheckUpdate) return;
+      // 2. 若当前已经在下载更新中，不重复触发
+      if (AppUpdateStore.statusNotifier.value.isDownloading) return;
+      // 3. 网络连通性检查
+      final hasNet = await NetworkDetector.hasInternetConnection();
+      if (!mounted || !hasNet) return;
+
+      // 4. 发起静默检查
+      final checker = UpdateChecker();
+      try {
+        final result = await checker.checkUpdate(currentVersion: appVersion);
+        if (!mounted || result.isCancelled || result.errorMessage != null) return;
+        // 仅在明确检测到新版本时主动弹窗提醒
+        if (result.info != null && result.info!.hasUpdate) {
+          final localApk = await AppUpdateStore.findMatchingApk(result.info!.version);
+          if (!mounted) return;
+          UpdateDialog.show(context, result.info!, localApk: localApk);
+        }
+      } catch (_) {
+        // 静默异常吞吐，保证不打扰用户
+      } finally {
+        checker.dispose();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _autoCheckUpdateTimer?.cancel();
+    _pageController.dispose();
     _automationServer?.stop();
     _sniffer.onLog = null;
     _sniffer.onLoginStateDetected = null;
@@ -154,6 +199,18 @@ class _AppShellState extends State<AppShell> {
   void _selectTab(int index) {
     if (index == _index) return;
     setState(() => _index = index);
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  void _onPageChanged(int index) {
+    if (index == _index) return;
+    setState(() => _index = index);
   }
 
   @override
@@ -213,8 +270,9 @@ class _AppShellState extends State<AppShell> {
             ),
       body: Stack(
         children: [
-          IndexedStack(
-            index: _index,
+          PageView(
+            controller: _pageController,
+            onPageChanged: _onPageChanged,
             children: [
               ParsePage(
                 sniffer: _sniffer,
@@ -225,17 +283,13 @@ class _AppShellState extends State<AppShell> {
                 externalUrlNotifier: _pendingInputUrl,
                 onTapAccount: () => _onAccountTap(_loggedIn.value),
                 // 解析出结果、准备弹选择面板前，确保用户看到的是解析页
-                onRequestParseTab: () {
-                  if (mounted && _index != 0) setState(() => _index = 0);
-                },
+                onRequestParseTab: () => _selectTab(0),
               ),
               HistoryPage(
                 onSelectRecord: (record) {
                   _pendingInputUrl.value = null;
                   _pendingInputUrl.value = record.url;
-                  if (mounted && _index != 0) {
-                    setState(() => _index = 0);
-                  }
+                  _selectTab(0);
                 },
               ),
               SettingsPage(logs: _logs, sniffer: _sniffer),

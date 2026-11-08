@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,8 +7,9 @@ import 'package:flutter/services.dart';
 import '../models/history_item.dart';
 import '../services/douyin_sniffer.dart';
 import '../utils/history_store.dart';
+import '../utils/history_thumbnail_cache.dart';
 
-/// 历史记录页：支持全文模糊检索、多选批量删除、单条左滑删除与一键载入解析
+/// 历史记录页：支持全文模糊检索、多选批量删除与一键载入解析
 class HistoryPage extends StatefulWidget {
   const HistoryPage({
     super.key,
@@ -21,7 +23,8 @@ class HistoryPage extends StatefulWidget {
   State<HistoryPage> createState() => _HistoryPageState();
 }
 
-class _HistoryPageState extends State<HistoryPage> {
+class _HistoryPageState extends State<HistoryPage>
+    with AutomaticKeepAliveClientMixin {
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounceTimer;
 
@@ -32,6 +35,9 @@ class _HistoryPageState extends State<HistoryPage> {
   bool _permanentlyDismissed = false;
 
   String _searchQuery = '';
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -163,6 +169,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final theme = Theme.of(context);
     final displayedItems =
         HistoryStore.search(_searchQuery, onlySaved: _filterOnlySaved);
@@ -280,72 +287,40 @@ class _HistoryPageState extends State<HistoryPage> {
                         final item = displayedItems[index];
                         final isSelected = _selectedIds.contains(item.id);
 
-                        return Dismissible(
+                        return _HistoryCard(
                           key: Key('history_${item.id}_$index'),
-                          direction: _isSelectionMode
-                              ? DismissDirection.none
-                              : DismissDirection.endToStart,
-                          background: Container(
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 24),
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.errorContainer,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Icon(
-                              Icons.delete_outline_rounded,
-                              color: theme.colorScheme.onErrorContainer,
-                              size: 26,
-                            ),
-                          ),
-                          onDismissed: (_) {
-                            HistoryStore.deleteRecord(item.id);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('已删除该条历史记录'),
-                                behavior: SnackBarBehavior.floating,
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          },
-                          child: _HistoryCard(
-                            item: item,
-                            isSelectionMode: _isSelectionMode,
-                            isSelected: isSelected,
-                            onTap: () {
-                              if (_isSelectionMode) {
-                                setState(() {
-                                  if (isSelected) {
-                                    _selectedIds.remove(item.id);
-                                  } else {
-                                    _selectedIds.add(item.id);
-                                  }
-                                });
-                              } else {
-                                widget.onSelectRecord?.call(item);
-                              }
-                            },
-                            onLongPress: () {
-                              HapticFeedback.selectionClick();
+                          item: item,
+                          isSelectionMode: _isSelectionMode,
+                          isSelected: isSelected,
+                          onTap: () {
+                            if (_isSelectionMode) {
                               setState(() {
-                                if (!_isSelectionMode) {
-                                  _isSelectionMode = true;
-                                  _selectedIds.clear();
-                                  _selectedIds.add(item.id);
+                                if (isSelected) {
+                                  _selectedIds.remove(item.id);
                                 } else {
-                                  if (isSelected) {
-                                    _selectedIds.remove(item.id);
-                                  } else {
-                                    _selectedIds.add(item.id);
-                                  }
+                                  _selectedIds.add(item.id);
                                 }
                               });
-                            },
-                          ),
+                            } else {
+                              widget.onSelectRecord?.call(item);
+                            }
+                          },
+                          onLongPress: () {
+                            HapticFeedback.selectionClick();
+                            setState(() {
+                              if (!_isSelectionMode) {
+                                _isSelectionMode = true;
+                                _selectedIds.clear();
+                                _selectedIds.add(item.id);
+                              } else {
+                                if (isSelected) {
+                                  _selectedIds.remove(item.id);
+                                } else {
+                                  _selectedIds.add(item.id);
+                                }
+                              }
+                            });
+                          },
                         );
                       },
                     ),
@@ -600,6 +575,7 @@ class _HistoryFilterButton extends StatelessWidget {
 /// 历史记录卡片组件（严格遵照设计：不含“抖音”二字，圆角缩略图与作品文案）
 class _HistoryCard extends StatelessWidget {
   const _HistoryCard({
+    super.key,
     required this.item,
     required this.isSelectionMode,
     required this.isSelected,
@@ -722,12 +698,23 @@ class _HistoryCard extends StatelessWidget {
     );
   }
 
-  /// 封面缩略图构建：支持网络图片渲染与错误占位（cacheWidth 节约内存并防止重复加载）
+  /// 封面缩略图构建：优先使用本地离线缓存（0 网络开销、离线可用），未命中时降级网络加载并异步缓存
   Widget _buildThumbnail(ThemeData theme) {
     const size = 80.0;
     final hasCover = item.coverUrl != null &&
         item.coverUrl!.isNotEmpty &&
         !HistoryItem.isVideoUrl(item.coverUrl);
+
+    if (!hasCover) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: _buildFallbackThumbnail(theme),
+        ),
+      );
+    }
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
@@ -735,59 +722,82 @@ class _HistoryCard extends StatelessWidget {
         width: size,
         height: size,
         color: Colors.black.withValues(alpha: 0.85),
-        child: hasCover
-            ? Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(
-                    item.coverUrl!,
-                    width: size,
-                    height: size,
-                    fit: BoxFit.cover,
-                    alignment: Alignment.center,
-                    headers: const {
-                      'Referer': 'https://www.douyin.com/',
-                      'User-Agent': DouyinSniffer.desktopUserAgent,
-                    },
-                    loadingBuilder: (context, child, progress) {
-                      if (progress == null) return child;
-                      return Center(
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            value: progress.expectedTotalBytes != null
-                                ? progress.cumulativeBytesLoaded /
-                                    progress.expectedTotalBytes!
-                                : null,
-                          ),
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) =>
-                        _buildFallbackThumbnail(theme),
-                  ),
-                  if (!item.isImagePost)
-                    Positioned(
-                      right: 4,
-                      bottom: 4,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Icon(
-                          Icons.play_arrow_rounded,
-                          size: 14,
-                          color: Colors.white,
-                        ),
+        child: FutureBuilder<File?>(
+          future: HistoryThumbnailCache.findValidCachedFile(item.id),
+          builder: (context, snapshot) {
+            final cachedFile = snapshot.data;
+            final Widget imageWidget;
+
+            if (cachedFile != null) {
+              // 1. 本地缓存命中：极速离线呈现，零网络消耗
+              imageWidget = Image.file(
+                cachedFile,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                errorBuilder: (context, error, stackTrace) =>
+                    _buildFallbackThumbnail(theme),
+              );
+            } else {
+              // 2. 本地尚未缓存：网络加载并后台触发异步落盘
+              HistoryThumbnailCache.cacheThumbnail(item.id, item.coverUrl!);
+              imageWidget = Image.network(
+                item.coverUrl!,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                headers: const {
+                  'Referer': 'https://www.douyin.com/',
+                  'User-Agent': DouyinSniffer.desktopUserAgent,
+                },
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        value: progress.expectedTotalBytes != null
+                            ? progress.cumulativeBytesLoaded /
+                                progress.expectedTotalBytes!
+                            : null,
                       ),
                     ),
-                ],
-              )
-            : _buildFallbackThumbnail(theme),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) =>
+                    _buildFallbackThumbnail(theme),
+              );
+            }
+
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                imageWidget,
+                if (!item.isImagePost)
+                  Positioned(
+                    right: 4,
+                    bottom: 4,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

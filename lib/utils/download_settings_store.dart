@@ -6,7 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../models/media_item.dart';
 
-/// 下载与画质相关配置持久化存储器
+/// 下载与画质、自动更新相关配置持久化存储器
 class DownloadSettingsStore {
   DownloadSettingsStore._();
 
@@ -15,19 +15,36 @@ class DownloadSettingsStore {
   /// 是否仅显示同分辨率下最高画质（默认开启）
   static bool _onlyHighestQualityPerResolution = true;
 
+  /// 是否在启动 2 秒后自动检查更新（默认开启）
+  static bool _autoCheckUpdate = true;
+
   /// 监听画质选项切换的 Notifier
   static final ValueNotifier<bool> onlyHighestQualityNotifier =
+      ValueNotifier<bool>(true);
+
+  /// 监听自动检查更新选项切换的 Notifier
+  static final ValueNotifier<bool> autoCheckUpdateNotifier =
       ValueNotifier<bool>(true);
 
   /// 当前是否仅显示同分辨率下最高画质
   static bool get onlyHighestQualityPerResolution =>
       _onlyHighestQualityPerResolution;
 
+  /// 当前是否自动检查更新
+  static bool get autoCheckUpdate => _autoCheckUpdate;
+
   /// 测试重置
   @visibleForTesting
-  static void resetForTesting({bool defaultValue = true}) {
-    _onlyHighestQualityPerResolution = defaultValue;
-    onlyHighestQualityNotifier.value = defaultValue;
+  static void resetForTesting({
+    bool defaultValue = true,
+    bool defaultOnlyHighest = true,
+    bool defaultAutoCheck = true,
+  }) {
+    final effectiveOnlyHighest = defaultValue && defaultOnlyHighest;
+    _onlyHighestQualityPerResolution = effectiveOnlyHighest;
+    onlyHighestQualityNotifier.value = effectiveOnlyHighest;
+    _autoCheckUpdate = defaultAutoCheck;
+    autoCheckUpdateNotifier.value = defaultAutoCheck;
   }
 
   /// 启动初始化
@@ -37,21 +54,34 @@ class DownloadSettingsStore {
       if (!await file.exists()) {
         _onlyHighestQualityPerResolution = true;
         onlyHighestQualityNotifier.value = true;
+        _autoCheckUpdate = true;
+        autoCheckUpdateNotifier.value = true;
         return;
       }
       final content = await file.readAsString();
       final map = jsonDecode(content) as Map<String, dynamic>;
-      final val = map['onlyHighestQualityPerResolution'];
-      if (val is bool) {
-        _onlyHighestQualityPerResolution = val;
-        onlyHighestQualityNotifier.value = val;
+      final valQuality = map['onlyHighestQualityPerResolution'];
+      if (valQuality is bool) {
+        _onlyHighestQualityPerResolution = valQuality;
+        onlyHighestQualityNotifier.value = valQuality;
       } else {
         _onlyHighestQualityPerResolution = true;
         onlyHighestQualityNotifier.value = true;
       }
+
+      final valUpdate = map['autoCheckUpdate'];
+      if (valUpdate is bool) {
+        _autoCheckUpdate = valUpdate;
+        autoCheckUpdateNotifier.value = valUpdate;
+      } else {
+        _autoCheckUpdate = true;
+        autoCheckUpdateNotifier.value = true;
+      }
     } catch (_) {
       _onlyHighestQualityPerResolution = true;
       onlyHighestQualityNotifier.value = true;
+      _autoCheckUpdate = true;
+      autoCheckUpdateNotifier.value = true;
     }
   }
 
@@ -60,6 +90,14 @@ class DownloadSettingsStore {
     if (_onlyHighestQualityPerResolution == value) return;
     _onlyHighestQualityPerResolution = value;
     onlyHighestQualityNotifier.value = value;
+    await _save();
+  }
+
+  /// 切换并持久化“自动检查更新”开关
+  static Future<void> setAutoCheckUpdate(bool value) async {
+    if (_autoCheckUpdate == value) return;
+    _autoCheckUpdate = value;
+    autoCheckUpdateNotifier.value = value;
     await _save();
   }
 
@@ -146,6 +184,7 @@ class DownloadSettingsStore {
       final file = await _file();
       final map = {
         'onlyHighestQualityPerResolution': _onlyHighestQualityPerResolution,
+        'autoCheckUpdate': _autoCheckUpdate,
       };
       await file.writeAsString(jsonEncode(map));
     } catch (_) {
