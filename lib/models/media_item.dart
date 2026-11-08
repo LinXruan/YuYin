@@ -174,6 +174,9 @@ class UserHomeResult {
   /// 页面 Tab 标注的作品总数（如无则为 null）
   final int? tabCount;
 
+  /// 作品数量 Tag 标注总数（若为空则为 0）
+  int get worksTotalTag => tabCount ?? 0;
+
   /// 捕获到的作品数量
   int get count => workUrls.length;
 
@@ -182,6 +185,7 @@ class UserHomeResult {
         'nickname': nickname,
         'count': count,
         'tabCount': tabCount,
+        'worksTotalTag': worksTotalTag,
         'workUrls': workUrls,
       };
 }

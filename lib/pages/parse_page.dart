@@ -236,11 +236,15 @@ class _ParsePageState extends State<ParsePage>
         if (mounted) setState(() {});
 
         final author = homeResult.nickname.isNotEmpty ? homeResult.nickname : '未知作者';
-        widget.logs.add('[主页] 成功捕获作者【$author】共 ${homeResult.count} 条作品链接');
+        final tagText = (homeResult.tabCount != null && homeResult.tabCount! > 0)
+            ? '，作品总数: ${homeResult.tabCount} 个'
+            : '';
+        widget.logs.add('[主页] 成功识别作者【$author】$tagText');
+        widget.logs.add('[主页] 本次捕获首屏作品: ${homeResult.count} 条（当前仅做数量tag捕获，未启用滚动）');
         for (int i = 0; i < homeResult.workUrls.length; i++) {
           widget.logs.add('  [${i + 1}] ${homeResult.workUrls[i]}');
         }
-        widget.logs.add('主页作品捕获完成（当前仅支持作品链接提取）');
+        widget.logs.add('主页作品捕获完成（作品数量Tag提取正常）');
       } catch (e) {
         if (!mounted || !_isParsing) return;
         _isParsing = false;
