@@ -102,7 +102,7 @@ class _LoginWebViewPageState extends State<LoginWebViewPage> {
 
         if (shouldAutoReturn) {
           _autoReturnTimer?.cancel();
-          _autoReturnTimer = Timer(const Duration(milliseconds: 2000), () {
+          _autoReturnTimer = Timer(const Duration(seconds: 5), () {
             if (mounted && _autoReturning) {
               Navigator.pop(context, true);
             }
@@ -209,7 +209,7 @@ class _LoginWebViewPageState extends State<LoginWebViewPage> {
                   const SizedBox(height: 2),
                   Text(
                     _autoReturning
-                        ? '正在自动返回 (3s)...'
+                        ? '正在自动返回 (5s)...'
                         : '点击右上角小头像，即可退出登录',
                     style: TextStyle(
                       fontSize: 11,

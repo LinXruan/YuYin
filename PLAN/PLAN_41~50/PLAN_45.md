@@ -1,4 +1,4 @@
-# PLAN_45：视频解析链路远端被动登出检测与自适应画质降级机制 (版本 1.4.4+155)
+# PLAN_45：视频解析链路远端被动登出检测与自适应画质降级机制 (版本 1.4.4+156)
 
 ## 一、需求背景与目标
 
@@ -20,10 +20,12 @@
      - 立即将本地登录态同步更新为未登录（`_loggedIn.value = false`，清除本地 `login_state.flag`）；
      - 立即中断对全码率画质 tab 的无谓等待；
      - 改为未登录模式极速输出（理论上单个默认画质，优先使用分享页兜底或基础流立即完成）；
-3. **日志规范与隐私安全**：
+3. **登录页体验微调**：
+   - 将登录成功后的自动返回延迟从原有的短时定时器纠正并调整为 5 秒（`Timer(const Duration(seconds: 5), ...)`），文案同步更新为 `正在自动返回 (5s)...`，给用户留出充分确认与操作时间。
+4. **日志规范与隐私安全**：
    - 调试测试使用的 Debug 版本输出远端状态感知日志；
    - Release 发布版本严格遵守规范，不向用户日志面板输出“未登录”字样。
-4. **自动化测试与接口完备性**：
+5. **自动化测试与接口完备性**：
    - 扩展 `AgentAutomationServer`，提供登录态 mock 调试接口，实现“本地已登录、远端失效”自动化回归测试；
    - 模拟器真机实测直至每次解析均能准确捕获“未登录”状态。
 
@@ -67,15 +69,16 @@ sequenceDiagram
 
 | 序号 | 文件路径 | 修改类型 | 说明 |
 | :--- | :--- | :--- | :--- |
-| 1 | `PLAN/PLAN_41~50/PLAN_45.md` | NEW | 详细记录 1.4.4+155 规划与实施文档 |
-| 2 | `pubspec.yaml` | MODIFY | 版本号提升至 `1.4.4+155` |
-| 3 | `lib/app_info.dart` | MODIFY | 常量升级为 `1.4.4+155` |
-| 4 | `GEMINI.md` | MODIFY | 维护守则版本同步更新至 `1.4.4+155` |
+| 1 | `PLAN/PLAN_41~50/PLAN_45.md` | NEW | 详细记录 1.4.4+156 规划与实施文档 |
+| 2 | `pubspec.yaml` | MODIFY | 版本号提升至 `1.4.4+156` |
+| 3 | `lib/app_info.dart` | MODIFY | 常量升级为 `1.4.4+156` |
+| 4 | `GEMINI.md` | MODIFY | 维护守则版本同步更新至 `1.4.4+156` |
 | 5 | `lib/services/js_script_builder.dart` | MODIFY | 注入针对视频解析页的远端登录态捕获探针与中断即时回传逻辑 |
 | 6 | `lib/services/douyin_sniffer.dart` | MODIFY | 增加 `login_state` 消息接收、中断多画质等待、快速降级与登出回调 |
 | 7 | `lib/pages/app_shell.dart` | MODIFY | 接入 `onLoginStateDetected`，自动清理本地登录标记并通知界面 |
-| 8 | `lib/services/agent_automation_server.dart` | MODIFY | 增加 `/api/login/mock` 模拟登录态接口与远端感知状态暴露，便于自动化测试 |
-| 9 | `test/douyin_sniffer_logic_test.dart` | MODIFY | 增加登录态回传、中断与降级逻辑的单元测试用例 |
+| 8 | `lib/pages/login_webview_page.dart` | MODIFY | 登录成功后自动跳转调整为 5 秒，文案同步对齐为 5s |
+| 9 | `lib/services/agent_automation_server.dart` | MODIFY | 增加 `/api/login/mock` 模拟登录态接口与远端感知状态暴露，便于自动化测试 |
+| 10 | `test/douyin_sniffer_logic_test.dart` | MODIFY | 增加登录态回传、中断与降级逻辑的单元测试用例 |
 
 ---
 
