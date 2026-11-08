@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import '../app_info.dart';
 import '../models/history_item.dart';
 import '../models/media_item.dart';
+import '../utils/display_mode_service.dart';
 import '../utils/download_settings_store.dart';
 import '../utils/file_name_formatter.dart';
 import '../utils/history_store.dart';
@@ -104,6 +105,8 @@ class AgentAutomationServer {
         await _handleClearHistory(request);
       } else if (path == '/api/login/mock' && request.method == 'POST') {
         await _handleMockLogin(request);
+      } else if (path == '/api/display' && request.method == 'GET') {
+        await _handleGetDisplay(request);
       } else {
         _sendJson(
           request,
@@ -154,6 +157,11 @@ class AgentAutomationServer {
         'onlyHighestQualityPerResolution':
             DownloadSettingsStore.onlyHighestQualityPerResolution,
         'isSaveLocationDefault': SaveLocationStore.isAllDefault,
+      },
+      'display': {
+        'activeRefreshRate': DisplayModeService.activeRefreshRate,
+        'maxRefreshRate': DisplayModeService.maxRefreshRate,
+        'isHighRefreshRate': DisplayModeService.isHighRefreshRate,
       },
     });
   }
@@ -540,6 +548,17 @@ class AgentAutomationServer {
         'gearName': item.gearName,
       };
     }).toList();
+  }
+
+  Future<void> _handleGetDisplay(HttpRequest request) async {
+    _sendJson(request, HttpStatus.ok, {
+      'activeRefreshRate': DisplayModeService.activeRefreshRate,
+      'maxRefreshRate': DisplayModeService.maxRefreshRate,
+      'isHighRefreshRate': DisplayModeService.isHighRefreshRate,
+      'width': DisplayModeService.displayWidth,
+      'height': DisplayModeService.displayHeight,
+      'supportedModesCount': DisplayModeService.supportedModesCount,
+    });
   }
 
   Future<Map<String, dynamic>> _readJsonBody(HttpRequest request) async {

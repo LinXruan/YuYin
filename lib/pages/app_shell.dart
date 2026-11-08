@@ -10,6 +10,7 @@ import '../services/douyin_sniffer.dart';
 import '../services/update_checker.dart';
 import '../services/video_downloader.dart';
 import '../utils/app_update_store.dart';
+import '../utils/display_mode_service.dart';
 import '../utils/download_settings_store.dart';
 import '../utils/log_controller.dart';
 import '../utils/login_state_store.dart';
@@ -48,6 +49,9 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
+    // 异步检测并上报屏幕高刷跟随状态至运行日志
+    DisplayModeService.init(logs: _logs);
+
     // 仅在 Debug 模式下启动 Agent 自动化本地控制台服务（Release 模式物理隔离）
     if (kDebugMode) {
       _automationServer = AgentAutomationServer(

@@ -1,4 +1,4 @@
-﻿param (
+param (
     [Parameter(Position = 0)]
     [string]$Action = "status",
 
@@ -107,6 +107,18 @@ switch ($Action.ToLower()) {
         Write-Host "[AgentBridge] [成功] 历史记录已清空"
     }
 
+    "display" {
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/display" -Method Get
+        Write-Host "=== 屏幕刷新率检测信息 ==="
+        Write-Host "当前激活刷新率: $($resp.activeRefreshRate) Hz"
+        Write-Host "硬件最高支持: $($resp.maxRefreshRate) Hz"
+        $status = if ($resp.isHighRefreshRate) { "已启用 (>60Hz 高刷模式)" } else { "标准 60Hz 模式" }
+        Write-Host "高刷跟随状态: $status"
+        if ($resp.width -gt 0) {
+            Write-Host "屏幕物理分辨率: $($resp.width) x $($resp.height)"
+        }
+    }
+
     "mock-login" {
         $enabled = if ($Arg1 -eq "off" -or $Arg1 -eq "false" -or $Arg1 -eq "0") { $false } else { $true }
         $body = @{ loggedIn = $enabled } | ConvertTo-Json
@@ -130,6 +142,6 @@ switch ($Action.ToLower()) {
 
     default {
         Write-Host "未知指令: $Action"
-        Write-Host "支持的指令: setup, status, quality [on|off], mock-login [on|off], parse, download, logs, clear-logs, history [query], clear-history, cancel, eval"
+        Write-Host "支持的指令: setup, status, display, quality [on|off], mock-login [on|off], parse, download, logs, clear-logs, history [query], clear-history, cancel, eval"
     }
 }

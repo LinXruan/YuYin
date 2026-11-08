@@ -15,6 +15,8 @@ import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.provider.Settings
+import android.view.Display
+import android.view.WindowManager
 import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
 import io.flutter.embedding.android.FlutterActivity
@@ -33,6 +35,7 @@ class MainActivity : FlutterActivity() {
     private val appChannel = "com.debug.yuyin/app"
     private val storageChannel = "com.debug.yuyin/storage"
     private val installerChannel = "com.debug.yuyin/app_installer"
+    private val displayModeChannel = "com.debug.yuyin/display_mode"
 
     private val requestCodeInstallPermission = 2002
     private var pendingApkPathForInstall: String? = null
@@ -41,9 +44,17 @@ class MainActivity : FlutterActivity() {
     private var pendingDirPickerResult: MethodChannel.Result? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 在最早期读取并设置启动背景与应用夜间模式，确保 cold start 启动画面无缝匹配用户选择
+        // 在最早期读取并设置启动背景与自适应高刷新率，确保 cold start 无缝匹配最高硬件刷新率
         applySavedThemeMode()
+        enableAdaptiveHighRefreshRate()
         super.onCreate(savedInstanceState)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            enableAdaptiveHighRefreshRate()
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -313,6 +324,17 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+
+        // 5. 屏幕刷新率通道
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, displayModeChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getDisplayInfo" -> {
+                        result.success(getDisplayInfo())
+                    }
+                    else -> result.notImplemented()
+                }
+            }
     }
 
     override fun onDestroy() {
@@ -574,5 +596,59 @@ class MainActivity : FlutterActivity() {
             e.printStackTrace()
             return false
         }
+    }
+
+    private fun getTargetDisplay(): Display? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            display
+        } else {
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay
+        }
+    }
+
+    private fun enableAdaptiveHighRefreshRate() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return
+        }
+        try {
+            val disp = getTargetDisplay() ?: return
+            val currentMode = disp.mode
+            val matchingModes = disp.supportedModes.filter {
+                it.physicalWidth == currentMode.physicalWidth && it.physicalHeight == currentMode.physicalHeight
+            }
+            val candidates = if (matchingModes.isNotEmpty()) matchingModes else disp.supportedModes.toList()
+            val bestMode = candidates.maxByOrNull { it.refreshRate } ?: return
+
+            val layoutParams = window.attributes
+            layoutParams.preferredDisplayModeId = bestMode.modeId
+            window.attributes = layoutParams
+        } catch (_: Exception) {}
+    }
+
+    private fun getDisplayInfo(): Map<String, Any> {
+        val map = mutableMapOf<String, Any>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                val disp = getTargetDisplay()
+                if (disp != null) {
+                    val currentMode = disp.mode
+                    map["activeRefreshRate"] = currentMode.refreshRate.toDouble()
+                    map["width"] = currentMode.physicalWidth
+                    map["height"] = currentMode.physicalHeight
+
+                    val maxHz = disp.supportedModes.maxOfOrNull { it.refreshRate } ?: currentMode.refreshRate
+                    map["maxRefreshRate"] = maxHz.toDouble()
+                    map["supportedModesCount"] = disp.supportedModes.size
+                    return map
+                }
+            } catch (_: Exception) {}
+        }
+        map["activeRefreshRate"] = 60.0
+        map["maxRefreshRate"] = 60.0
+        map["width"] = 0
+        map["height"] = 0
+        map["supportedModesCount"] = 1
+        return map
     }
 }
