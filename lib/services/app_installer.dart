@@ -44,9 +44,18 @@ class AppInstaller {
     }
   }
 
-  /// 判断当前设备是否适合使用轻量版 arm64-v8a 安装包
-  static Future<bool> isArm64Supported() async {
+  /// 依据 ABI 列表判断是否应选择 v8a 架构包：
+  /// - 只有首选主架构（primary ABI）为 arm64-v8a / aarch64 的设备，才选择下载 v8a 轻量版；
+  /// - 其余 x86_64、x86、armeabi-v7a、armeabi 等均选择下载 Universal 全架构通用版。
+  static bool isArm64Abi(List<String> abis) {
+    if (abis.isEmpty) return true;
+    final primaryAbi = abis.first.toLowerCase().trim();
+    return primaryAbi == 'arm64-v8a' || primaryAbi == 'aarch64';
+  }
+
+  /// 判断当前设备是否为纯 arm64 架构设备
+  static Future<bool> isArm64Device() async {
     final abis = await getCpuAbi();
-    return abis.any((abi) => abi.toLowerCase().contains('arm64-v8a') || abi.toLowerCase().contains('aarch64'));
+    return isArm64Abi(abis);
   }
 }

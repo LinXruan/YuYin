@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yuyin/services/app_installer.dart';
 import 'package:yuyin/services/update_checker.dart';
 import 'package:yuyin/utils/app_update_store.dart';
 import 'package:yuyin/widgets/update_dialog.dart';
@@ -90,6 +91,39 @@ void main() {
       expect(find.text('关闭'), findsNothing);
       expect(find.text('好的'), findsNothing);
       expect(find.text('查看 Release'), findsOneWidget);
+    });
+
+    test('AppInstaller: isArm64Abi 准确识别 arm64 架构与 非 arm64 (x86_64, x86, v7a)', () {
+      // 常见 arm64 真机 ABI
+      expect(AppInstaller.isArm64Abi(['arm64-v8a', 'armeabi-v7a', 'armeabi']), isTrue);
+      expect(AppInstaller.isArm64Abi(['aarch64']), isTrue);
+
+      // x86_64 模拟器（包含 translation 层）
+      expect(AppInstaller.isArm64Abi(['x86_64', 'arm64-v8a', 'x86', 'armeabi-v7a']), isFalse);
+
+      // x86 模拟器
+      expect(AppInstaller.isArm64Abi(['x86', 'armeabi-v7a']), isFalse);
+
+      // 32 位 armv7a 设备
+      expect(AppInstaller.isArm64Abi(['armeabi-v7a', 'armeabi']), isFalse);
+    });
+
+    test('UpdateReleaseInfo: getDownloadUrl 严格区分 arm64 (v8a) 与 non-arm64 (Universal)', () {
+      const info = UpdateReleaseInfo(
+        version: '1.4.8',
+        htmlUrl: 'https://github.com/LinXruan/YuYin/releases/tag/1.4.8',
+        releaseNotes: '版本说明',
+        publishedAt: '2026-11-08',
+        hasUpdate: true,
+        v8aDownloadUrl: 'https://github.com/.../YuYin_1.4.8_v8a.apk',
+        universalDownloadUrl: 'https://github.com/.../YuYin_1.4.8_Universal.apk',
+      );
+
+      // arm64 设备必须返回 v8a
+      expect(info.getDownloadUrl(preferArm64: true), 'https://github.com/.../YuYin_1.4.8_v8a.apk');
+
+      // x86/v7a 设备必须返回 Universal
+      expect(info.getDownloadUrl(preferArm64: false), 'https://github.com/.../YuYin_1.4.8_Universal.apk');
     });
 
     test('AppUpdateStore: extractVersionFromFileName 正确提取文件名中的版本号', () {

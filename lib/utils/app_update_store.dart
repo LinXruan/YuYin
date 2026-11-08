@@ -142,6 +142,8 @@ class AppUpdateStore {
       final dir = await getUpdatesDirectory();
       if (!await dir.exists()) return null;
 
+      final isArm64 = await AppInstaller.isArm64Device();
+      final expectedArch = isArm64 ? 'v8a' : 'Universal';
       final cleanTarget = targetVersion.split('+').first.trim().replaceFirst(RegExp(r'^[vV]'), '');
       final entities = dir.listSync();
 
@@ -149,7 +151,8 @@ class AppUpdateStore {
         if (entity is File && entity.path.endsWith('.apk')) {
           final name = entity.uri.pathSegments.last;
           final ver = extractVersionFromFileName(name);
-          if (ver != null && ver == cleanTarget) {
+          // 匹配版本号并匹配架构要求（避免在 x86/v7a 设备上误用本地已有的 v8a 安装包）
+          if (ver != null && ver == cleanTarget && name.contains(expectedArch)) {
             final len = await entity.length();
             // 大于 5MB 视为完整的安装包
             if (len > 5 * 1024 * 1024) {
@@ -182,9 +185,9 @@ class AppUpdateStore {
     if (statusNotifier.value.isDownloading) return;
 
     final dir = await getUpdatesDirectory();
-    final preferArm64 = await AppInstaller.isArm64Supported();
-    final downloadUrl = info.getDownloadUrl(preferArm64: preferArm64);
-    final arch = preferArm64 ? 'v8a' : 'Universal';
+    final isArm64 = await AppInstaller.isArm64Device();
+    final downloadUrl = info.getDownloadUrl(preferArm64: isArm64);
+    final arch = isArm64 ? 'v8a' : 'Universal';
     final fileName = 'YuYin_${info.version}_$arch.apk';
     final targetPath = '${dir.path}/$fileName';
     final tempPath = '$targetPath.download';
@@ -204,68 +207,108 @@ class AppUpdateStore {
     final dio = _dio ??
         Dio(
           BaseOptions(
-            connectTimeout: const Duration(seconds: 30),
-            receiveTimeout: const Duration(minutes: 5),
+            // 国内代理/直连连接握手耗时较长，加长至 120 秒，彻底避免提前超时中断
+            connectTimeout: const Duration(seconds: 120),
+            sendTimeout: const Duration(seconds: 60),
+            receiveTimeout: const Duration(minutes: 15),
+            followRedirects: true,
+            maxRedirects: 8,
             headers: {
-              'User-Agent': 'Mozilla/5.0 (Android; Mobile) YuYin-App',
+              'User-Agent':
+                  'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
               'Accept': '*/*',
+              'Accept-Encoding': 'identity',
             },
           ),
         );
 
-    try {
-      final tempFile = File(tempPath);
-      if (await tempFile.exists()) {
-        await tempFile.delete();
-      }
+    int retryCount = 0;
+    const maxRetries = 3;
 
-      await dio.download(
-        downloadUrl,
-        tempPath,
-        cancelToken: cancelToken,
-        onReceiveProgress: (received, total) {
-          if (cancelToken.isCancelled) return;
-          final p = total > 0 ? (received / total).clamp(0.0, 1.0) : 0.0;
-          statusNotifier.value = statusNotifier.value.copyWith(
-            progress: p,
-            receivedBytes: received,
-            totalBytes: total,
-          );
-        },
-      );
-
-      // 下载成功，将 .download 临时文件原子重命名为最终 .apk
-      final finalFile = File(tempPath);
-      if (await finalFile.exists()) {
-        await finalFile.rename(targetPath);
-      }
-
-      statusNotifier.value = statusNotifier.value.copyWith(
-        isDownloading: false,
-        progress: 1.0,
-        targetApkPath: targetPath,
-      );
-
-      // 自动触发安装或回调
-      onDownloadComplete?.call(targetPath);
-      await AppInstaller.installApk(targetPath);
-    } on DioException catch (e) {
-      if (CancelToken.isCancel(e)) {
+    while (retryCount < maxRetries) {
+      if (cancelToken.isCancelled) {
         _cleanTempFile(tempPath);
         statusNotifier.value = const AppUpdateStatus();
         return;
       }
-      _cleanTempFile(tempPath);
-      statusNotifier.value = statusNotifier.value.copyWith(
-        isDownloading: false,
-        errorMessage: '下载更新失败: ${e.message ?? "网络异常"}',
-      );
-    } catch (e) {
-      _cleanTempFile(tempPath);
-      statusNotifier.value = statusNotifier.value.copyWith(
-        isDownloading: false,
-        errorMessage: '下载更新异常: $e',
-      );
+
+      try {
+        final tempFile = File(tempPath);
+        if (await tempFile.exists()) {
+          await tempFile.delete();
+        }
+
+        int lastProgressUpdateMs = 0;
+
+        await dio.download(
+          downloadUrl,
+          tempPath,
+          cancelToken: cancelToken,
+          deleteOnError: true,
+          onReceiveProgress: (received, total) {
+            if (cancelToken.isCancelled) return;
+            final now = DateTime.now().millisecondsSinceEpoch;
+            final isDone = total > 0 && received >= total;
+            // 节流分发（至少间隔 150ms 或已完成），避免高频 setState 占用 Dart 线程导致下载吞吐量断崖下跌
+            if (now - lastProgressUpdateMs >= 150 || isDone) {
+              lastProgressUpdateMs = now;
+              final p = total > 0 ? (received / total).clamp(0.0, 1.0) : 0.0;
+              statusNotifier.value = statusNotifier.value.copyWith(
+                progress: p,
+                receivedBytes: received,
+                totalBytes: total,
+                errorMessage: null,
+              );
+            }
+          },
+        );
+
+        // 下载成功，将 .download 临时文件原子重命名为最终 .apk
+        final finalFile = File(tempPath);
+        if (await finalFile.exists()) {
+          await finalFile.rename(targetPath);
+        }
+
+        statusNotifier.value = statusNotifier.value.copyWith(
+          isDownloading: false,
+          progress: 1.0,
+          targetApkPath: targetPath,
+        );
+
+        // 自动触发安装或回调
+        onDownloadComplete?.call(targetPath);
+        await AppInstaller.installApk(targetPath);
+        return;
+      } on DioException catch (e) {
+        if (CancelToken.isCancel(e)) {
+          _cleanTempFile(tempPath);
+          statusNotifier.value = const AppUpdateStatus();
+          return;
+        }
+
+        retryCount++;
+        if (retryCount >= maxRetries) {
+          _cleanTempFile(tempPath);
+          statusNotifier.value = statusNotifier.value.copyWith(
+            isDownloading: false,
+            errorMessage: '下载更新失败: ${e.message ?? "网络握手超时"}',
+          );
+          return;
+        }
+
+        // 浮条上提示重试状态并等待 2 秒
+        statusNotifier.value = statusNotifier.value.copyWith(
+          errorMessage: '连接重试中 ($retryCount/$maxRetries)...',
+        );
+        await Future.delayed(const Duration(seconds: 2));
+      } catch (e) {
+        _cleanTempFile(tempPath);
+        statusNotifier.value = statusNotifier.value.copyWith(
+          isDownloading: false,
+          errorMessage: '下载更新异常: $e',
+        );
+        return;
+      }
     }
   }
 

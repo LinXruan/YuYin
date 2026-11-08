@@ -38,17 +38,20 @@ class UpdateReleaseInfo {
   final String? universalDownloadUrl;
 
   /// 获取指定架构的首选下载链接
+  /// - [preferArm64] 为 true 时，仅匹配 v8a 架构包；
+  /// - [preferArm64] 为 false 时，仅匹配 Universal 全架构通用包。
   String getDownloadUrl({bool preferArm64 = true}) {
-    if (preferArm64 && v8aDownloadUrl != null && v8aDownloadUrl!.isNotEmpty) {
-      return v8aDownloadUrl!;
+    if (preferArm64) {
+      if (v8aDownloadUrl != null && v8aDownloadUrl!.isNotEmpty) {
+        return v8aDownloadUrl!;
+      }
+      return 'https://github.com/LinXruan/YuYin/releases/download/$version/YuYin_${version}_v8a.apk';
+    } else {
+      if (universalDownloadUrl != null && universalDownloadUrl!.isNotEmpty) {
+        return universalDownloadUrl!;
+      }
+      return 'https://github.com/LinXruan/YuYin/releases/download/$version/YuYin_${version}_Universal.apk';
     }
-    if (universalDownloadUrl != null && universalDownloadUrl!.isNotEmpty) {
-      return universalDownloadUrl!;
-    }
-    // 默认按照标准化命名规则生成直链
-    final tag = version;
-    final arch = preferArm64 ? 'v8a' : 'Universal';
-    return 'https://github.com/LinXruan/YuYin/releases/download/$tag/YuYin_${tag}_$arch.apk';
   }
 }
 

@@ -301,6 +301,22 @@ class _AppShellState extends State<AppShell> {
     final theme = Theme.of(context);
     final percent = (status.progress * 100).toInt();
     final versionStr = status.version != null ? ' v${status.version}' : '';
+    final isRetrying =
+        status.errorMessage != null && status.errorMessage!.contains('重试');
+    final isConnecting = status.progress <= 0 && status.receivedBytes <= 0;
+
+    final String titleText;
+    final String trailingText;
+    if (isRetrying) {
+      titleText = status.errorMessage!;
+      trailingText = '重试中';
+    } else if (isConnecting) {
+      titleText = '正在连接更新服务器$versionStr...';
+      trailingText = '连接中';
+    } else {
+      titleText = '正在下载新版本$versionStr';
+      trailingText = '$percent%';
+    }
 
     return Container(
       width: double.infinity,
@@ -334,15 +350,20 @@ class _AppShellState extends State<AppShell> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      '正在下载新版本$versionStr',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
+                    Expanded(
+                      child: Text(
+                        titleText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Text(
-                      '$percent%',
+                      trailingText,
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: theme.colorScheme.primary,
@@ -354,10 +375,13 @@ class _AppShellState extends State<AppShell> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
-                    value: status.progress > 0 ? status.progress : null,
+                    value: (!isConnecting && !isRetrying && status.progress > 0)
+                        ? status.progress
+                        : null,
                     minHeight: 5,
                     backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                    valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
                   ),
                 ),
               ],
