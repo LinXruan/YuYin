@@ -642,7 +642,7 @@ class DouyinSniffer {
         final msg = data['msg']?.toString() ?? '';
         if (msg.isNotEmpty) {
           _log(msg);
-          if (msg.contains('正在加载作品')) {
+          if (msg.contains('正在加载')) {
             _refreshHomeInactivityTimer(_taskId);
           }
         }

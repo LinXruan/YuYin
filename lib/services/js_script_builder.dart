@@ -752,7 +752,7 @@ const String kDouyinSniffJs = r'''
     }
     if (current >= 10 && current - S.homeLoggedCount >= 10) {
       S.homeLoggedCount = Math.floor(current / 10) * 10;
-      log('正在加载作品: 已捕获 ' + S.homeLoggedCount + targetStr + ' 条...');
+      log('已捕获 ' + S.homeLoggedCount + targetStr + ' 条...');
     }
   }
   // 检查是否满足主页作品采集结束条件
