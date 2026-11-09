@@ -1,54 +1,41 @@
 # 余音 YuYin
 
-Android 端抖音无水印资源下载工具，支持视频、图集和实况图。
+<p align="center">
+  <img src="assets/icon.png" alt="YuYin Logo" width="128" />
+</p>
+
+<p align="center">
+  <a href="https://github.com/LinXruan/YuYin/releases">
+    <img src="https://img.shields.io/github/v/release/LinXruan/YuYin?style=flat-square&color=blue" alt="Release" />
+  </a>
+  <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform" />
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-AGPL%203.0-orange?style=flat-square" alt="License" />
+  </a>
+</p>
+
+**Android 端**抖音无水印资源下载，支持**视频、图集、实况图、音频**
 
 > 仅供学习、开发与技术交流使用，禁止商业用途。
 
 ## 功能
 
-- 解析抖音分享口令、短链和作品长链
-- 视频多画质选择，登录后可获取更高画质
-- 图集 / 实况图预览、多选并保存到系统相册
-- 解析 / 历史 / 设置三个主页面，历史页开发中
-- 设置内提供调试日志与关于页
+- 粘贴抖音长链/短链，解析下载资源
+- 支持图像预览、音频预览播放
+- 粘贴主页链接批量下载（开发ing）
 
-## 使用
+## 亮点
 
-1. 复制抖音作品的分享链接或口令；
-2. 打开余音，粘贴并点击“解析作品”；
-3. 视频选择画质，图集 / 实况图勾选需要的资源；
-4. 保存到系统相册。
+- 完善的现代UI
+- 完善的筛选功能
+- 纯本地解析，无任何遥测，绝对隐私
 
-需要更高画质时，点击右上角“抖音登录/提画质”登录抖音。登录仅用于解析，状态只保存在本机 WebView，不会读取或上传账号信息。
+## 应用预览
 
-## 反馈交流
-
-- QQ 群：`1132880576`（关于页“反馈交流Q群”右侧按钮可一键复制）
-- 开源地址：<https://github.com/LinXruan/YuYin>
-
-## 构建
-
-- Flutter 3.47.6 / Dart 3.13.5，JDK 17
-- 仅 Android，minSdk 24 / targetSdk 36
-- 版本 `1.4.4+156`
-- 包名：debug `com.debug.yuyin`，release `com.release.yuyin`（可同时安装）
-
-```bash
-flutter pub get
-flutter analyze
-flutter test
-# 构建 Release 双版本（v8a 轻量版约 18MB 与 Universal 全架构版约 51MB）
-.\tool\build_release_apk.bat
-# 或单架构编译
-flutter build apk --release --target-platform android-arm64
-```
-
-release 签名读取 `android/key.properties` 与 `android/app/yuyin-release.jks`（不提交仓库，请自行备份）。
-
-## 作者
-
-制作人：LinXruan
-
-## 免责声明
-
-本应用不提供、不存储任何音视频内容，资源均来自抖音公开页面。请勿用于批量抓取、侵权传播或违反法律法规及平台协议的行为。使用产生的一切后果由使用者自行承担。
+<table align="center">
+  <tr>
+    <td align="center" width="33%"><img src="assets/UI_1.jpg" alt="应用截图 1" /></td>
+    <td align="center" width="33%"><img src="assets/UI_2.jpg" alt="应用截图 2" /></td>
+    <td align="center" width="33%"><img src="assets/UI_3.jpg" alt="应用截图 3" /></td>
+  </tr>
+</table>
