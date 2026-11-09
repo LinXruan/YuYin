@@ -1,4 +1,4 @@
-﻿param (
+param (
 
     [Parameter(Position = 0)]
 
@@ -295,25 +295,27 @@ switch ($Action.ToLower()) {
 
 
     "verify-covers" {
-
         $resp = Invoke-RestMethod -Uri "$baseUrl/api/verify/home-covers" -Method Post
-
         Write-Host "=== 主页作品封面图抓取校验比对报告 ==="
-
         Write-Host "基准期望作品数: $($resp.totalExpected)"
-
         Write-Host "本次捕获作品数: $($resp.capturedCount)"
-
         Write-Host "成功关联封面数: $($resp.coversCount)"
-
         Write-Host "样本精确匹配数: $($resp.matchedCount)"
-
         $pct = [math]::Round($resp.matchRate * 100, 1)
-
         Write-Host "封面匹配成功率: $pct %"
-
         $resp.details | Format-Table -Property index, matched, hasCover, referenceImage, url -AutoSize
+    }
 
+    "verify-titles" {
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/verify/home-titles" -Method Post
+        Write-Host "=== 主页作品标题/文案抓取校验比对报告 ==="
+        Write-Host "基准期望作品数: $($resp.totalExpected)"
+        Write-Host "本次捕获作品数: $($resp.capturedCount)"
+        Write-Host "成功关联标题数: $($resp.titlesCount)"
+        Write-Host "样本精确匹配数: $($resp.matchedCount)"
+        $pct = [math]::Round($resp.matchRate * 100, 1)
+        Write-Host "标题匹配成功率: $pct %"
+        $resp.details | Format-Table -Property index, matched, hasTitle, expectedTitle, titleSummary, url -AutoSize
     }
 
 
@@ -364,7 +366,7 @@ switch ($Action.ToLower()) {
 
         Write-Host "未知指令: $Action"
 
-        Write-Host "支持的指令: setup, status, display, quality [on|off], mock-login [on|off], parse, download, logs, clear-logs, history [query], clear-history, thumbnails, clear-thumbnails, preload-thumbnails, verify-covers, cancel, eval"
+        Write-Host "支持的指令: setup, status, display, quality [on|off], mock-login [on|off], parse, download, logs, clear-logs, history [query], clear-history, thumbnails, clear-thumbnails, preload-thumbnails, verify-covers, verify-titles, cancel, eval"
 
     }
 

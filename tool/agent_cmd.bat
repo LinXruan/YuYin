@@ -18,6 +18,7 @@ rem   agent_cmd.bat thumbnails
 rem   agent_cmd.bat clear-thumbnails
 rem   agent_cmd.bat preload-thumbnails
 rem   agent_cmd.bat verify-covers
+rem   agent_cmd.bat verify-titles
 rem   agent_cmd.bat cancel
 rem ========================================================
 

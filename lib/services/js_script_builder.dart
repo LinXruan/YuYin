@@ -5,7 +5,7 @@ const String kDouyinSniffJs = r'''
   var S = window.__dyState || (window.__dyState = {
     sent: false, homeSent: false, worksTabCount: 0, lastUrl: '', logs: {}, videoHintSent: false, degraded: false,
     desc: '', coverUrl: '', scannedPaceIdx: 0, loginReported: null, authProbed: false,
-    homeWorks: [], homeWorkSet: {}, homeWorkCovers: {}, homeLoggedCount: 0, homeScrollInterval: null,
+    homeWorks: [], homeWorkSet: {}, homeWorkCovers: {}, homeWorkTitles: {}, homeLoggedCount: 0, homeScrollInterval: null,
     homeHasMore: null, homeIdleScrolls: 0, homeLastCount: 0, homeFinished: false, authorNickname: ''
   });
   function isUserPage() {
@@ -355,6 +355,21 @@ const String kDouyinSniffJs = r'''
       }
     } catch (e) {}
     return '';
+  }
+  // 提取作品标题/文案（优先真实 desc，其次 item_title / title / article_info.title）
+  function pickTitle(node) {
+    if (!node) return '';
+    var text = '';
+    if (typeof node.desc === 'string' && node.desc.trim()) {
+      text = node.desc.trim();
+    } else if (typeof node.item_title === 'string' && node.item_title.trim()) {
+      text = node.item_title.trim();
+    } else if (typeof node.title === 'string' && node.title.trim()) {
+      text = node.title.trim();
+    } else if (node.article_info && typeof node.article_info.title === 'string' && node.article_info.title.trim()) {
+      text = node.article_info.title.trim();
+    }
+    return text.replace(/[\r\n\t]+/g, ' ').trim();
   }
   function sendItems(items, isImagePost, customDesc, customCover) {
     if (S.sent || !items || !items.length) return false;
@@ -729,11 +744,12 @@ const String kDouyinSniffJs = r'''
     }
     return 0;
   }
-  // 将新作品链接与封面追加到全局去重池中，并按每 10 条汇报进度
-  function appendHomeWorks(urls, authorName, coversMap) {
+  // 将新作品链接、封面及标题追加到全局去重池中，并按每 10 条汇报进度
+  function appendHomeWorks(urls, authorName, coversMap, titlesMap) {
     if (!Array.isArray(urls) || !urls.length) return 0;
     var newAdded = 0;
     S.homeWorkCovers = S.homeWorkCovers || {};
+    S.homeWorkTitles = S.homeWorkTitles || {};
     for (var i = 0; i < urls.length; i++) {
       var u = urls[i];
       if (u && !S.homeWorkSet[u]) {
@@ -743,6 +759,9 @@ const String kDouyinSniffJs = r'''
       }
       if (u && coversMap && coversMap[u] && !S.homeWorkCovers[u]) {
         S.homeWorkCovers[u] = coversMap[u];
+      }
+      if (u && titlesMap && titlesMap[u] && !S.homeWorkTitles[u]) {
+        S.homeWorkTitles[u] = titlesMap[u];
       }
     }
     if (authorName && !S.authorNickname) {
@@ -803,7 +822,8 @@ const String kDouyinSniffJs = r'''
       if (m && m[1]) secUid = m[1];
 
       var coversCount = S.homeWorkCovers ? Object.keys(S.homeWorkCovers).length : 0;
-      log('主页作品捕获完成: 共 ' + current + ' 条作品 (已关联封面: ' + coversCount + ' 条, ' + finishReason + ')');
+      var titlesCount = S.homeWorkTitles ? Object.keys(S.homeWorkTitles).length : 0;
+      log('主页作品捕获完成: 共 ' + current + ' 条作品 (已关联封面: ' + coversCount + ' 条, 已关联标题: ' + titlesCount + ' 条, ' + finishReason + ')');
       if (window.DouyinChannel && window.DouyinChannel.postMessage) {
         window.DouyinChannel.postMessage(JSON.stringify({
           type: 'user_home_result',
@@ -812,19 +832,22 @@ const String kDouyinSniffJs = r'''
           workUrls: S.homeWorks,
           workCovers: S.homeWorkCovers || {},
           coversCount: coversCount,
+          workTitles: S.homeWorkTitles || {},
+          titlesCount: titlesCount,
           tabCount: target || current,
           count: current
         }));
       }
     }
   }
-  // 扫描当前 DOM 容器中的作品链接与对应封面图
+  // 扫描当前 DOM 容器中的作品链接、对应封面图与显示文案
   function scanDomPostLinks() {
     var container = document.querySelector('[data-e2e="user-post-list"]') || document.querySelector('ul[data-e2e="scroll-list"]');
-    if (!container) return { urls: [], covers: {} };
+    if (!container) return { urls: [], covers: {}, titles: {} };
     var links = Array.from(container.querySelectorAll('a'));
     var validUrls = [];
     var covers = {};
+    var titles = {};
     var seen = {};
     for (var i = 0; i < links.length; i++) {
       var a = links[i];
@@ -842,11 +865,22 @@ const String kDouyinSniffJs = r'''
               if (src.indexOf('//') === 0) src = 'https:' + src;
               covers[cleanUrl] = src;
             }
+            if (img.alt && !titles[cleanUrl]) {
+              titles[cleanUrl] = img.alt.trim();
+            }
+          }
+          if (!titles[cleanUrl]) {
+            var t = a.getAttribute('title') || '';
+            if (!t) {
+              var textEl = a.querySelector('[class*="desc"], [class*="title"], p, span');
+              if (textEl) t = (textEl.innerText || textEl.textContent || '').trim();
+            }
+            if (t) titles[cleanUrl] = t.replace(/[\r\n\t]+/g, ' ').trim();
           }
         }
       }
     }
-    return { urls: validUrls, covers: covers };
+    return { urls: validUrls, covers: covers, titles: titles };
   }
   // 驱动真实容器向下步进滚动
   function triggerHomeScroll() {
@@ -885,7 +919,7 @@ const String kDouyinSniffJs = r'''
 
     tryFinishHomeCollection();
   }
-  // 从 /aweme/v1/web/aweme/post/ 接口响应增量累加主页作品及封面
+  // 从 /aweme/v1/web/aweme/post/ 接口响应增量累加主页作品、封面及标题
   function tryExtractFromAwemePostJson(json) {
     if (S.homeFinished || !json || !isUserPage()) return;
     if (json.has_more !== undefined) S.homeHasMore = json.has_more;
@@ -894,6 +928,7 @@ const String kDouyinSniffJs = r'''
     if (Array.isArray(list) && list.length > 0) {
       var validUrls = [];
       var coversMap = {};
+      var titlesMap = {};
       for (var i = 0; i < list.length; i++) {
         var item = list[i];
         if (!item) continue;
@@ -908,12 +943,16 @@ const String kDouyinSniffJs = r'''
         if (cover) {
           coversMap[workUrl] = cover;
         }
+        var title = pickTitle(item);
+        if (title) {
+          titlesMap[workUrl] = title;
+        }
       }
       var nickname = '';
       try {
         if (list[0] && list[0].author) nickname = (list[0].author.nickname || '').trim();
       } catch (e) {}
-      appendHomeWorks(validUrls, nickname, coversMap);
+      appendHomeWorks(validUrls, nickname, coversMap, titlesMap);
     }
 
     var tabCount = extractWorksTabCount();
@@ -933,7 +972,7 @@ const String kDouyinSniffJs = r'''
     if (S.homeFinished || !isUserPage()) return;
     var domResult = scanDomPostLinks();
     if (domResult && domResult.urls && domResult.urls.length > 0) {
-      appendHomeWorks(domResult.urls, '', domResult.covers);
+      appendHomeWorks(domResult.urls, '', domResult.covers, domResult.titles);
     }
 
     var tabCount = extractWorksTabCount();
@@ -964,7 +1003,7 @@ const String kDouyinSniffJs = r'''
   tryExtractNow();
   window.__douyinSnifferReset = function () {
     S.sent = false; S.homeSent = false; S.worksTabCount = 0; S.lastUrl = ''; S.logs = {}; S.targetId = ''; S.desc = ''; S.coverUrl = '';
-    S.homeWorks = []; S.homeWorkSet = {}; S.homeWorkCovers = {}; S.homeLoggedCount = 0;
+    S.homeWorks = []; S.homeWorkSet = {}; S.homeWorkCovers = {}; S.homeWorkTitles = {}; S.homeLoggedCount = 0;
     if (S.homeScrollInterval) { clearInterval(S.homeScrollInterval); S.homeScrollInterval = null; }
     S.homeHasMore = null; S.homeIdleScrolls = 0; S.homeLastCount = 0; S.homeFinished = false; S.authorNickname = '';
     S.videoHintSent = false; S.degraded = false; S.scannedPaceIdx = 0;

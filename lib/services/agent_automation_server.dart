@@ -123,6 +123,8 @@ class AgentAutomationServer {
         await _handlePreloadThumbnails(request);
       } else if (path == '/api/verify/home-covers' && request.method == 'POST') {
         await _handleVerifyHomeCovers(request);
+      } else if (path == '/api/verify/home-titles' && request.method == 'POST') {
+        await _handleVerifyHomeTitles(request);
       } else {
         _sendJson(
           request,
@@ -178,6 +180,8 @@ class AgentAutomationServer {
               'worksTotalTag': _lastUserHomeResult!.worksTotalTag,
               'coversCount': _lastUserHomeResult!.coversCount,
               'hasCovers': _lastUserHomeResult!.workCovers.isNotEmpty,
+              'titlesCount': _lastUserHomeResult!.titlesCount,
+              'hasTitles': _lastUserHomeResult!.workTitles.isNotEmpty,
             },
       'logsCount': logs.logs.length,
       'downloadSettings': {
@@ -762,6 +766,109 @@ class AgentAutomationServer {
       'totalExpected': kReference167Map.length,
       'capturedCount': homeResult.count,
       'coversCount': homeResult.coversCount,
+      'matchedCount': matchedCount,
+      'details': details,
+    });
+  }
+
+  /// 168 真实主页作品与显示标题/文案参照对照表 (仅用于 Debug 比对验证)
+  static const Map<String, String> kReference168TitlesMap = {
+    'https://www.douyin.com/note/7701683319334910554': '所以我们撕下了邪典 折成千万',
+    'https://www.douyin.com/video/7699742794776932454': '泰拉瑞亚二十万瞬伤！骑枪秒',
+    'https://www.douyin.com/video/7681695622663032794': '泰拉瑞亚原版10万瞬伤装置',
+    'https://www.douyin.com/video/7704664460653454153': '根本没有这样的车技',
+    'https://www.douyin.com/note/7701331294467341211': '若是真英雄怎么会怕？#哈基米',
+    'https://www.douyin.com/note/7701270275615027622': '好像回到了中学时代，那时候',
+    'https://www.douyin.com/note/7700845558298246502': 'ai，我们来做个约定，我会遍',
+    'https://www.douyin.com/note/7699169682201808818': '遗憾的是，人们往往在了解什',
+    'https://www.douyin.com/note/7698651843623366906': '服下过期的药，期盼它能够治',
+    'https://www.douyin.com/article/7697159257049500763': '文娱工作者离不开绿帽烂裤裆',
+    'https://www.douyin.com/video/7696450088373463451': '人类历史的转折点，却无人问',
+    'https://www.douyin.com/note/7695431697895172234': '遗憾的是多少年后，每一个少',
+    'https://www.douyin.com/video/7692078721939105499': '何为第九艺术的魅力 #第九艺',
+    'https://www.douyin.com/video/7681983578297077897': '1.4.5.8.卡地牢宝箱，145通用',
+    'https://www.douyin.com/note/7675935070243298907': '我最害怕有小萝莉给我发语音',
+  };
+
+  /// POST /api/verify/home-titles：主页作品标题/文案捕获校验与比对（仅 Debug 版）
+  Future<void> _handleVerifyHomeTitles(HttpRequest request) async {
+    final homeResult = _lastUserHomeResult;
+    if (homeResult == null) {
+      _sendJson(
+        request,
+        HttpStatus.badRequest,
+        {'error': '尚未执行主页解析，请先调用 /api/parse 解析主页链接', 'code': 400},
+      );
+      return;
+    }
+
+    final titles = homeResult.workTitles;
+    final details = <Map<String, dynamic>>[];
+    int matchedCount = 0;
+
+    int idx = 1;
+    for (final entry in kReference168TitlesMap.entries) {
+      final expectedUrl = entry.key;
+      final expectedKeyword = entry.value;
+      final expectedId = RegExp(r'\d{10,}').firstMatch(expectedUrl)?.group(0);
+
+      // 支持精准匹配或按作品数字 ID 跨路由兼容匹配 (/video/ /note/ /article/)
+      String? capturedTitle = titles[expectedUrl];
+      if (capturedTitle == null && expectedId != null) {
+        for (final item in titles.entries) {
+          if (item.key.contains(expectedId)) {
+            capturedTitle = item.value;
+            break;
+          }
+        }
+      }
+
+      final hasTitle = capturedTitle != null && capturedTitle.trim().isNotEmpty;
+      // 判定匹配：由于卡片文案可能包含省略号，因此检查包含关系或前缀一致
+      bool matched = false;
+      if (hasTitle) {
+        final cleanExpected = expectedKeyword.replaceAll('…', '').replaceAll('...', '').trim();
+        final cleanCaptured = capturedTitle.replaceAll('…', '').replaceAll('...', '').trim();
+        if (cleanCaptured.contains(cleanExpected) || cleanExpected.contains(cleanCaptured)) {
+          matched = true;
+        } else {
+          final prefixLen = cleanExpected.length < 6 ? cleanExpected.length : 6;
+          if (cleanCaptured.startsWith(cleanExpected.substring(0, prefixLen))) {
+            matched = true;
+          }
+        }
+      }
+
+      if (matched) matchedCount++;
+
+      final summary = capturedTitle == null
+          ? ''
+          : (capturedTitle.length > 20 ? '${capturedTitle.substring(0, 20)}...' : capturedTitle);
+
+      details.add({
+        'index': idx.toString().padLeft(2, '0'),
+        'url': expectedUrl,
+        'expectedTitle': expectedKeyword,
+        'hasTitle': hasTitle,
+        'title': capturedTitle ?? '',
+        'titleSummary': summary,
+        'matched': matched,
+      });
+      idx++;
+    }
+
+    final rate = kReference168TitlesMap.isEmpty
+        ? 0.0
+        : (matchedCount / kReference168TitlesMap.length);
+
+    logs.add('[标题验证] 168 样本比对完成: 匹配 $matchedCount / ${kReference168TitlesMap.length} (${(rate * 100).toStringAsFixed(1)}%)');
+
+    _sendJson(request, HttpStatus.ok, {
+      'status': 'ok',
+      'matchRate': rate,
+      'totalExpected': kReference168TitlesMap.length,
+      'capturedCount': homeResult.count,
+      'titlesCount': homeResult.titlesCount,
       'matchedCount': matchedCount,
       'details': details,
     });

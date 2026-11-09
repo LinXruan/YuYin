@@ -93,6 +93,7 @@
 | `.\tool\agent_cmd.bat clear-thumbnails` | 无 | 清空本地缩略图缓存与内存索引 | `[AgentBridge] [成功] 本地缩略图离线缓存已完全清空` |
 | `.\tool\agent_cmd.bat preload-thumbnails` | 无 | 触发所有历史记录项的本地缩略图后台预热 | 报告预热触发数量与总条数 |
 | `.\tool\agent_cmd.bat verify-covers` | 无 | 针对最近一次主页作品执行封面图匹配校验 (PLAN_54) | 报告 167 样本匹配率、URL 有效性与对照表比对 |
+| `.\tool\agent_cmd.bat verify-titles` | 无 | 针对最近一次主页作品执行标题/文案匹配校验 (PLAN_55) | 报告 168 样本匹配率、关联有效性与对照表比对 |
 | `.\tool\agent_cmd.bat cancel` | 无 | 终止当前正在进行的捕获解析或下载任务 | 停止定时器并加载空页面 |
 | `.\tool\agent_cmd.bat eval "<script>"` | JS 脚本表达式 | 向后台捕获 WebView 注入并同步执行 JS，返回执行结果 | 终端输出 JS 表达式求值结果 |
 
@@ -113,6 +114,7 @@
 | `/api/thumbnails/clear`| `POST` | 无 | `{"status":"ok","message":"缩略图缓存已清空"}` | 清空缩略图本地缓存 |
 | `/api/thumbnails/preload`| `POST`| 无 | `{"status":"ok","triggeredCount":3,"totalRecords":5}` | 后台预热历史记录缩略图 |
 | `/api/verify/home-covers`| `POST`| 无 | `{"status":"ok","matchRate":1.0,"matchedCount":15,...}` | 主页作品封面匹配校验 (PLAN_54) |
+| `/api/verify/home-titles`| `POST`| 无 | `{"status":"ok","matchRate":1.0,"matchedCount":15,...}` | 主页作品标题/文案匹配校验 (PLAN_55) |
 | `/api/cancel` | `POST` | 无 | `{"success":true,"message":"Task cancelled"}` | 取消活动任务 |
 | `/api/eval` | `POST` | `{"script":"<js_expression>"}` | `{"success":true,"result":"..."}` | 注入执行 JS 脚本 |
 

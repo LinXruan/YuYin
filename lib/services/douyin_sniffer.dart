@@ -691,11 +691,23 @@ class DouyinSniffer {
             }
           }
         }
+        final rawTitles = data['workTitles'];
+        final workTitles = <String, String>{};
+        if (rawTitles is Map) {
+          for (final entry in rawTitles.entries) {
+            final k = entry.key?.toString();
+            final v = entry.value?.toString();
+            if (k != null && k.isNotEmpty && v != null && v.isNotEmpty) {
+              workTitles[k] = v;
+            }
+          }
+        }
         final homeResult = UserHomeResult(
           secUid: secUid,
           nickname: nickname,
           workUrls: workUrls,
           workCovers: workCovers,
+          workTitles: workTitles,
           tabCount: tabCount,
         );
         _finishHomeWithResult(homeResult, _taskId);
@@ -936,7 +948,10 @@ class DouyinSniffer {
     _stopTimers();
 
     final author = result.nickname.isNotEmpty ? result.nickname : '未知作者';
-    _log('主页捕获成功：作者【$author】，共 ${result.count} 条作品（已关联封面: ${result.coversCount} 条）');
+    final coverText = result.coversCount > 0 ? '已关联封面: ${result.coversCount} 条, ' : '';
+    final titleText = result.titlesCount > 0 ? '已关联标题: ${result.titlesCount} 条' : '';
+    final metaText = (coverText.isNotEmpty || titleText.isNotEmpty) ? '（$coverText$titleText）' : '';
+    _log('主页捕获成功：作者【$author】，共 ${result.count} 条作品$metaText');
     completer.complete(result);
     if (identical(_homeCompleter, completer)) _homeCompleter = null;
 
