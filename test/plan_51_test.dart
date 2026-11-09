@@ -11,7 +11,10 @@ import 'package:yuyin/utils/url_parser.dart';
 void main() {
   group('PLAN_51: 抖音主页作品数量 Tag 捕获单元测试', () {
     test('读取 sources/164_抖音主页链接 样本文件验证 3 个样本链接', () {
-      final sampleFile = File('sources/164_抖音主页链接/151个作品的主页链接.txt');
+      File sampleFile = File('sources/164_抖音主页链接/主页链接.txt');
+      if (!sampleFile.existsSync()) {
+        sampleFile = File('sources/164_抖音主页链接/151个作品的主页链接.txt');
+      }
       expect(sampleFile.existsSync(), isTrue);
 
       final content = sampleFile.readAsStringSync();
