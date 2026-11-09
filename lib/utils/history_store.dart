@@ -115,6 +115,10 @@ class HistoryStore {
         recordsNotifier.value = List.unmodifiable(_records);
         await _save();
       }
+      // PLAN_53：标记已保存时确保缩略图离线缓存就绪，与“已保存”筛选模式完全对齐
+      if (isSaved && current.coverUrl != null && current.coverUrl!.isNotEmpty) {
+        HistoryThumbnailCache.cacheThumbnail(current.id, current.coverUrl!);
+      }
     }
   }
 

@@ -1,14 +1,22 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/history_item.dart';
 import 'package:yuyin/pages/history_page.dart';
 import 'package:yuyin/utils/history_store.dart';
+import 'package:yuyin/utils/history_thumbnail_cache.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
     HistoryStore.resetForTesting(skipSave: true);
+    HistoryThumbnailCache.resetForTesting();
+  });
+
+  tearDown(() {
+    HistoryThumbnailCache.resetForTesting();
   });
 
   Widget buildTestWidget({void Function(HistoryItem)? onSelectRecord}) {
@@ -237,14 +245,22 @@ void main() {
   });
 
   testWidgets('历史卡片封面缩略图使用 BoxFit.cover 裁切填满且不拉伸变形（对齐保存页）', (tester) async {
-    await HistoryStore.addRecord(
-      HistoryItem(
-        id: '1',
-        url: 'https://v.douyin.com/1/',
-        fullDesc: '包含封面的作品',
-        coverUrl: 'https://p3-pc.douyinpic.com/tos-cn-p-0015/cover.jpeg',
-      ),
-    );
+    final tempDir = Directory.systemTemp.createTempSync('history_thumb_test');
+    HistoryThumbnailCache.testDir = tempDir;
+    final file = File('${tempDir.path}/${HistoryThumbnailCache.generateFileName('1')}');
+    file.writeAsBytesSync(List.filled(600, 1));
+
+    await tester.runAsync(() async {
+      await HistoryThumbnailCache.warmUp();
+      await HistoryStore.addRecord(
+        HistoryItem(
+          id: '1',
+          url: 'https://v.douyin.com/1/',
+          fullDesc: '包含封面的作品',
+          coverUrl: 'https://p3-pc.douyinpic.com/tos-cn-p-0015/cover.jpeg',
+        ),
+      );
+    });
 
     await tester.pumpWidget(buildTestWidget());
     await tester.pump();
@@ -254,6 +270,17 @@ void main() {
     final imageWidget = tester.widget<Image>(imageFinder);
     expect(imageWidget.fit, BoxFit.cover);
     expect(imageWidget.alignment, Alignment.center);
+    final imageProvider = imageWidget.image;
+    if (imageProvider is ResizeImage) {
+      expect(imageProvider.imageProvider, isA<FileImage>());
+    } else {
+      expect(imageProvider, isA<FileImage>());
+    }
+
+    HistoryThumbnailCache.resetForTesting();
+    try {
+      tempDir.deleteSync(recursive: true);
+    } catch (_) {}
   });
 
   testWidgets('PLAN_46: “已保存”与“已解析”筛选功能、多选联动排除未保存项、全选与筛选联动', (tester) async {

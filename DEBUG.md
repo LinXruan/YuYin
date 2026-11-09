@@ -89,6 +89,9 @@
 | `.\tool\agent_cmd.bat clear-logs` | 无 | 清空应用内当前日志缓存 | `[AgentBridge] [成功] 日志已清空` |
 | `.\tool\agent_cmd.bat history [query]` | 可选搜索词 | 查看历史记录，支持关键词模糊搜索 | 终端输出历史记录表格（标题、媒体摘要、时间） |
 | `.\tool\agent_cmd.bat clear-history` | 无 | 清空应用内所有历史记录 | `[AgentBridge] [成功] 历史记录已清空` |
+| `.\tool\agent_cmd.bat thumbnails` | 无 | 查看缩略图本地离线缓存状态与统计 | 输出文件数、磁盘体积、内存索引与下载任务数 |
+| `.\tool\agent_cmd.bat clear-thumbnails` | 无 | 清空本地缩略图缓存与内存索引 | `[AgentBridge] [成功] 本地缩略图离线缓存已完全清空` |
+| `.\tool\agent_cmd.bat preload-thumbnails` | 无 | 触发所有历史记录项的本地缩略图后台预热 | 报告预热触发数量与总条数 |
 | `.\tool\agent_cmd.bat cancel` | 无 | 终止当前正在进行的捕获解析或下载任务 | 停止定时器并加载空页面 |
 | `.\tool\agent_cmd.bat eval "<script>"` | JS 脚本表达式 | 向后台捕获 WebView 注入并同步执行 JS，返回执行结果 | 终端输出 JS 表达式求值结果 |
 
@@ -105,6 +108,9 @@
 | `/api/logs/clear`| `POST` | 无 | `{"success":true,"message":"Logs cleared"}` | 清空日志缓存 |
 | `/api/history` | `GET` | 无 (支持 `?q=关键词`) | `{"count":10,"records":[{"id":"...","title":"...","fullDesc":"..."},...]}` | 查询或模糊搜索历史记录 |
 | `/api/history/clear`| `POST` | 无 | `{"success":true,"message":"历史记录已清空"}` | 清空全部历史记录 |
+| `/api/thumbnails` | `GET` | 无 | `{"status":"ok","stats":{"cachedFilesCount":10,"totalBytes":...}}` | 查询缩略图本地缓存统计 |
+| `/api/thumbnails/clear`| `POST` | 无 | `{"status":"ok","message":"缩略图缓存已清空"}` | 清空缩略图本地缓存 |
+| `/api/thumbnails/preload`| `POST`| 无 | `{"status":"ok","triggeredCount":3,"totalRecords":5}` | 后台预热历史记录缩略图 |
 | `/api/cancel` | `POST` | 无 | `{"success":true,"message":"Task cancelled"}` | 取消活动任务 |
 | `/api/eval` | `POST` | `{"script":"<js_expression>"}` | `{"success":true,"result":"..."}` | 注入执行 JS 脚本 |
 

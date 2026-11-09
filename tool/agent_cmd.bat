@@ -14,6 +14,9 @@ rem   agent_cmd.bat logs
 rem   agent_cmd.bat clear-logs
 rem   agent_cmd.bat history [query]
 rem   agent_cmd.bat clear-history
+rem   agent_cmd.bat thumbnails
+rem   agent_cmd.bat clear-thumbnails
+rem   agent_cmd.bat preload-thumbnails
 rem   agent_cmd.bat cancel
 rem ========================================================
 

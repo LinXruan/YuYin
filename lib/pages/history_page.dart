@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/history_item.dart';
-import '../services/douyin_sniffer.dart';
 import '../utils/history_store.dart';
 import '../utils/history_thumbnail_cache.dart';
 
@@ -42,6 +41,8 @@ class _HistoryPageState extends State<HistoryPage>
   @override
   void initState() {
     super.initState();
+    HistoryThumbnailCache.warmUp();
+    HistoryThumbnailCache.cacheUpdateNotifier.addListener(_onCacheUpdated);
     HistoryStore.recordsNotifier.addListener(_onRecordsChanged);
     HistoryStore.isPromptDismissed().then((dismissed) {
       if (mounted && dismissed) {
@@ -52,10 +53,16 @@ class _HistoryPageState extends State<HistoryPage>
 
   @override
   void dispose() {
+    HistoryThumbnailCache.cacheUpdateNotifier.removeListener(_onCacheUpdated);
     HistoryStore.recordsNotifier.removeListener(_onRecordsChanged);
     _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onCacheUpdated() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   void _onRecordsChanged() {
@@ -288,7 +295,7 @@ class _HistoryPageState extends State<HistoryPage>
                         final isSelected = _selectedIds.contains(item.id);
 
                         return _HistoryCard(
-                          key: Key('history_${item.id}_$index'),
+                          key: ValueKey(item.id),
                           item: item,
                           isSelectionMode: _isSelectionMode,
                           isSelected: isSelected,
@@ -698,7 +705,7 @@ class _HistoryCard extends StatelessWidget {
     );
   }
 
-  /// 封面缩略图构建：优先使用本地离线缓存（0 网络开销、离线可用），未命中时降级网络加载并异步缓存
+  /// 封面缩略图构建：100% 纯本地离线缓存驱动，彻底杜绝任何网络图片请求与流量消耗
   Widget _buildThumbnail(ThemeData theme) {
     const size = 80.0;
     final hasCover = item.coverUrl != null &&
@@ -716,6 +723,16 @@ class _HistoryCard extends StatelessWidget {
       );
     }
 
+    // 1. 同步内存检查：极速 O(1) 命中已缓存本地文件（0 异步等待、0 闪烁、0 网络）
+    final syncFile = HistoryThumbnailCache.getCachedFileSync(item.id);
+    if (syncFile != null) {
+      return _buildLocalImageThumbnail(theme, syncFile, size);
+    }
+
+    // 2. 内存尚未命中：触发后台异步下载落盘（内置 In-flight 去重），同时在本地寻找
+    // 注意：UI 层绝对不挂载任何 Image.network，100% 由本地离线缓存驱动！
+    HistoryThumbnailCache.cacheThumbnail(item.id, item.coverUrl!);
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: Container(
@@ -726,80 +743,70 @@ class _HistoryCard extends StatelessWidget {
           future: HistoryThumbnailCache.findValidCachedFile(item.id),
           builder: (context, snapshot) {
             final cachedFile = snapshot.data;
-            final Widget imageWidget;
-
             if (cachedFile != null) {
-              // 1. 本地缓存命中：极速离线呈现，零网络消耗
-              imageWidget = Image.file(
-                cachedFile,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                alignment: Alignment.center,
-                errorBuilder: (context, error, stackTrace) =>
-                    _buildFallbackThumbnail(theme),
-              );
-            } else {
-              // 2. 本地尚未缓存：网络加载并后台触发异步落盘
-              HistoryThumbnailCache.cacheThumbnail(item.id, item.coverUrl!);
-              imageWidget = Image.network(
-                item.coverUrl!,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                alignment: Alignment.center,
-                headers: const {
-                  'Referer': 'https://www.douyin.com/',
-                  'User-Agent': DouyinSniffer.desktopUserAgent,
-                },
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) return child;
-                  return Center(
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        value: progress.expectedTotalBytes != null
-                            ? progress.cumulativeBytesLoaded /
-                                progress.expectedTotalBytes!
-                            : null,
-                      ),
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) =>
-                    _buildFallbackThumbnail(theme),
-              );
+              return _buildLocalImageStack(theme, cachedFile, size);
             }
-
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                imageWidget,
-                if (!item.isImagePost)
-                  Positioned(
-                    right: 4,
-                    bottom: 4,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Icon(
-                        Icons.play_arrow_rounded,
-                        size: 14,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-              ],
-            );
+            // 本地缓存尚未完成或正在静默下载：展示优雅占位图，杜绝任何 Image.network 联网
+            return _buildPlaceholderThumbnail(theme);
           },
         ),
       ),
     );
+  }
+
+  /// 封装带圆角的本地文件缩略图组件
+  Widget _buildLocalImageThumbnail(ThemeData theme, File file, double size) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: size,
+        height: size,
+        color: Colors.black.withValues(alpha: 0.85),
+        child: _buildLocalImageStack(theme, file, size),
+      ),
+    );
+  }
+
+  /// 渲染已落盘的本地图片图层与视频微标
+  Widget _buildLocalImageStack(ThemeData theme, File file, double size) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.file(
+          file,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          alignment: Alignment.center,
+          cacheWidth: 200,
+          cacheHeight: 200,
+          errorBuilder: (context, error, stackTrace) =>
+              _buildFallbackThumbnail(theme),
+        ),
+        if (!item.isImagePost)
+          Positioned(
+            right: 4,
+            bottom: 4,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Icon(
+                Icons.play_arrow_rounded,
+                size: 14,
+                color: Colors.white,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// 本地缩略图尚未落盘时的占位图组件（避免白屏或网络闪烁）
+  Widget _buildPlaceholderThumbnail(ThemeData theme) {
+    return _buildFallbackThumbnail(theme);
   }
 
   /// 兜底缩略图（根据媒体类型渲染专属矢量图标与文案，避免重复请求并保持视觉优雅）

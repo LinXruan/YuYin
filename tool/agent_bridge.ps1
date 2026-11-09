@@ -1,4 +1,4 @@
-﻿param (
+param (
     [Parameter(Position = 0)]
     [string]$Action = "status",
 
@@ -119,6 +119,25 @@ switch ($Action.ToLower()) {
         }
     }
 
+    "thumbnails" {
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/thumbnails" -Method Get
+        Write-Host "=== 缩略图离线缓存状态 ==="
+        Write-Host "本地已缓存缩略图: $($resp.stats.cachedFilesCount) 个文件"
+        Write-Host "磁盘占用大小: $([math]::Round($resp.stats.totalBytes / 1KB, 2)) KB"
+        Write-Host "内存索引记录数: $($resp.stats.inMemoryEntries) 条"
+        Write-Host "正在下载任务数: $($resp.stats.inFlightDownloadsCount) 个"
+    }
+
+    "clear-thumbnails" {
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/thumbnails/clear" -Method Post
+        Write-Host "[AgentBridge] [成功] 本地缩略图离线缓存已完全清空"
+    }
+
+    "preload-thumbnails" {
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/thumbnails/preload" -Method Post
+        Write-Host "[AgentBridge] [成功] 触发离线缓存预热: $($resp.triggeredCount) / $($resp.totalRecords) 条记录"
+    }
+
     "mock-login" {
         $enabled = if ($Arg1 -eq "off" -or $Arg1 -eq "false" -or $Arg1 -eq "0") { $false } else { $true }
         $body = @{ loggedIn = $enabled } | ConvertTo-Json
@@ -142,6 +161,6 @@ switch ($Action.ToLower()) {
 
     default {
         Write-Host "未知指令: $Action"
-        Write-Host "支持的指令: setup, status, display, quality [on|off], mock-login [on|off], parse, download, logs, clear-logs, history [query], clear-history, cancel, eval"
+        Write-Host "支持的指令: setup, status, display, quality [on|off], mock-login [on|off], parse, download, logs, clear-logs, history [query], clear-history, thumbnails, clear-thumbnails, preload-thumbnails, cancel, eval"
     }
 }
