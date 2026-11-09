@@ -5,7 +5,7 @@ const String kDouyinSniffJs = r'''
   var S = window.__dyState || (window.__dyState = {
     sent: false, homeSent: false, worksTabCount: 0, lastUrl: '', logs: {}, videoHintSent: false, degraded: false,
     desc: '', coverUrl: '', scannedPaceIdx: 0, loginReported: null, authProbed: false,
-    homeWorks: [], homeWorkSet: {}, homeLoggedCount: 0, homeScrollInterval: null,
+    homeWorks: [], homeWorkSet: {}, homeWorkCovers: {}, homeLoggedCount: 0, homeScrollInterval: null,
     homeHasMore: null, homeIdleScrolls: 0, homeLastCount: 0, homeFinished: false, authorNickname: ''
   });
   function isUserPage() {
@@ -312,20 +312,29 @@ const String kDouyinSniffJs = r'''
     return '';
   }
   // 按 url 去重后一次性回传（彻底废除 title 逻辑，专攻真实作品 desc）
-  // 提取作品封面图（优先高清封面，严禁提取视频流）
+  // 提取作品封面图（优先高清封面 origin_cover，严禁提取视频流）
   function pickCover(node, video) {
     var v = video || (node && node.video);
     if (v) {
-      if (v.cover && Array.isArray(v.cover.url_list) && v.cover.url_list.length) return clean(v.cover.url_list[0]);
       if (v.origin_cover && Array.isArray(v.origin_cover.url_list) && v.origin_cover.url_list.length) return clean(v.origin_cover.url_list[0]);
+      if (v.cover && Array.isArray(v.cover.url_list) && v.cover.url_list.length) return clean(v.cover.url_list[0]);
       if (v.dynamic_cover && Array.isArray(v.dynamic_cover.url_list) && v.dynamic_cover.url_list.length) return clean(v.dynamic_cover.url_list[0]);
       if (typeof v.poster === 'string' && v.poster) return clean(v.poster);
     }
     if (node) {
-      if (node.cover && Array.isArray(node.cover.url_list) && node.cover.url_list.length) return clean(node.cover.url_list[0]);
       if (node.origin_cover && Array.isArray(node.origin_cover.url_list) && node.origin_cover.url_list.length) return clean(node.origin_cover.url_list[0]);
+      if (node.cover && Array.isArray(node.cover.url_list) && node.cover.url_list.length) return clean(node.cover.url_list[0]);
       if (Array.isArray(node.images) && node.images.length && node.images[0] && Array.isArray(node.images[0].url_list) && node.images[0].url_list.length) {
         return clean(node.images[0].url_list[0]);
+      }
+      if (node.image_post_info && Array.isArray(node.image_post_info.images) && node.image_post_info.images.length) {
+        var postImg0 = node.image_post_info.images[0];
+        if (postImg0 && postImg0.display_image && Array.isArray(postImg0.display_image.url_list) && postImg0.display_image.url_list.length) {
+          return clean(postImg0.display_image.url_list[0]);
+        }
+      }
+      if (node.article_info && node.article_info.cover && Array.isArray(node.article_info.cover.url_list) && node.article_info.cover.url_list.length) {
+        return clean(node.article_info.cover.url_list[0]);
       }
     }
     try {
@@ -333,11 +342,11 @@ const String kDouyinSniffJs = r'''
       if (p && p.config) {
         if (typeof p.config.poster === 'string' && p.config.poster) return clean(p.config.poster);
         var pInfo = p.config.awemeInfo;
-        if (pInfo && pInfo.video && pInfo.video.cover && Array.isArray(pInfo.video.cover.url_list) && pInfo.video.cover.url_list.length) {
-          return clean(pInfo.video.cover.url_list[0]);
-        }
         if (pInfo && pInfo.video && pInfo.video.origin_cover && Array.isArray(pInfo.video.origin_cover.url_list) && pInfo.video.origin_cover.url_list.length) {
           return clean(pInfo.video.origin_cover.url_list[0]);
+        }
+        if (pInfo && pInfo.video && pInfo.video.cover && Array.isArray(pInfo.video.cover.url_list) && pInfo.video.cover.url_list.length) {
+          return clean(pInfo.video.cover.url_list[0]);
         }
       }
       var domVideos = document.getElementsByTagName('video');
@@ -720,16 +729,20 @@ const String kDouyinSniffJs = r'''
     }
     return 0;
   }
-  // 将新作品链接追加到全局去重池中，并按每 10 条汇报进度
-  function appendHomeWorks(urls, authorName) {
+  // 将新作品链接与封面追加到全局去重池中，并按每 10 条汇报进度
+  function appendHomeWorks(urls, authorName, coversMap) {
     if (!Array.isArray(urls) || !urls.length) return 0;
     var newAdded = 0;
+    S.homeWorkCovers = S.homeWorkCovers || {};
     for (var i = 0; i < urls.length; i++) {
       var u = urls[i];
       if (u && !S.homeWorkSet[u]) {
         S.homeWorkSet[u] = true;
         S.homeWorks.push(u);
         newAdded++;
+      }
+      if (u && coversMap && coversMap[u] && !S.homeWorkCovers[u]) {
+        S.homeWorkCovers[u] = coversMap[u];
       }
     }
     if (authorName && !S.authorNickname) {
@@ -789,38 +802,51 @@ const String kDouyinSniffJs = r'''
       var m = location.pathname.match(/\/user\/([^\/?#]+)/);
       if (m && m[1]) secUid = m[1];
 
-      log('主页作品捕获完成: 共 ' + current + ' 条作品 (' + finishReason + ')');
+      var coversCount = S.homeWorkCovers ? Object.keys(S.homeWorkCovers).length : 0;
+      log('主页作品捕获完成: 共 ' + current + ' 条作品 (已关联封面: ' + coversCount + ' 条, ' + finishReason + ')');
       if (window.DouyinChannel && window.DouyinChannel.postMessage) {
         window.DouyinChannel.postMessage(JSON.stringify({
           type: 'user_home_result',
           secUid: secUid,
           nickname: nickname,
           workUrls: S.homeWorks,
+          workCovers: S.homeWorkCovers || {},
+          coversCount: coversCount,
           tabCount: target || current,
           count: current
         }));
       }
     }
   }
-  // 扫描当前 DOM 容器中的作品链接
+  // 扫描当前 DOM 容器中的作品链接与对应封面图
   function scanDomPostLinks() {
     var container = document.querySelector('[data-e2e="user-post-list"]') || document.querySelector('ul[data-e2e="scroll-list"]');
-    if (!container) return [];
-    var links = Array.from(container.querySelectorAll('a')).map(function (a) { return a.href || ''; });
+    if (!container) return { urls: [], covers: {} };
+    var links = Array.from(container.querySelectorAll('a'));
     var validUrls = [];
+    var covers = {};
     var seen = {};
     for (var i = 0; i < links.length; i++) {
-      var h = links[i];
+      var a = links[i];
+      var h = a.href || '';
       if (!h) continue;
-      var clean = h.split('?')[0].split('#')[0];
-      if (/\/(?:video|note|article)\/\d{10,25}/.test(clean)) {
-        if (!seen[clean]) {
-          seen[clean] = true;
-          validUrls.push(clean);
+      var cleanUrl = h.split('?')[0].split('#')[0];
+      if (/\/(?:video|note|article)\/\d{10,25}/.test(cleanUrl)) {
+        if (!seen[cleanUrl]) {
+          seen[cleanUrl] = true;
+          validUrls.push(cleanUrl);
+          var img = a.querySelector('img') || (a.parentElement ? a.parentElement.querySelector('img') : null);
+          if (img) {
+            var src = img.currentSrc || img.src || img.getAttribute('src') || img.getAttribute('data-src') || '';
+            if (src && src.indexOf('data:') !== 0 && src.indexOf('blob:') !== 0) {
+              if (src.indexOf('//') === 0) src = 'https:' + src;
+              covers[cleanUrl] = src;
+            }
+          }
         }
       }
     }
-    return validUrls;
+    return { urls: validUrls, covers: covers };
   }
   // 驱动真实容器向下步进滚动
   function triggerHomeScroll() {
@@ -859,7 +885,7 @@ const String kDouyinSniffJs = r'''
 
     tryFinishHomeCollection();
   }
-  // 从 /aweme/v1/web/aweme/post/ 接口响应增量累加主页作品
+  // 从 /aweme/v1/web/aweme/post/ 接口响应增量累加主页作品及封面
   function tryExtractFromAwemePostJson(json) {
     if (S.homeFinished || !json || !isUserPage()) return;
     if (json.has_more !== undefined) S.homeHasMore = json.has_more;
@@ -867,6 +893,7 @@ const String kDouyinSniffJs = r'''
     var list = json.aweme_list;
     if (Array.isArray(list) && list.length > 0) {
       var validUrls = [];
+      var coversMap = {};
       for (var i = 0; i < list.length; i++) {
         var item = list[i];
         if (!item) continue;
@@ -874,13 +901,19 @@ const String kDouyinSniffJs = r'''
         if (!awemeId) continue;
         var awemeType = item.aweme_type;
         var path = (awemeType === 68 || awemeType === 61 || item.images) ? 'note' : 'video';
-        validUrls.push('https://www.douyin.com/' + path + '/' + awemeId);
+        var workUrl = 'https://www.douyin.com/' + path + '/' + awemeId;
+        validUrls.push(workUrl);
+
+        var cover = pickCover(item, item.video);
+        if (cover) {
+          coversMap[workUrl] = cover;
+        }
       }
       var nickname = '';
       try {
         if (list[0] && list[0].author) nickname = (list[0].author.nickname || '').trim();
       } catch (e) {}
-      appendHomeWorks(validUrls, nickname);
+      appendHomeWorks(validUrls, nickname, coversMap);
     }
 
     var tabCount = extractWorksTabCount();
@@ -898,9 +931,9 @@ const String kDouyinSniffJs = r'''
   // 扫描主页作品链接列表（DOM 层即时解析与滚动驱动）
   function scanUserHome() {
     if (S.homeFinished || !isUserPage()) return;
-    var domUrls = scanDomPostLinks();
-    if (domUrls.length > 0) {
-      appendHomeWorks(domUrls);
+    var domResult = scanDomPostLinks();
+    if (domResult && domResult.urls && domResult.urls.length > 0) {
+      appendHomeWorks(domResult.urls, '', domResult.covers);
     }
 
     var tabCount = extractWorksTabCount();
@@ -931,7 +964,7 @@ const String kDouyinSniffJs = r'''
   tryExtractNow();
   window.__douyinSnifferReset = function () {
     S.sent = false; S.homeSent = false; S.worksTabCount = 0; S.lastUrl = ''; S.logs = {}; S.targetId = ''; S.desc = ''; S.coverUrl = '';
-    S.homeWorks = []; S.homeWorkSet = {}; S.homeLoggedCount = 0;
+    S.homeWorks = []; S.homeWorkSet = {}; S.homeWorkCovers = {}; S.homeLoggedCount = 0;
     if (S.homeScrollInterval) { clearInterval(S.homeScrollInterval); S.homeScrollInterval = null; }
     S.homeHasMore = null; S.homeIdleScrolls = 0; S.homeLastCount = 0; S.homeFinished = false; S.authorNickname = '';
     S.videoHintSent = false; S.degraded = false; S.scannedPaceIdx = 0;

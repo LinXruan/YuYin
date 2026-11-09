@@ -159,6 +159,7 @@ class UserHomeResult {
     required this.secUid,
     required this.nickname,
     required this.workUrls,
+    this.workCovers = const {},
     this.tabCount,
   });
 
@@ -171,6 +172,9 @@ class UserHomeResult {
   /// 捕获到的所有作品链接列表（去重且按页面顺序）
   final List<String> workUrls;
 
+  /// 作品链接至封面图片直链的映射字典
+  final Map<String, String> workCovers;
+
   /// 页面 Tab 标注的作品总数（如无则为 null）
   final int? tabCount;
 
@@ -180,6 +184,16 @@ class UserHomeResult {
   /// 捕获到的作品数量
   int get count => workUrls.length;
 
+  /// 已成功关联封面的作品总数
+  int get coversCount => workCovers.length;
+
+  /// 获取指定作品的封面直链
+  String? getCover(String workUrl) => workCovers[workUrl];
+
+  /// 按作品列表顺序输出对应的封面图列表（未捕获的为空字符串）
+  List<String> get coverList =>
+      workUrls.map((u) => workCovers[u] ?? '').toList();
+
   Map<String, dynamic> toMap() => {
         'secUid': secUid,
         'nickname': nickname,
@@ -187,5 +201,7 @@ class UserHomeResult {
         'tabCount': tabCount,
         'worksTotalTag': worksTotalTag,
         'workUrls': workUrls,
+        'workCovers': workCovers,
+        'coversCount': coversCount,
       };
 }

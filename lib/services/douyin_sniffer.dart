@@ -680,10 +680,22 @@ class DouyinSniffer {
           }
         }
         final tabCount = int.tryParse(data['tabCount']?.toString() ?? '');
+        final rawCovers = data['workCovers'];
+        final workCovers = <String, String>{};
+        if (rawCovers is Map) {
+          for (final entry in rawCovers.entries) {
+            final k = entry.key?.toString();
+            final v = entry.value?.toString();
+            if (k != null && k.isNotEmpty && v != null && v.isNotEmpty) {
+              workCovers[k] = v;
+            }
+          }
+        }
         final homeResult = UserHomeResult(
           secUid: secUid,
           nickname: nickname,
           workUrls: workUrls,
+          workCovers: workCovers,
           tabCount: tabCount,
         );
         _finishHomeWithResult(homeResult, _taskId);
@@ -924,7 +936,7 @@ class DouyinSniffer {
     _stopTimers();
 
     final author = result.nickname.isNotEmpty ? result.nickname : '未知作者';
-    _log('主页捕获成功：作者【$author】，共 ${result.count} 条作品');
+    _log('主页捕获成功：作者【$author】，共 ${result.count} 条作品（已关联封面: ${result.coversCount} 条）');
     completer.complete(result);
     if (identical(_homeCompleter, completer)) _homeCompleter = null;
 

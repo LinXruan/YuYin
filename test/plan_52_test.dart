@@ -35,7 +35,10 @@ void main() {
     });
 
     test('验证 164 样本中 3 个主页 URL 的合法性与 sec_uid 提取', () {
-      File sampleFile = File('sources/164_抖音主页链接/主页链接.txt');
+      File sampleFile = File('sources/164/主页链接.txt');
+      if (!sampleFile.existsSync()) {
+        sampleFile = File('sources/164_抖音主页链接/主页链接.txt');
+      }
       if (!sampleFile.existsSync()) {
         sampleFile = File('sources/164_抖音主页链接/151个作品的主页链接.txt');
       }

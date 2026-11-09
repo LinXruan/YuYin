@@ -87,7 +87,10 @@ void main() {
     });
 
     test('读取 sources/163_抖音主页链接 样本文件验证 15 条作品格式', () {
-      final sampleFile = File('sources/163_抖音主页链接/主页以及其作品链接');
+      File sampleFile = File('sources/163/主页以及其作品链接');
+      if (!sampleFile.existsSync()) {
+        sampleFile = File('sources/163_抖音主页链接/主页以及其作品链接');
+      }
       expect(sampleFile.existsSync(), isTrue);
 
       final lines = sampleFile
