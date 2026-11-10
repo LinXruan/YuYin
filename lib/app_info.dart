@@ -1,6 +1,6 @@
 /// 应用发布信息统一维护处
 const String appName = '余音';
-const String appVersion = '1.5.5+169';
+const String appVersion = '1.5.5+170';
 const String appRepoUrl = 'https://github.com/LinXruan/YuYin';
 const String appAuthor = 'LinXruan';
 const String appFeedbackGroup = '1132880576';

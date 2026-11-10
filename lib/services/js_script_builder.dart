@@ -989,7 +989,12 @@ const String kDouyinSniffJs = r'''
 
       var src = targetImg.currentSrc || targetImg.src || targetImg.getAttribute('data-src') || '';
       if (src && !S.authorAvatar) {
-        S.authorAvatar = clean(src);
+        var mUri = src.match(/(tos-cn-[a-zA-Z0-9_-]+)/);
+        if (mUri && mUri[1]) {
+          S.authorAvatar = 'https://p3-pc.douyinpic.com/aweme/1080x1080/aweme-avatar/' + mUri[1] + '.jpeg?from=2956013662';
+        } else {
+          S.authorAvatar = clean(src);
+        }
       }
       var altName = (targetImg.alt || '').replace(/头像\s*$/, '').trim();
       if (altName && !S.authorNickname && altName !== '用户' && altName !== '默认') {
@@ -1127,8 +1132,8 @@ const String kDouyinSniffJs = r'''
   function tryExtractNow() {
     checkLoginState();
     if (isUserPage()) {
-      if (S.homeSent) return;
       scanUserProfileDom();
+      if (S.homeSent) return;
       scanUserHome();
       return;
     }

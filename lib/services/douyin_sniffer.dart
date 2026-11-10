@@ -9,6 +9,10 @@ import '../utils/login_state_store.dart';
 import '../utils/url_parser.dart';
 import 'douyin_share_api.dart';
 import 'js_script_builder.dart';
+import 'single_work/i_single_work_extractor.dart';
+import 'single_work/single_work_extractor.dart';
+import 'user_home/i_user_home_extractor.dart';
+import 'user_home/user_home_extractor.dart';
 
 /// 隐藏式 WebView 捕获服务：抓取无水印视频/图文/实况图直链
 ///
@@ -17,7 +21,18 @@ import 'js_script_builder.dart';
 /// - B：Dio 请求 iesdouyin 分享页（[_runShareFallback]）；
 /// - C：切换 iPhone UA 的 WebView 分享页（[_startWebViewShareFallback]）。
 /// A 的 30 秒主超时是所有兜底的总预算，C 必须在超时前结束。
-class DouyinSniffer {
+class DouyinSniffer
+    implements
+        ISingleWorkExtractor,
+        IUserHomeExtractor,
+        ISingleWorkSnifferDelegate,
+        IUserHomeSnifferDelegate {
+  /// 单作品解析领域提取器
+  late final ISingleWorkExtractor singleWork = SingleWorkExtractor(this);
+
+  /// 主页批量抓取领域提取器
+  late final IUserHomeExtractor userHome = UserHomeExtractor(this);
+
   /// 抖音 PC 网页版使用的桌面 Chrome UA
   static const String desktopUserAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
@@ -168,6 +183,7 @@ class DouyinSniffer {
   String? get awemePageUrl => _awemePageUrl;
 
   /// 加载分享链接并等待 JS 回传，最长等待 30 秒
+  @override
   Future<SniffResult> sniffVideoUrl(String shareUrl) async {
     // 先取消旧任务（此时 _taskId 仍是旧值）
     _finishWithError(StateError('已有新的解析任务开始，旧任务已取消'));
@@ -284,6 +300,7 @@ class DouyinSniffer {
 
     try {
       await _controller.loadRequest(uri);
+      unawaited(_injectScript());
     } catch (e) {
       _finishWithError(e, taskId: taskId);
     }
@@ -1056,6 +1073,7 @@ class DouyinSniffer {
   }
 
   /// 加载主页链接并捕获作品列表，最长等待 30 秒
+  @override
   Future<UserHomeResult> sniffUserHomeUrl(String homeUrl) async {
     _finishWithError(StateError('已有新的解析任务开始，旧任务已取消'));
     _finishHomeWithError(StateError('已有新的解析任务开始，旧任务已取消'));
@@ -1158,6 +1176,7 @@ class DouyinSniffer {
 
     try {
       await _controller.loadRequest(uri);
+      unawaited(_injectScript());
     } catch (e) {
       if (taskId == _taskId) {
         _finishHomeWithError(e, taskId: taskId);
@@ -1168,6 +1187,7 @@ class DouyinSniffer {
   }
 
   /// 加载主页链接并捕获作者头像与昵称，最长等待 15 秒（无需等待作品翻页滚动）
+  @override
   Future<UserHomeProfile> sniffUserProfile(String homeUrl) async {
     _finishWithError(StateError('已有新的解析任务开始，旧任务已取消'));
     _finishHomeWithError(StateError('已有新的解析任务开始，旧任务已取消'));
@@ -1270,6 +1290,7 @@ class DouyinSniffer {
 
     try {
       await _controller.loadRequest(uri);
+      unawaited(_injectScript());
     } catch (e) {
       if (taskId == _taskId) {
         _finishProfileWithError(e, taskId: taskId);
@@ -1293,9 +1314,11 @@ class DouyinSniffer {
   }
 
   Future<void> _injectScript() async {
-    if (_disposed) return;
+    if (_disposed || !_isTaskActive) return;
     try {
       await _controller.runJavaScript(kDouyinSniffJs);
+      _acceptMessages = true;
+      _acceptLogs = true;
     } catch (e) {
       if (!_loggedInjectFailure) {
         _loggedInjectFailure = true;
@@ -1305,6 +1328,7 @@ class DouyinSniffer {
   }
 
   /// 用户取消下载/选择后，立即停止后台捕获与网页加载
+  @override
   void cancelActiveTask() {
     _taskId++;
     _acceptMessages = false;
@@ -1344,4 +1368,38 @@ class DouyinSniffer {
     _finishHomeWithError(StateError('捕获服务已释放'));
     _finishProfileWithError(StateError('捕获服务已释放'));
   }
+
+  // =======================================================
+  // ISingleWorkExtractor & IUserHomeExtractor 契约实现
+  // ==========================================
+  @override
+  String? extractShareUrl(String text) {
+    final url = UrlParser.extractDouyinUrl(text);
+    if (url != null && !UrlParser.isUserHomeUrl(url)) return url;
+    return null;
+  }
+
+  @override
+  Future<SingleWorkResult> extract(String shareUrl) => sniffVideoUrl(shareUrl);
+
+  @override
+  String? extractHomeUrl(String text) {
+    final url = UrlParser.extractDouyinUrl(text);
+    if (url != null && UrlParser.isUserHomeUrl(url)) return url;
+    return null;
+  }
+
+  @override
+  Future<UserHomeProfile> extractProfile(String homeUrl) =>
+      sniffUserProfile(homeUrl);
+
+  @override
+  Future<UserHomeResult> extractAllWorks(
+    String homeUrl, {
+    void Function(int current, int total)? onProgress,
+  }) =>
+      sniffUserHomeUrl(homeUrl);
+
+  @override
+  void cancel() => cancelActiveTask();
 }
