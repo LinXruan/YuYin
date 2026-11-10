@@ -318,6 +318,33 @@ switch ($Action.ToLower()) {
         $resp.details | Format-Table -Property index, matched, hasTitle, expectedTitle, titleSummary, url -AutoSize
     }
 
+    "parse-profile" {
+        if (-not $Arg1) {
+            throw "请提供主页链接，例如: .\tool\agent_cmd.bat parse-profile 'https://www.douyin.com/user/...'"
+        }
+        $body = @{ text = $Arg1 } | ConvertTo-Json
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/parse-profile" -Method Post -Body $body -ContentType "application/json; charset=utf-8"
+        Write-Host "=== 主页作者基础信息抓取结果 ==="
+        Write-Host "作者昵称: $($resp.profile.nickname)"
+        Write-Host "作者secUid: $($resp.profile.secUid)"
+        Write-Host "头像直链: $($resp.profile.avatarUrl)"
+    }
+
+    "verify-profile" {
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/verify/home-profile" -Method Post
+        Write-Host "=== 主页作者头像与昵称校验比对报告 (PLAN_56) ==="
+        Write-Host "匹配判定: $(if ($resp.matched) { '[成功] 完全匹配' } else { '[注意] 未完全匹配' })"
+        Write-Host "捕获作者昵称: $($resp.nickname)"
+        Write-Host "基准期望昵称: $($resp.expectedNickname)"
+        Write-Host "昵称是否吻合: $($resp.nicknameMatched)"
+        Write-Host "头像是否有效: $($resp.hasAvatar)"
+        Write-Host "头像URI是否吻合: $($resp.avatarUriMatched)"
+        Write-Host "头像直链地址: $($resp.avatarUrl)"
+        if ($resp.avatarFile) {
+            Write-Host "对照样本本地文件: $($resp.avatarFile)"
+        }
+    }
+
 
 
     "mock-login" {
@@ -366,7 +393,7 @@ switch ($Action.ToLower()) {
 
         Write-Host "未知指令: $Action"
 
-        Write-Host "支持的指令: setup, status, display, quality [on|off], mock-login [on|off], parse, download, logs, clear-logs, history [query], clear-history, thumbnails, clear-thumbnails, preload-thumbnails, verify-covers, verify-titles, cancel, eval"
+        Write-Host "支持的指令: setup, status, display, quality [on|off], mock-login [on|off], parse, parse-profile, download, logs, clear-logs, history [query], clear-history, thumbnails, clear-thumbnails, preload-thumbnails, verify-covers, verify-titles, verify-profile, cancel, eval"
 
     }
 

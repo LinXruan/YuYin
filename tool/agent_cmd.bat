@@ -19,6 +19,8 @@ rem   agent_cmd.bat clear-thumbnails
 rem   agent_cmd.bat preload-thumbnails
 rem   agent_cmd.bat verify-covers
 rem   agent_cmd.bat verify-titles
+rem   agent_cmd.bat parse-profile "<url>"
+rem   agent_cmd.bat verify-profile
 rem   agent_cmd.bat cancel
 rem ========================================================
 

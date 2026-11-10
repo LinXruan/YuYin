@@ -120,10 +120,10 @@ const String kDouyinSniffJs = r'''
         location.href.indexOf('/slides/') !== -1;
     } catch (e) { return false; }
   }
-  // 只扫描这些作品接口，避免评论/推荐/搜索响应里的图片字段抢跑
+  // 只扫描这些作品与资料接口，避免评论/推荐/搜索响应里的图片字段抢跑
   function isAwemeApiUrl(url) {
     if (!url || typeof url !== 'string') return false;
-    return /\/aweme\/v1\/web\/(?:aweme|item)\/(?:detail|post|favorite|like|article|related)(\/|\?|$)/.test(url);
+    return /\/aweme\/v1\/web\/(?:aweme|item|user)\/(?:detail|post|favorite|like|article|related|profile)(\/|\?|$)/.test(url);
   }
   // 从详情接口 URL 的 aweme_id 或 item_id 参数取目标 ID
   function awemeIdFromUrl(url) {
@@ -371,6 +371,27 @@ const String kDouyinSniffJs = r'''
     }
     return text.replace(/[\r\n\t]+/g, ' ').trim();
   }
+  // 提取作者头像直链（优先高清原图 1080x1080 / larger / 300x300）
+  function pickAuthorAvatar(author) {
+    if (!author || typeof author !== 'object') return '';
+    var keys = ['avatar_larger', 'avatar_1080x1080', 'avatar_300x300', 'avatar_medium', 'avatar_thumb', 'avatar_168x168'];
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      var f = author[k];
+      if (f && Array.isArray(f.url_list) && f.url_list.length > 0) {
+        for (var j = 0; j < f.url_list.length; j++) {
+          var u = f.url_list[j];
+          if (u && typeof u === 'string' && u.indexOf('http') === 0) return clean(u);
+        }
+      }
+    }
+    if (author.avatar_uri && typeof author.avatar_uri === 'string' && author.avatar_uri.length > 5) {
+      return clean('https://p3-pc.douyinpic.com/aweme/1080x1080/' + author.avatar_uri + '.jpeg?from=2956013662');
+    }
+    if (typeof author.avatarUrl === 'string' && author.avatarUrl) return clean(author.avatarUrl);
+    if (typeof author.avatar_url === 'string' && author.avatar_url) return clean(author.avatar_url);
+    return '';
+  }
   function sendItems(items, isImagePost, customDesc, customCover) {
     if (S.sent || !items || !items.length) return false;
     var unique = [], seen = {};
@@ -495,6 +516,8 @@ const String kDouyinSniffJs = r'''
                       if (isUserPage()) {
                         if (String(url).indexOf('/aweme/v1/web/aweme/post/') !== -1) {
                           tryExtractFromAwemePostJson(json);
+                        } else if (String(url).indexOf('/aweme/v1/web/user/profile/') !== -1 || String(url).indexOf('/user/profile/other/') !== -1) {
+                          tryExtractFromUserProfileJson(json);
                         }
                       } else {
                         scanTree(json, awemeIdFromUrl(url));
@@ -536,6 +559,8 @@ const String kDouyinSniffJs = r'''
                     if (isUserPage()) {
                       if (strUrl.indexOf('/aweme/v1/web/aweme/post/') !== -1) {
                         tryExtractFromAwemePostJson(json);
+                      } else if (strUrl.indexOf('/aweme/v1/web/user/profile/') !== -1 || strUrl.indexOf('/user/profile/other/') !== -1) {
+                        tryExtractFromUserProfileJson(json);
                       }
                     } else {
                       scanTree(json, awemeIdFromUrl(strUrl));
@@ -745,7 +770,7 @@ const String kDouyinSniffJs = r'''
     return 0;
   }
   // 将新作品链接、封面及标题追加到全局去重池中，并按每 10 条汇报进度
-  function appendHomeWorks(urls, authorName, coversMap, titlesMap) {
+  function appendHomeWorks(urls, authorName, coversMap, titlesMap, authorAvatar) {
     if (!Array.isArray(urls) || !urls.length) return 0;
     var newAdded = 0;
     S.homeWorkCovers = S.homeWorkCovers || {};
@@ -767,6 +792,10 @@ const String kDouyinSniffJs = r'''
     if (authorName && !S.authorNickname) {
       S.authorNickname = authorName;
     }
+    if (authorAvatar && !S.authorAvatar) {
+      S.authorAvatar = authorAvatar;
+    }
+    maybeReportUserProfile();
     if (newAdded > 0) {
       S.homeIdleScrolls = 0;
       reportHomeProgress();
@@ -817,18 +846,25 @@ const String kDouyinSniffJs = r'''
         var h1 = document.querySelector('h1');
         if (h1) nickname = (h1.innerText || h1.textContent || '').trim();
       }
+      var avatarUrl = S.authorAvatar || '';
+      if (!avatarUrl) {
+        scanUserProfileDom();
+        avatarUrl = S.authorAvatar || '';
+      }
       var secUid = '';
       var m = location.pathname.match(/\/user\/([^\/?#]+)/);
       if (m && m[1]) secUid = m[1];
 
       var coversCount = S.homeWorkCovers ? Object.keys(S.homeWorkCovers).length : 0;
       var titlesCount = S.homeWorkTitles ? Object.keys(S.homeWorkTitles).length : 0;
+      maybeReportUserProfile(true);
       log('主页作品捕获完成: 共 ' + current + ' 条作品 (已关联封面: ' + coversCount + ' 条, 已关联标题: ' + titlesCount + ' 条, ' + finishReason + ')');
       if (window.DouyinChannel && window.DouyinChannel.postMessage) {
         window.DouyinChannel.postMessage(JSON.stringify({
           type: 'user_home_result',
           secUid: secUid,
           nickname: nickname,
+          avatarUrl: avatarUrl,
           workUrls: S.homeWorks,
           workCovers: S.homeWorkCovers || {},
           coversCount: coversCount,
@@ -919,6 +955,101 @@ const String kDouyinSniffJs = r'''
 
     tryFinishHomeCollection();
   }
+  // 从用户信息接口（如 /aweme/v1/web/user/profile/other/）中提取昵称与头像
+  function tryExtractFromUserProfileJson(json) {
+    if (!json || !isUserPage()) return;
+    var user = json.user || json.user_info || json.userInfo;
+    if (!user) return;
+    var name = (user.nickname || user.nick_name || '').trim();
+    if (name && !S.authorNickname) {
+      S.authorNickname = name;
+    }
+    var avatar = pickAuthorAvatar(user);
+    if (avatar && !S.authorAvatar) {
+      S.authorAvatar = avatar;
+    }
+    scanUserProfileDom();
+    maybeReportUserProfile();
+  }
+  // 从 DOM 中提取主页作者昵称与头像
+  function scanUserProfileDom() {
+    if (!isUserPage()) return;
+    // 1. 优先扫描排除导航栏后的头像 img 标签（Douyin 规范：alt="<昵称>头像"）
+    var avatarImgs = Array.from(document.querySelectorAll('img')).filter(function (img) {
+      var alt = img.alt || '';
+      var src = img.currentSrc || img.src || img.getAttribute('data-src') || '';
+      return (alt.indexOf('头像') !== -1 || src.indexOf('aweme-avatar') !== -1) &&
+             !img.closest('header, nav, [data-e2e*="nav"], .douyin-header');
+    });
+
+    if (avatarImgs.length > 0) {
+      var targetImg = avatarImgs.find(function (img) {
+        return (img.alt || '').indexOf('头像') !== -1;
+      }) || avatarImgs[0];
+
+      var src = targetImg.currentSrc || targetImg.src || targetImg.getAttribute('data-src') || '';
+      if (src && !S.authorAvatar) {
+        S.authorAvatar = clean(src);
+      }
+      var altName = (targetImg.alt || '').replace(/头像\s*$/, '').trim();
+      if (altName && !S.authorNickname && altName !== '用户' && altName !== '默认') {
+        S.authorNickname = altName;
+      }
+    }
+
+    // 2. 昵称兜底：扫描 h1 元素
+    if (!S.authorNickname) {
+      var h1 = document.querySelector('h1');
+      if (h1) {
+        var t = (h1.innerText || h1.textContent || '').trim();
+        if (t && t !== '验证码' && t !== '登录') S.authorNickname = t;
+      }
+      if (!S.authorNickname) {
+        var nameEl = document.querySelector('[data-e2e="user-info"] h1, [data-e2e="user-title"], [data-e2e="user-nickname"], .user-info h1');
+        if (nameEl) {
+          var nt = (nameEl.innerText || nameEl.textContent || '').trim();
+          if (nt) S.authorNickname = nt;
+        }
+      }
+    }
+
+    // 3. 头像兜底：扫描 user-detail / user-info 容器内的 img
+    if (!S.authorAvatar) {
+      var userDetail = document.querySelector('[data-e2e="user-detail"]') || document.querySelector('[data-e2e="user-info"]');
+      if (userDetail) {
+        var imgs = Array.from(userDetail.querySelectorAll('img'));
+        for (var i = 0; i < imgs.length; i++) {
+          var img2 = imgs[i];
+          var s2 = img2.currentSrc || img2.src || img2.getAttribute('data-src') || '';
+          if (s2 && s2.indexOf('aweme-avatar') !== -1) {
+            S.authorAvatar = clean(s2);
+            break;
+          }
+        }
+      }
+    }
+
+    maybeReportUserProfile();
+  }
+  // 当获取到作者昵称且有头像（或有效信息）时，上报主页作者资料事件
+  function maybeReportUserProfile(force) {
+    if (!isUserPage() || S.profileSent) return;
+    if ((S.authorNickname && S.authorAvatar) || (force && (S.authorNickname || S.authorAvatar))) {
+      S.profileSent = true;
+      var secUid = '';
+      var m = location.pathname.match(/\/user\/([^\/?#]+)/);
+      if (m && m[1]) secUid = m[1];
+      if (window.DouyinChannel && window.DouyinChannel.postMessage) {
+        log('上报主页作者信息: 【' + S.authorNickname + '】(avatar=' + (S.authorAvatar ? 'yes' : 'no') + ')');
+        window.DouyinChannel.postMessage(JSON.stringify({
+          type: 'user_profile_result',
+          secUid: secUid,
+          nickname: S.authorNickname || '',
+          avatarUrl: S.authorAvatar || ''
+        }));
+      }
+    }
+  }
   // 从 /aweme/v1/web/aweme/post/ 接口响应增量累加主页作品、封面及标题
   function tryExtractFromAwemePostJson(json) {
     if (S.homeFinished || !json || !isUserPage()) return;
@@ -949,10 +1080,16 @@ const String kDouyinSniffJs = r'''
         }
       }
       var nickname = '';
+      var avatar = '';
       try {
-        if (list[0] && list[0].author) nickname = (list[0].author.nickname || '').trim();
+        if (list[0] && list[0].author) {
+          nickname = (list[0].author.nickname || '').trim();
+          avatar = pickAuthorAvatar(list[0].author);
+        }
       } catch (e) {}
-      appendHomeWorks(validUrls, nickname, coversMap, titlesMap);
+      if (nickname && !S.authorNickname) S.authorNickname = nickname;
+      if (avatar && !S.authorAvatar) S.authorAvatar = avatar;
+      appendHomeWorks(validUrls, nickname, coversMap, titlesMap, avatar);
     }
 
     var tabCount = extractWorksTabCount();
@@ -970,9 +1107,10 @@ const String kDouyinSniffJs = r'''
   // 扫描主页作品链接列表（DOM 层即时解析与滚动驱动）
   function scanUserHome() {
     if (S.homeFinished || !isUserPage()) return;
+    scanUserProfileDom();
     var domResult = scanDomPostLinks();
     if (domResult && domResult.urls && domResult.urls.length > 0) {
-      appendHomeWorks(domResult.urls, '', domResult.covers, domResult.titles);
+      appendHomeWorks(domResult.urls, '', domResult.covers, domResult.titles, '');
     }
 
     var tabCount = extractWorksTabCount();
@@ -990,6 +1128,7 @@ const String kDouyinSniffJs = r'''
     checkLoginState();
     if (isUserPage()) {
       if (S.homeSent) return;
+      scanUserProfileDom();
       scanUserHome();
       return;
     }
@@ -1006,6 +1145,7 @@ const String kDouyinSniffJs = r'''
     S.homeWorks = []; S.homeWorkSet = {}; S.homeWorkCovers = {}; S.homeWorkTitles = {}; S.homeLoggedCount = 0;
     if (S.homeScrollInterval) { clearInterval(S.homeScrollInterval); S.homeScrollInterval = null; }
     S.homeHasMore = null; S.homeIdleScrolls = 0; S.homeLastCount = 0; S.homeFinished = false; S.authorNickname = '';
+    S.authorAvatar = ''; S.profileSent = false;
     S.videoHintSent = false; S.degraded = false; S.scannedPaceIdx = 0;
     S.loginReported = null; S.authProbed = false;
     if (window.__dyHomeObserver) {

@@ -41,6 +41,7 @@ class DouyinSniffer {
   late final WebViewController _controller;
   Completer<SniffResult>? _completer;
   Completer<UserHomeResult>? _homeCompleter;
+  Completer<UserHomeProfile>? _profileCompleter;
   Timer? _timeoutTimer;
   Timer? _injectTimer;
 
@@ -85,6 +86,8 @@ class DouyinSniffer {
     if (completer != null && !completer.isCompleted) return true;
     final homeCompleter = _homeCompleter;
     if (homeCompleter != null && !homeCompleter.isCompleted) return true;
+    final profileCompleter = _profileCompleter;
+    if (profileCompleter != null && !profileCompleter.isCompleted) return true;
     return false;
   }
 
@@ -168,6 +171,8 @@ class DouyinSniffer {
   Future<SniffResult> sniffVideoUrl(String shareUrl) async {
     // 先取消旧任务（此时 _taskId 仍是旧值）
     _finishWithError(StateError('已有新的解析任务开始，旧任务已取消'));
+    _finishHomeWithError(StateError('已有新的解析任务开始，旧任务已取消'));
+    _finishProfileWithError(StateError('已有新的解析任务开始，旧任务已取消'));
 
     final taskId = ++_taskId;
     final completer = Completer<SniffResult>();
@@ -669,9 +674,23 @@ class DouyinSniffer {
         }
         return;
       }
+      if (data['type'] == 'user_profile_result') {
+        final secUid = data['secUid']?.toString() ?? '';
+        final nickname = data['nickname']?.toString() ?? '';
+        final avatarUrl = data['avatarUrl']?.toString() ?? '';
+        if (nickname.isEmpty || avatarUrl.isEmpty) return;
+        final profile = UserHomeProfile(
+          secUid: secUid,
+          nickname: nickname,
+          avatarUrl: avatarUrl,
+        );
+        _finishProfileWithResult(profile, _taskId);
+        return;
+      }
       if (data['type'] == 'user_home_result') {
         final secUid = data['secUid']?.toString() ?? '';
         final nickname = data['nickname']?.toString() ?? '';
+        final avatarUrl = data['avatarUrl']?.toString() ?? '';
         final rawUrls = data['workUrls'];
         final workUrls = <String>[];
         if (rawUrls is List) {
@@ -705,11 +724,15 @@ class DouyinSniffer {
         final homeResult = UserHomeResult(
           secUid: secUid,
           nickname: nickname,
+          avatarUrl: avatarUrl,
           workUrls: workUrls,
           workCovers: workCovers,
           workTitles: workTitles,
           tabCount: tabCount,
         );
+        if (_profileCompleter != null && !_profileCompleter!.isCompleted) {
+          _finishProfileWithResult(homeResult.profile, _taskId);
+        }
         _finishHomeWithResult(homeResult, _taskId);
         return;
       }
@@ -940,6 +963,9 @@ class DouyinSniffer {
   /// 主页作品捕获成功完成当前任务
   void _finishHomeWithResult(UserHomeResult result, int taskId) {
     if (taskId != _taskId) return;
+    if (_profileCompleter != null && !_profileCompleter!.isCompleted) {
+      _finishProfileWithResult(result.profile, taskId);
+    }
     final completer = _homeCompleter;
     if (completer == null || completer.isCompleted) return;
 
@@ -948,10 +974,17 @@ class DouyinSniffer {
     _stopTimers();
 
     final author = result.nickname.isNotEmpty ? result.nickname : '未知作者';
+    final avatarText = result.avatarUrl.isNotEmpty ? '已关联头像, ' : '';
     final coverText = result.coversCount > 0 ? '已关联封面: ${result.coversCount} 条, ' : '';
     final titleText = result.titlesCount > 0 ? '已关联标题: ${result.titlesCount} 条' : '';
-    final metaText = (coverText.isNotEmpty || titleText.isNotEmpty) ? '（$coverText$titleText）' : '';
+    final metaText = (avatarText.isNotEmpty || coverText.isNotEmpty || titleText.isNotEmpty)
+        ? '（$avatarText$coverText$titleText）'
+        : '';
     _log('主页捕获成功：作者【$author】，共 ${result.count} 条作品$metaText');
+    if (_profileCompleter != null && !_profileCompleter!.isCompleted) {
+      _profileCompleter!.complete(result.profile);
+      _profileCompleter = null;
+    }
     completer.complete(result);
     if (identical(_homeCompleter, completer)) _homeCompleter = null;
 
@@ -960,6 +993,41 @@ class DouyinSniffer {
         debugPrint('卸载网页释放内存失败: $error');
       }),
     );
+  }
+
+  /// 主页作者资料捕获成功完成当前任务
+  void _finishProfileWithResult(UserHomeProfile profile, int taskId) {
+    if (taskId != _taskId) return;
+    final completer = _profileCompleter;
+    if (completer == null || completer.isCompleted) return;
+
+    _acceptMessages = false;
+    _acceptLogs = false;
+    _stopTimers();
+
+    final author = profile.nickname.isNotEmpty ? profile.nickname : '未知作者';
+    final hasAvatar = profile.avatarUrl.isNotEmpty;
+    _log('主页作者信息捕获成功：作者【$author】（${hasAvatar ? "已获取头像" : "未获取头像"}）');
+    completer.complete(profile);
+    if (identical(_profileCompleter, completer)) _profileCompleter = null;
+
+    unawaited(
+      _controller.loadRequest(Uri.parse('about:blank')).catchError((Object error) {
+        debugPrint('卸载网页释放内存失败: $error');
+      }),
+    );
+  }
+
+  /// 超时、取消或异常时结束当前主页作者资料任务
+  void _finishProfileWithError(Object error, {int? taskId}) {
+    if (taskId != null && taskId != _taskId) return;
+    _acceptMessages = false;
+    _acceptLogs = false;
+    final completer = _profileCompleter;
+    _profileCompleter = null;
+    _stopTimers();
+    if (completer == null || completer.isCompleted) return;
+    completer.completeError(error);
   }
 
   /// 超时、取消或异常时结束当前主页任务
@@ -991,6 +1059,7 @@ class DouyinSniffer {
   Future<UserHomeResult> sniffUserHomeUrl(String homeUrl) async {
     _finishWithError(StateError('已有新的解析任务开始，旧任务已取消'));
     _finishHomeWithError(StateError('已有新的解析任务开始，旧任务已取消'));
+    _finishProfileWithError(StateError('已有新的解析任务开始，旧任务已取消'));
 
     final taskId = ++_taskId;
     final completer = Completer<UserHomeResult>();
@@ -1098,6 +1167,118 @@ class DouyinSniffer {
     return completer.future;
   }
 
+  /// 加载主页链接并捕获作者头像与昵称，最长等待 15 秒（无需等待作品翻页滚动）
+  Future<UserHomeProfile> sniffUserProfile(String homeUrl) async {
+    _finishWithError(StateError('已有新的解析任务开始，旧任务已取消'));
+    _finishHomeWithError(StateError('已有新的解析任务开始，旧任务已取消'));
+    _finishProfileWithError(StateError('已有新的解析任务开始，旧任务已取消'));
+
+    final taskId = ++_taskId;
+    final completer = Completer<UserHomeProfile>();
+    _profileCompleter = completer;
+    _acceptMessages = false;
+    _acceptLogs = false;
+    _lastPageUrl = null;
+    _targetAwemeId = null;
+    _shareFallbackStarted = false;
+    _shareVideoFallback = null;
+    _pendingImageResult = null;
+    _imageGraceTimer?.cancel();
+    _imageGraceTimer = null;
+    _webviewShareFallback = false;
+    _workPageKind = DouyinWorkPage.userHome;
+    _degradedVideoSeen = false;
+    _shareFallbackFailed = false;
+    _sourceUrl = homeUrl;
+    _awemePageUrl = null;
+    _taskStartedAt = DateTime.now();
+    _blockedSchemes.clear();
+    _lastWebResourceError = null;
+    _loggedNonWebPage = false;
+    _loggedInjectFailure = false;
+    _loggedCaptchaFailure = false;
+    _lateFallbackTimer?.cancel();
+    _lateFallbackTimer = null;
+
+    if (isLoggedIn != null) {
+      _isLoggedIn = isLoggedIn!();
+    } else {
+      try {
+        final isSaved = await LoginStateStore.isLoggedIn();
+        _isLoggedIn =
+            isSaved && await LoginStateStore.checkWebViewCookieSession();
+      } catch (_) {
+        _isLoggedIn = false;
+      }
+    }
+
+    if (!_isLoggedIn) {
+      _log('请登录再进行主页链接解析');
+      final err = StateError('请登录再进行主页链接解析');
+      completer.completeError(err);
+      return completer.future;
+    }
+
+    _log('开始捕获主页作者信息: $homeUrl');
+
+    _timeoutTimer?.cancel();
+    _timeoutTimer = Timer(const Duration(seconds: 15), () {
+      if (taskId != _taskId) return;
+      _finishProfileWithError(
+        TimeoutException('未捕获到主页作者信息，请检查网络或主页链接有效性'),
+        taskId: taskId,
+      );
+    });
+
+    _injectTimer?.cancel();
+    _injectTimer = Timer.periodic(_kInjectInterval, (_) {
+      if (taskId != _taskId) {
+        _stopTimers();
+        return;
+      }
+      if (_profileCompleter?.isCompleted ?? true) {
+        _stopTimers();
+      } else {
+        _injectScript();
+      }
+    });
+
+    final uri = Uri.tryParse(homeUrl);
+    if (uri == null) {
+      _finishProfileWithError(
+        FormatException('无效的主页链接: $homeUrl'),
+        taskId: taskId,
+      );
+      return completer.future;
+    }
+
+    try {
+      await _controller.setUserAgent(desktopUserAgent);
+    } catch (e) {
+      _log('设置桌面 UA 失败: $e');
+    }
+
+    if (taskId != _taskId) return completer.future;
+
+    try {
+      await _controller.runJavaScript(
+        'window.__douyinSnifferReset && window.__douyinSnifferReset();',
+      );
+    } catch (_) {}
+
+    if (taskId != _taskId) return completer.future;
+
+    try {
+      await _controller.loadRequest(uri);
+    } catch (e) {
+      if (taskId == _taskId) {
+        _finishProfileWithError(e, taskId: taskId);
+      }
+    }
+
+    return completer.future;
+  }
+
   /// 超时、取消或异常时结束当前任务
   void _finishWithError(Object error, {int? taskId}) {
     // 过期任务不能停掉新任务的定时器或分享页请求
@@ -1139,6 +1320,11 @@ class DouyinSniffer {
     if (homeCompleter != null && !homeCompleter.isCompleted) {
       homeCompleter.completeError(StateError('用户已取消解析'));
     }
+    final profileCompleter = _profileCompleter;
+    _profileCompleter = null;
+    if (profileCompleter != null && !profileCompleter.isCompleted) {
+      profileCompleter.completeError(StateError('用户已取消解析'));
+    }
     _stopTimers();
 
     // webview_flutter 没有 stopLoading，用 about:blank 终止当前页面加载
@@ -1156,5 +1342,6 @@ class DouyinSniffer {
     _acceptLogs = false;
     _finishWithError(StateError('捕获服务已释放'));
     _finishHomeWithError(StateError('捕获服务已释放'));
+    _finishProfileWithError(StateError('捕获服务已释放'));
   }
 }

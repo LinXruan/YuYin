@@ -41,6 +41,7 @@ class AgentAutomationServer {
   HttpServer? _server;
   SniffResult? _lastResult;
   UserHomeResult? _lastUserHomeResult;
+  UserHomeProfile? _lastUserHomeProfile;
   String? _lastRawInput;
   String? _lastParsedUrl;
   CancelToken? _activeDownloadToken;
@@ -49,6 +50,13 @@ class AgentAutomationServer {
   @visibleForTesting
   void setLastUserHomeResultForTesting(UserHomeResult result) {
     _lastUserHomeResult = result;
+    _lastUserHomeProfile = result.profile;
+  }
+
+  /// 供单元测试注入模拟的主页作者基础信息
+  @visibleForTesting
+  void setLastUserHomeProfileForTesting(UserHomeProfile profile) {
+    _lastUserHomeProfile = profile;
   }
 
   /// 启动本地 HTTP 自动化服务
@@ -125,6 +133,10 @@ class AgentAutomationServer {
         await _handleVerifyHomeCovers(request);
       } else if (path == '/api/verify/home-titles' && request.method == 'POST') {
         await _handleVerifyHomeTitles(request);
+      } else if (path == '/api/parse-profile' && request.method == 'POST') {
+        await _handleParseProfile(request);
+      } else if (path == '/api/verify/home-profile' && request.method == 'POST') {
+        await _handleVerifyHomeProfile(request);
       } else {
         _sendJson(
           request,
@@ -175,6 +187,8 @@ class AgentAutomationServer {
           : {
               'secUid': _lastUserHomeResult!.secUid,
               'nickname': _lastUserHomeResult!.nickname,
+              'avatarUrl': _lastUserHomeResult!.avatarUrl,
+              'hasAvatar': _lastUserHomeResult!.avatarUrl.isNotEmpty,
               'count': _lastUserHomeResult!.count,
               'tabCount': _lastUserHomeResult!.tabCount,
               'worksTotalTag': _lastUserHomeResult!.worksTotalTag,
@@ -183,6 +197,8 @@ class AgentAutomationServer {
               'titlesCount': _lastUserHomeResult!.titlesCount,
               'hasTitles': _lastUserHomeResult!.workTitles.isNotEmpty,
             },
+      'lastUserHomeProfile': _lastUserHomeProfile?.toMap() ??
+          _lastUserHomeResult?.profile.toMap(),
       'logsCount': logs.logs.length,
       'downloadSettings': {
         'onlyHighestQualityPerResolution':
@@ -251,6 +267,7 @@ class AgentAutomationServer {
         }
         final homeResult = await currentSniffer.sniffUserHomeUrl(url);
         _lastUserHomeResult = homeResult;
+        _lastUserHomeProfile = homeResult.profile;
         _lastRawInput = text;
         _lastParsedUrl = url;
         final author =
@@ -871,6 +888,175 @@ class AgentAutomationServer {
       'titlesCount': homeResult.titlesCount,
       'matchedCount': matchedCount,
       'details': details,
+    });
+  }
+
+  /// POST /api/parse-profile：快速提取主页作者信息（昵称与头像，不等待作品滚动）
+  Future<void> _handleParseProfile(HttpRequest request) async {
+    final body = await _readJsonBody(request);
+    final text = body['text']?.toString() ?? '';
+    if (text.isEmpty) {
+      _sendJson(
+        request,
+        HttpStatus.badRequest,
+        {'error': '缺少 text 参数（分享文本或链接）', 'code': 400},
+      );
+      return;
+    }
+
+    final url = UrlParser.extractDouyinUrl(text) ?? text.trim();
+    if (url.isEmpty) {
+      _sendJson(
+        request,
+        HttpStatus.badRequest,
+        {'error': '未提取到有效 URL', 'code': 400},
+      );
+      return;
+    }
+
+    if (!UrlParser.isUserHomeUrl(url)) {
+      _sendJson(
+        request,
+        HttpStatus.badRequest,
+        {'error': '给定的链接不是抖音用户主页链接: $url', 'code': 400},
+      );
+      return;
+    }
+
+    if (!loggedIn.value) {
+      logs.reset('正在提取短链...');
+      logs.add('请登录再进行主页链接解析');
+      _sendJson(
+        request,
+        HttpStatus.forbidden,
+        {'error': '请登录再进行主页链接解析', 'code': 403, 'isUserHome': true},
+      );
+      return;
+    }
+
+    busy.value = true;
+    logs.reset('正在提取短链...');
+    logs.add('正在捕获主页作者信息（头像与昵称）...');
+    try {
+      final currentSniffer = sniffer;
+      if (currentSniffer == null) {
+        throw StateError('捕获服务未初始化');
+      }
+      final profile = await currentSniffer.sniffUserProfile(url);
+      _lastUserHomeProfile = profile;
+      _lastRawInput = text;
+      _lastParsedUrl = url;
+      final author = profile.nickname.isNotEmpty ? profile.nickname : '未知作者';
+      final hasAvatar = profile.avatarUrl.isNotEmpty;
+      logs.add('[主页] 成功捕获作者【$author】基础资料（${hasAvatar ? "已获取头像" : "未获取头像"}）');
+      _sendJson(request, HttpStatus.ok, {
+        'status': 'ok',
+        'type': 'user_profile',
+        'profile': profile.toMap(),
+        'logs': logs.logs,
+      });
+    } catch (e) {
+      logs.add('主页作者信息捕获失败: $e');
+      _sendJson(
+        request,
+        HttpStatus.internalServerError,
+        {'error': '$e', 'code': 500},
+      );
+    } finally {
+      busy.value = false;
+    }
+  }
+
+  /// 169 方案：主页作者头像与昵称基准对照表 (PLAN_56)
+  static const List<Map<String, String>> kReference169Profiles = [
+    {
+      'nickname': '宁采君',
+      'secUid': '8YYeky7_h9eHILUHN6UF3mUatKki7QS81NMfbzLHO04',
+      'url': 'https://www.douyin.com/user/MS4wLjABAAAA8YYeky7_h9eHILUHN6UF3mUatKki7QS81NMfbzLHO04?from_tab_name=main',
+      'avatarUri': 'tos-cn-i-0813_osIMyzAvEiznnjAA6W1AXBRCSIQHN0AfgASiCe',
+      'avatarFile': 'sources/169/profile/宁采君.jpeg',
+    },
+    {
+      'nickname': '药厂人家',
+      'secUid': 'ZdOvEbWjf4xvbLcbhITo_77_pWvO71pLZ7sUyVlwcIM',
+      'url': 'https://www.douyin.com/user/MS4wLjABAAAAZdOvEbWjf4xvbLcbhITo_77_pWvO71pLZ7sUyVlwcIM?from_tab_name=main',
+      'avatarUri': 'tos-cn-i-0813c001_oMBlAnRE8AeJAJCbAgOwMCkElD948APVDIfCAJ',
+      'avatarFile': 'sources/169/profile/药厂人家.jpeg',
+    },
+    {
+      'nickname': '腿祖宗.Ann',
+      'secUid': 'bsKQ1oJmO2lPuWeLbiBuEGZ4Wycv-dOODWb1p625oY7IPuPmdIyqsVmzsQ-FkDIM',
+      'url': 'https://www.douyin.com/user/MS4wLjABAAAAbsKQ1oJmO2lPuWeLbiBuEGZ4Wycv-dOODWb1p625oY7IPuPmdIyqsVmzsQ-FkDIM?from_tab_name=main&vid=7695021109306389211',
+      'avatarUri': 'tos-cn-avt-0015_9fff5b3e30b9237b74949f2e8d3da829',
+      'avatarFile': 'sources/169/profile/腿祖宗.Ann.jpeg',
+    },
+  ];
+
+  /// POST /api/verify/home-profile：主页作者头像与昵称捕获校验与比对（仅 Debug 版）
+  Future<void> _handleVerifyHomeProfile(HttpRequest request) async {
+    final profile = _lastUserHomeProfile ?? _lastUserHomeResult?.profile;
+    if (profile == null) {
+      _sendJson(
+        request,
+        HttpStatus.badRequest,
+        {
+          'error': '尚未执行主页解析或未获取到主页信息，请先调用 /api/parse 或 /api/parse-profile 解析主页链接',
+          'code': 400,
+        },
+      );
+      return;
+    }
+
+    final nickname = profile.nickname.trim();
+    final avatarUrl = profile.avatarUrl.trim();
+    final secUid = profile.secUid.trim();
+
+    // 在样本表中寻找最匹配的对照项
+    Map<String, String>? matchedRef;
+    for (final ref in kReference169Profiles) {
+      final refNick = ref['nickname']!;
+      final refSecUid = ref['secUid']!;
+      if ((secUid.isNotEmpty && secUid.contains(refSecUid)) ||
+          (nickname.isNotEmpty && (nickname == refNick || nickname.contains(refNick) || refNick.contains(nickname)))) {
+        matchedRef = ref;
+        break;
+      }
+    }
+
+    final bool hasNickname = nickname.isNotEmpty;
+    final bool hasAvatar = avatarUrl.isNotEmpty &&
+        (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) &&
+        avatarUrl.contains('aweme-avatar');
+
+    bool nicknameMatched = false;
+    bool avatarUriMatched = false;
+
+    if (matchedRef != null) {
+      final expectedNick = matchedRef['nickname']!;
+      final expectedUri = matchedRef['avatarUri']!;
+      nicknameMatched = nickname.contains(expectedNick) || expectedNick.contains(nickname);
+      avatarUriMatched = avatarUrl.contains(expectedUri);
+    }
+
+    final bool overallMatched = matchedRef != null
+        ? (nicknameMatched && hasAvatar)
+        : (hasNickname && hasAvatar);
+
+    _sendJson(request, HttpStatus.ok, {
+      'status': 'ok',
+      'matched': overallMatched,
+      'hasNickname': hasNickname,
+      'hasAvatar': hasAvatar,
+      'nickname': nickname,
+      'avatarUrl': avatarUrl,
+      'secUid': secUid,
+      'matchedSample': matchedRef?['nickname'],
+      'expectedNickname': matchedRef?['nickname'],
+      'nicknameMatched': nicknameMatched,
+      'avatarUriMatched': avatarUriMatched,
+      'expectedAvatarUri': matchedRef?['avatarUri'],
+      'avatarFile': matchedRef?['avatarFile'],
+      'referenceCount': kReference169Profiles.length,
     });
   }
 
