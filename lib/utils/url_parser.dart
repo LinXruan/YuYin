@@ -10,17 +10,20 @@ class UrlParser {
     r'https?://[A-Za-z0-9\-._~:/?#\[\]@!$&()*+,;=%]+',
   );
 
-  /// 判断链接是否属于抖音用户主页链接（如 /user/MS4wLj... 或 /user/self）
+  /// 判断链接是否属于抖音用户主页链接（如 /user/MS4wLj...、/share/user/... 或 /user/self）
   static bool isUserHomeUrl(String? url) {
     if (url == null || url.trim().isEmpty) return false;
-    final uri = Uri.tryParse(url.trim());
+    final trimmed = url.trim();
+    final uri = Uri.tryParse(trimmed);
     if (uri == null) {
-      return RegExp(r'douyin\.com/user/([a-zA-Z0-9_\-]+)').hasMatch(url);
+      return RegExp(r'(?:ies)?douyin\.com/(?:share/)?user/([a-zA-Z0-9_\-]+)')
+          .hasMatch(trimmed);
     }
-    final host = uri.host.toLowerCase();
-    final isDouyin = host == 'douyin.com' || host.endsWith('.douyin.com');
-    if (!isDouyin) return false;
-    return uri.path.startsWith('/user/');
+    if (!_isSupportedHost(uri.host)) return false;
+    final path = uri.path.toLowerCase();
+    return path.startsWith('/user/') ||
+        path.startsWith('/share/user/') ||
+        path.contains('/user/');
   }
 
   /// 从主页链接中提取用户 sec_uid（若为 self 则返回 self）
@@ -127,8 +130,12 @@ class UrlParser {
         host.endsWith('.iesdouyin.com');
     if (!isDouyinHost) return DouyinWorkPage.unknown;
 
-    final path = uri.path;
-    if (path.startsWith('/user/')) return DouyinWorkPage.userHome;
+    final path = uri.path.toLowerCase();
+    if (path.startsWith('/user/') ||
+        path.startsWith('/share/user/') ||
+        path.contains('/user/')) {
+      return DouyinWorkPage.userHome;
+    }
     if (path.contains('/note/') || path.contains('/slides/')) {
       return DouyinWorkPage.note;
     }

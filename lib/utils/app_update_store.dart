@@ -299,9 +299,10 @@ class AppUpdateStore {
         retryCount++;
         if (retryCount >= maxRetries) {
           _cleanTempFile(tempPath);
+          final friendlyError = UpdateChecker.formatDioError(e);
           statusNotifier.value = statusNotifier.value.copyWith(
             isDownloading: false,
-            errorMessage: '下载更新失败: ${e.message ?? "网络握手超时"}',
+            errorMessage: '下载更新失败: $friendlyError',
           );
           return;
         }
@@ -313,9 +314,10 @@ class AppUpdateStore {
         await Future.delayed(const Duration(seconds: 2));
       } catch (e) {
         _cleanTempFile(tempPath);
+        final friendlyError = UpdateChecker.formatUnknownError(e);
         statusNotifier.value = statusNotifier.value.copyWith(
           isDownloading: false,
-          errorMessage: '下载更新异常: $e',
+          errorMessage: '下载更新失败: $friendlyError',
         );
         return;
       }

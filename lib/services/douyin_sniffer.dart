@@ -238,6 +238,8 @@ class DouyinSniffer
     _timeoutTimer?.cancel();
     _timeoutTimer = Timer(_kTaskTimeout, () {
       if (taskId != _taskId) return;
+      // 30 秒超时仅管控单作品链接解析流程
+      if (_completer == null || _completer!.isCompleted) return;
       final cached = _shareVideoFallback;
       if (cached != null && cached.items.isNotEmpty) {
         _log('主流程超时，使用分享页视频结果兜底');
@@ -349,6 +351,18 @@ class DouyinSniffer
       final wasNote = _isNotePage;
       if (kind != DouyinWorkPage.unknown) {
         _workPageKind = kind;
+      }
+
+      // 若当前为单作品解析任务，但目标页面重定向至作者主页，立即明确终止，杜绝干等 30 秒超时
+      if (_completer != null &&
+          !_completer!.isCompleted &&
+          kind == DouyinWorkPage.userHome) {
+        _log('检测到页面已重定向至作者主页，终止单作品解析');
+        _finishWithError(
+          const FormatException('检测到当前链接为作者主页，非单作品链接。请使用主页批量解析'),
+          taskId: taskId,
+        );
+        return;
       }
 
       final awemeId = UrlParser.extractAwemeId(url);
@@ -1072,7 +1086,7 @@ class DouyinSniffer
     });
   }
 
-  /// 加载主页链接并捕获作品列表，最长等待 30 秒
+  /// 加载主页链接并捕获作品列表（由主页初始与无新作品翻页超时独立管控，不受单作品 30 秒超时约束）
   @override
   Future<UserHomeResult> sniffUserHomeUrl(String homeUrl) async {
     _finishWithError(StateError('已有新的解析任务开始，旧任务已取消'));

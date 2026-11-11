@@ -778,8 +778,7 @@ class _HistoryCard extends StatelessWidget {
           height: size,
           fit: BoxFit.cover,
           alignment: Alignment.center,
-          cacheWidth: 200,
-          cacheHeight: 200,
+          cacheWidth: 240,
           errorBuilder: (context, error, stackTrace) =>
               _buildFallbackThumbnail(theme),
         ),

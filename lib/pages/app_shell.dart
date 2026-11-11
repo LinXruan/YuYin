@@ -49,8 +49,8 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
-    // 异步检测并上报屏幕高刷跟随状态至运行日志
-    DisplayModeService.init(logs: _logs);
+    // 异步检测并上报屏幕高刷跟随状态（正式版 Release 静默运行，不在解析页显示 Hz 提示）
+    DisplayModeService.init(logs: kDebugMode ? _logs : null);
 
     // 仅在 Debug 模式下启动 Agent 自动化本地控制台服务（Release 模式物理隔离）
     if (kDebugMode) {

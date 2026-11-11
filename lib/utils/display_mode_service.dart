@@ -19,6 +19,10 @@ class DisplayModeService {
   @visibleForTesting
   static bool? testIsAndroid;
 
+  /// 测试开关：覆盖是否允许写入运行日志（默认仅 Debug 模式允许）
+  @visibleForTesting
+  static bool? testReportToLogs;
+
   /// 当前激活的屏幕刷新率（Hz）
   static double activeRefreshRate = 60.0;
 
@@ -61,12 +65,15 @@ class DisplayModeService {
       _fallbackFlutterView();
     }
 
-    final message =
-        '[系统] 屏幕已启用自适应高刷跟随: 当前 ${activeRefreshRate.toStringAsFixed(0)} Hz '
-        '(设备最高支持 ${maxRefreshRate.toStringAsFixed(0)} Hz)';
-    logs?.add(message);
-    if (kDebugMode) {
-      debugPrint('[DisplayModeService] $message');
+    final shouldReport = testReportToLogs ?? kDebugMode;
+    if (shouldReport) {
+      final message =
+          '[系统] 屏幕已启用自适应高刷跟随: 当前 ${activeRefreshRate.toStringAsFixed(0)} Hz '
+          '(设备最高支持 ${maxRefreshRate.toStringAsFixed(0)} Hz)';
+      logs?.add(message);
+      if (kDebugMode) {
+        debugPrint('[DisplayModeService] $message');
+      }
     }
   }
 
@@ -90,5 +97,6 @@ class DisplayModeService {
     supportedModesCount = 1;
     nativeChannel = _defaultChannel;
     testIsAndroid = null;
+    testReportToLogs = null;
   }
 }

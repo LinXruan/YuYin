@@ -110,7 +110,9 @@ class _SettingsPageState extends State<SettingsPage>
     setState(() => _isChecking = false);
 
     if (result.errorMessage != null) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      messenger?.hideCurrentSnackBar();
+      messenger?.showSnackBar(
         SnackBar(
           content: Text(result.errorMessage!),
           behavior: SnackBarBehavior.floating,

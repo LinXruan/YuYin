@@ -245,7 +245,7 @@ class _ParsePageState extends State<ParsePage>
         if (!mounted || !_isParsing) return;
         _isParsing = false;
         if (mounted) setState(() {});
-        widget.logs.add('主页解析失败: $e');
+        widget.logs.add('主页解析失败：${_friendlyError(e)}');
       } finally {
         if (mounted) {
           widget.busy.value = false;
@@ -419,7 +419,9 @@ class _ParsePageState extends State<ParsePage>
     if (error is DioException && error.response?.statusCode == 403) {
       return '视频服务器拒绝了请求（403），请稍后重试';
     }
-    return error.toString().replaceFirst(RegExp(r'^(Exception|Bad state): '), '');
+    return error
+        .toString()
+        .replaceFirst(RegExp(r'^(Exception|Bad state|FormatException): '), '');
   }
 
   @override
