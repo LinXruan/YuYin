@@ -33,13 +33,25 @@ class SelectionModeStore {
     MediaType.audio: 1,
   };
 
+  /// 顶层（多主页）“全选”按钮用于下次解析的判断值 a (1 = 全选, 2 = 全不选)
+  static int _homeSelectAllMode = 1;
+
   /// 获取指定媒体标签用于下次解析的判断值 a (1 = 全选, 2 = 全不选)
   static int getMode(MediaType type) => _aMap[type] ?? 1;
+
+  /// 获取顶层（多主页）“全选”按钮用于下次解析的判断值 a (1 = 全选, 2 = 全不选)
+  static int getHomeSelectAllMode() => _homeSelectAllMode;
 
   /// 供测试或调试直接设置指定标签类型的 a
   @visibleForTesting
   static void setMode(MediaType type, int value) {
     _aMap[type] = value;
+  }
+
+  /// 供测试或调试直接设置顶层（多主页）“全选”的 a
+  @visibleForTesting
+  static void setHomeSelectAllMode(int value) {
+    _homeSelectAllMode = value == 2 ? 2 : 1;
   }
 
   /// 重置所有标签的判断值为初始状态 (1: 全选)，方便单元测试
@@ -48,6 +60,7 @@ class SelectionModeStore {
     _aMap[MediaType.image] = 1;
     _aMap[MediaType.video] = 1;
     _aMap[MediaType.audio] = 1;
+    _homeSelectAllMode = 1;
   }
 
   /// 启动时从本地文件恢复上次保存的各标签记忆
@@ -69,6 +82,8 @@ class SelectionModeStore {
             _aMap[type] = 1;
           }
         }
+        final homeVal = decoded['home_all'];
+        _homeSelectAllMode = homeVal == 2 ? 2 : 1;
       }
     } catch (_) {
       reset();
@@ -142,11 +157,42 @@ class SelectionModeStore {
     }
   }
 
+  /// 根据顶层（多主页）当前作者选择状态计算 b 并驱动“全选”记忆状态转移
+  static void updateFromHomeSelections(List<AuthorSelectionState> states) {
+    if (states.isEmpty) return;
+    final int b;
+    if (states.every((s) => s == AuthorSelectionState.all)) {
+      b = 1;
+    } else if (states.every((s) => s == AuthorSelectionState.none)) {
+      b = 2;
+    } else {
+      b = 3;
+    }
+    recordHomeSelectAllSelection(b);
+  }
+
+  /// 根据顶层“全选”判断值 b 更新 a 并异步持久化
+  static void recordHomeSelectAllSelection(int b) {
+    if (b == 1) {
+      if (_homeSelectAllMode != 1) {
+        _homeSelectAllMode = 1;
+        _saveToFile();
+      }
+    } else if (b == 2) {
+      if (_homeSelectAllMode != 2) {
+        _homeSelectAllMode = 2;
+        _saveToFile();
+      }
+    }
+    // b == 3 => a 保持不变
+  }
+
   static Future<void> _saveToFile() async {
     try {
       final file = await _file();
       final data = {
         for (final type in MediaType.values) type.name: _aMap[type] ?? 1,
+        'home_all': _homeSelectAllMode,
       };
       await file.writeAsString(jsonEncode(data), flush: true);
     } catch (_) {

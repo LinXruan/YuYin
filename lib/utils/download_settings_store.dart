@@ -18,6 +18,10 @@ class DownloadSettingsStore {
   /// 是否在启动 2 秒后自动检查更新（默认开启）
   static bool _autoCheckUpdate = true;
 
+  /// 多主页/批量下载时的视频保存画质偏好（默认最高画质）
+  static BatchVideoQualityMode _batchVideoQualityMode =
+      BatchVideoQualityMode.highest;
+
   /// 监听画质选项切换的 Notifier
   static final ValueNotifier<bool> onlyHighestQualityNotifier =
       ValueNotifier<bool>(true);
@@ -26,6 +30,10 @@ class DownloadSettingsStore {
   static final ValueNotifier<bool> autoCheckUpdateNotifier =
       ValueNotifier<bool>(true);
 
+  /// 监听批量下载视频画质偏好的 Notifier
+  static final ValueNotifier<BatchVideoQualityMode> batchVideoQualityNotifier =
+      ValueNotifier<BatchVideoQualityMode>(BatchVideoQualityMode.highest);
+
   /// 当前是否仅显示同分辨率下最高画质
   static bool get onlyHighestQualityPerResolution =>
       _onlyHighestQualityPerResolution;
@@ -33,18 +41,25 @@ class DownloadSettingsStore {
   /// 当前是否自动检查更新
   static bool get autoCheckUpdate => _autoCheckUpdate;
 
+  /// 当前批量下载视频画质偏好
+  static BatchVideoQualityMode get batchVideoQualityMode =>
+      _batchVideoQualityMode;
+
   /// 测试重置
   @visibleForTesting
   static void resetForTesting({
     bool defaultValue = true,
     bool defaultOnlyHighest = true,
     bool defaultAutoCheck = true,
+    BatchVideoQualityMode defaultBatchQuality = BatchVideoQualityMode.highest,
   }) {
     final effectiveOnlyHighest = defaultValue && defaultOnlyHighest;
     _onlyHighestQualityPerResolution = effectiveOnlyHighest;
     onlyHighestQualityNotifier.value = effectiveOnlyHighest;
     _autoCheckUpdate = defaultAutoCheck;
     autoCheckUpdateNotifier.value = defaultAutoCheck;
+    _batchVideoQualityMode = defaultBatchQuality;
+    batchVideoQualityNotifier.value = defaultBatchQuality;
   }
 
   /// 启动初始化
@@ -77,11 +92,22 @@ class DownloadSettingsStore {
         _autoCheckUpdate = true;
         autoCheckUpdateNotifier.value = true;
       }
+
+      final valBatchQuality = map['batchVideoQualityMode'];
+      if (valBatchQuality == BatchVideoQualityMode.lowest.name) {
+        _batchVideoQualityMode = BatchVideoQualityMode.lowest;
+        batchVideoQualityNotifier.value = BatchVideoQualityMode.lowest;
+      } else {
+        _batchVideoQualityMode = BatchVideoQualityMode.highest;
+        batchVideoQualityNotifier.value = BatchVideoQualityMode.highest;
+      }
     } catch (_) {
       _onlyHighestQualityPerResolution = true;
       onlyHighestQualityNotifier.value = true;
       _autoCheckUpdate = true;
       autoCheckUpdateNotifier.value = true;
+      _batchVideoQualityMode = BatchVideoQualityMode.highest;
+      batchVideoQualityNotifier.value = BatchVideoQualityMode.highest;
     }
   }
 
@@ -98,6 +124,16 @@ class DownloadSettingsStore {
     if (_autoCheckUpdate == value) return;
     _autoCheckUpdate = value;
     autoCheckUpdateNotifier.value = value;
+    await _save();
+  }
+
+  /// 切换并持久化“批量下载视频画质偏好（最高/最低画质）”
+  static Future<void> setBatchVideoQualityMode(
+    BatchVideoQualityMode mode,
+  ) async {
+    if (_batchVideoQualityMode == mode) return;
+    _batchVideoQualityMode = mode;
+    batchVideoQualityNotifier.value = mode;
     await _save();
   }
 
@@ -185,6 +221,7 @@ class DownloadSettingsStore {
       final map = {
         'onlyHighestQualityPerResolution': _onlyHighestQualityPerResolution,
         'autoCheckUpdate': _autoCheckUpdate,
+        'batchVideoQualityMode': _batchVideoQualityMode.name,
       };
       await file.writeAsString(jsonEncode(map));
     } catch (_) {
