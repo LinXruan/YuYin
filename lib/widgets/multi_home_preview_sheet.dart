@@ -119,6 +119,7 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
     SelectionModeStore.updateFromHomeSelections(
       _authors.map((e) => e.selectionState).toList(),
     );
+    DownloadSettingsStore.recordBatchVideoQualitySelection(_qualityMode);
   }
 
   bool get _hasAuthors => _authors.isNotEmpty;
@@ -156,6 +157,7 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
   }
 
   /// 切换“最高画质 / 最低画质”
+  /// 切换规则与“全选”一致：当处于混合画质（或最低画质）时切为最高画质，最高画质切为最低画质
   void _toggleQualityMode() {
     final next = _qualityMode == BatchVideoQualityMode.highest
         ? BatchVideoQualityMode.lowest
@@ -422,7 +424,7 @@ class _AuthorAvatarContent extends StatelessWidget {
   }
 }
 
-/// “最高画质 / 最低画质”切换按钮：采用圆角矩形 + 图标样式，与右侧“全选”胶囊筛选按钮明确区分
+/// “最高画质 / 最低画质 / 混合画质”切换按钮：采用圆角矩形 + 图标样式，与右侧“全选”胶囊筛选按钮明确区分
 class _QualityToggleChip extends StatelessWidget {
   const _QualityToggleChip({
     super.key,
@@ -437,12 +439,34 @@ class _QualityToggleChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isHighest = mode == BatchVideoQualityMode.highest;
-    final backgroundColor = isHighest
-        ? theme.colorScheme.secondaryContainer
-        : theme.colorScheme.surfaceContainerHighest;
-    final foregroundColor = isHighest
-        ? theme.colorScheme.onSecondaryContainer
-        : theme.colorScheme.onSurfaceVariant;
+    final isLowest = mode == BatchVideoQualityMode.lowest;
+
+    // 最低画质使用专用填充色彩（tertiaryContainer），绝不使用保存页背景色
+    final Color backgroundColor;
+    final Color foregroundColor;
+    final Color borderColor;
+    final IconData iconData;
+    final String label;
+
+    if (isHighest) {
+      backgroundColor = theme.colorScheme.secondaryContainer;
+      foregroundColor = theme.colorScheme.onSecondaryContainer;
+      borderColor = theme.colorScheme.secondary.withValues(alpha: 0.5);
+      iconData = Icons.hd_outlined;
+      label = '最高画质';
+    } else if (isLowest) {
+      backgroundColor = theme.colorScheme.tertiaryContainer;
+      foregroundColor = theme.colorScheme.onTertiaryContainer;
+      borderColor = theme.colorScheme.tertiary.withValues(alpha: 0.5);
+      iconData = Icons.sd_outlined;
+      label = '最低画质';
+    } else {
+      backgroundColor = theme.colorScheme.primaryContainer;
+      foregroundColor = theme.colorScheme.onPrimaryContainer;
+      borderColor = theme.colorScheme.primary.withValues(alpha: 0.5);
+      iconData = Icons.tune_rounded;
+      label = '混合画质';
+    }
 
     return InkWell(
       onTap: onTap,
@@ -454,7 +478,7 @@ class _QualityToggleChip extends StatelessWidget {
           color: backgroundColor,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.7),
+            color: borderColor,
             width: 1.0,
           ),
         ),
@@ -462,13 +486,13 @@ class _QualityToggleChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              isHighest ? Icons.hd_outlined : Icons.sd_outlined,
+              iconData,
               size: 15,
               color: foregroundColor,
             ),
             const SizedBox(width: 4),
             Text(
-              isHighest ? '最高画质' : '最低画质',
+              label,
               style: theme.textTheme.labelMedium?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: foregroundColor,

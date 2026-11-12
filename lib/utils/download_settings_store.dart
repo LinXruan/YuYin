@@ -131,10 +131,21 @@ class DownloadSettingsStore {
   static Future<void> setBatchVideoQualityMode(
     BatchVideoQualityMode mode,
   ) async {
+    // 记忆状态仅保存 highest(1) / lowest(2)，mixed(3) 保持原记忆不变
+    if (mode == BatchVideoQualityMode.mixed) return;
     if (_batchVideoQualityMode == mode) return;
     _batchVideoQualityMode = mode;
     batchVideoQualityNotifier.value = mode;
     await _save();
+  }
+
+  /// 按“全选”同款 a/b 状态机规则记录顶层画质选择：
+  /// highest(b=1) -> a=highest；lowest(b=2) -> a=lowest；mixed(b=3) -> a 保持不变
+  static Future<void> recordBatchVideoQualitySelection(
+    BatchVideoQualityMode mode,
+  ) async {
+    if (mode == BatchVideoQualityMode.mixed) return;
+    await setBatchVideoQualityMode(mode);
   }
 
   /// 根据全局设置对视频画质列表进行过滤

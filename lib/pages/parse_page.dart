@@ -408,10 +408,11 @@ class _ParsePageState extends State<ParsePage>
         return;
       }
 
-      final qualityLabel =
-          selection.qualityMode == BatchVideoQualityMode.highest
-              ? '最高画质'
-              : '最低画质';
+      final qualityLabel = switch (selection.qualityMode) {
+        BatchVideoQualityMode.highest => '最高画质',
+        BatchVideoQualityMode.lowest => '最低画质',
+        BatchVideoQualityMode.mixed => '混合画质',
+      };
       widget.logs.add(
         '已选择 ${selection.selectedAuthors.length} 位作者（画质：$qualityLabel），批量下载逻辑待后续接入',
       );

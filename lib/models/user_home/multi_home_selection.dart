@@ -19,6 +19,9 @@ enum BatchVideoQualityMode {
 
   /// 最低画质
   lowest,
+
+  /// 混合画质（所有作者的视频作品中存在非统一最高/最低画质时启用）
+  mixed,
 }
 
 /// 顶层保存页中的单个作者条目
