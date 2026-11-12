@@ -1,4 +1,4 @@
-# PLAN_59: 三层结构保存页顶层 UI（多主页保存面板）(版本 1.5.5+172)
+# PLAN_59: 三层结构保存页顶层 UI、粘贴板多链接识别与多主页串联 (版本 1.5.5+173)
 
 ## 一、需求背景与目标
 
@@ -17,8 +17,14 @@
 
 ## 二、任务分解与执行清单
 
-1. **版本号同步升级 (`1.5.5+172`)**：
+1. **版本号同步升级 (`1.5.5+173`)**：
    - 更新 `pubspec.yaml`、`lib/app_info.dart`、`GEMINI.md`。
+2. **粘贴板多链接识别与分类重构 (`lib/utils/url_parser.dart`)**：
+   - 新增 `UrlParser.parseBatchInput(String rawText)`，按链接上下文精确区分**口令主页链接（无 `MM/dd` 日期参数）**与**口令作品链接（含 `MM/dd` 日期参数）**；
+   - 支持口令与网址混合输入，自动归类为 `singleWork`、`multiWork`、`userHomes`、`mixed`、`empty`。
+3. **解析页多主页串联 (`lib/pages/parse_page.dart`)**：
+   - 识别为主页类时依次调用 `sniffer.userHome.extractProfile` 捕获多作者头像与昵称，成功后自动弹出 `MultiHomePreviewSheet` 顶层保存页；
+   - 识别为多作品时预留中层保存页入口并输出提示。
 2. **领域模型 (`lib/models/user_home/multi_home_selection.dart`)**：
    - 定义 `AuthorSelectionState`（`none` / `partial` / `all`）、`BatchVideoQualityMode`（`highest` / `lowest`）、`MultiHomeAuthorItem`、`MultiHomeSelectionResult`，并在 `lib/models/media_item.dart` 聚合导出。
 3. **记忆与偏好存储**：

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
 import 'package:yuyin/utils/download_settings_store.dart';
 import 'package:yuyin/utils/selection_mode_store.dart';
+import 'package:yuyin/utils/url_parser.dart';
 import 'package:yuyin/widgets/multi_home_preview_sheet.dart';
 
 void main() {
@@ -212,6 +213,59 @@ void main() {
       expect(openedIndex, 2);
       expect(find.byKey(const ValueKey('author_partial_border_2')), findsOneWidget);
       expect(find.text('已选 3 / 3 位作者'), findsOneWidget);
+    });
+  });
+
+  group('UrlParser.parseBatchInput 粘贴板多链接识别与分类测试', () {
+    test('口令主页链接（无日期参数）识别为 userHomes', () {
+      const text =
+          '5- 长按复制此条消息，打开抖音搜索，查看TA的更多作品。 https://v.douyin.com/1YtriCIWMK0/ 3@1.com :7pm';
+      final result = UrlParser.parseBatchInput(text);
+      expect(result.kind, ParsedBatchKind.userHomes);
+      expect(result.homeUrls, ['https://v.douyin.com/1YtriCIWMK0/']);
+      expect(result.workUrls, isEmpty);
+    });
+
+    test('口令作品链接（含 MM/dd 日期参数）识别为 singleWork', () {
+      const text =
+          '5.61 复制打开抖音，看看【非影Q的作品】关于妹妹突然对我非常殷勤这件事…… # 二次元 #... https://v.douyin.com/mWWRFO2hyA8/ NJV:/ R@k.cN 05/22 :2pm';
+      final result = UrlParser.parseBatchInput(text);
+      expect(result.kind, ParsedBatchKind.singleWork);
+      expect(result.workUrls, ['https://v.douyin.com/mWWRFO2hyA8/']);
+      expect(result.homeUrls, isEmpty);
+    });
+
+    test('混合口令主页与网址主页（/user/...）归类为纯粹的多主页 userHomes', () {
+      const text = '''
+5- 长按复制此条消息，打开抖音搜索，查看TA的更多作品。 https://v.douyin.com/1YtriCIWMK0/ 3@1.com :7pm
+https://www.douyin.com/user/MS4wLjABAAAAeBMbdyCfKJbCWbdWN9toLwnJhgkUU4ydTGkOvsRx9v5CWG6uRYQpFqXrxmWF2QFV?from_tab_name=main
+''';
+      final result = UrlParser.parseBatchInput(text);
+      expect(result.kind, ParsedBatchKind.userHomes);
+      expect(result.homeUrls.length, 2);
+      expect(result.workUrls, isEmpty);
+    });
+
+    test('混合口令作品与网址作品（/video/ 或 modal_id）归类为纯粹的多作品 multiWork', () {
+      const text = '''
+5.61 复制打开抖音，看看【非影Q的作品】https://v.douyin.com/mWWRFO2hyA8/ NJV:/ R@k.cN 05/22 :2pm
+https://www.douyin.com/jingxuan?modal_id=7696132501084917042
+''';
+      final result = UrlParser.parseBatchInput(text);
+      expect(result.kind, ParsedBatchKind.multiWork);
+      expect(result.workUrls.length, 2);
+      expect(result.homeUrls, isEmpty);
+    });
+
+    test('同时混合主页链接与作品链接时识别为 mixed', () {
+      const text = '''
+5- 长按复制此条消息，打开抖音搜索，查看TA的更多作品。 https://v.douyin.com/1YtriCIWMK0/ 3@1.com :7pm
+5.61 复制打开抖音，看看【非影Q的作品】https://v.douyin.com/mWWRFO2hyA8/ NJV:/ R@k.cN 05/22 :2pm
+''';
+      final result = UrlParser.parseBatchInput(text);
+      expect(result.kind, ParsedBatchKind.mixed);
+      expect(result.homeUrls.length, 1);
+      expect(result.workUrls.length, 1);
     });
   });
 }

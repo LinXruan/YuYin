@@ -1,6 +1,48 @@
 /// 抖音作品页面类型（只用于选择兜底策略，不代表作品内容）
 enum DouyinWorkPage { note, video, userHome, unknown }
 
+/// 单条链接的归类（作品 vs 主页）
+enum DouyinLinkKind { work, userHome }
+
+/// 粘贴板批量解析的整段归类结果
+enum ParsedBatchKind {
+  /// 未识别到有效抖音链接
+  empty,
+
+  /// 单个作品链接（口令或网址）
+  singleWork,
+
+  /// 多个作品链接（混合口令/网址，跳转中层保存页）
+  multiWork,
+
+  /// 一个或多个主页链接（混合口令/网址，跳转顶层保存页）
+  userHomes,
+
+  /// 同时混合了主页链接与作品链接
+  mixed,
+}
+
+/// 粘贴板中识别出的单条抖音链接及其类型
+class ParsedLinkEntry {
+  const ParsedLinkEntry({required this.url, required this.kind});
+
+  final String url;
+  final DouyinLinkKind kind;
+}
+
+/// 粘贴板批量识别结果
+class ParsedBatchResult {
+  const ParsedBatchResult({
+    required this.kind,
+    this.workUrls = const [],
+    this.homeUrls = const [],
+  });
+
+  final ParsedBatchKind kind;
+  final List<String> workUrls;
+  final List<String> homeUrls;
+}
+
 /// 抖音分享口令解析工具
 class UrlParser {
   UrlParser._(); // 工具类禁止实例化
@@ -9,6 +51,120 @@ class UrlParser {
   static final RegExp _urlRegExp = RegExp(
     r'https?://[A-Za-z0-9\-._~:/?#\[\]@!$&()*+,;=%]+',
   );
+
+  /// 匹配口令作品链接尾部携带的 MM/dd 日期参数（口令主页链接不含该日期参数）
+  static final RegExp _shareDateParamRegExp = RegExp(
+    r'(?<!\d)(?:0[1-9]|1[0-2])/(?:0[1-9]|[12]\d|3[01])(?!\d)',
+  );
+
+  /// 批量解析粘贴板内容：提取所有有效抖音链接并按作品 / 主页分类。
+  ///
+  /// 规则：
+  /// - 显式 `/user/`、`/share/user/` 归类为主页；
+  /// - 显式 `/video/`、`/note/`、`/slides/`、`?modal_id=` 归类为作品；
+  /// - 口令短链（如 `v.douyin.com/...`）：后缀同行包含 `MM/dd` 日期参数归类为作品，
+  ///   携带口令上下文但无日期参数归类为主页；纯裸短链兜底为作品。
+  static ParsedBatchResult parseBatchInput(String rawText) {
+    if (rawText.trim().isEmpty) {
+      return const ParsedBatchResult(kind: ParsedBatchKind.empty);
+    }
+
+    final allMatches = _urlRegExp.allMatches(rawText).toList();
+    final douyinEntries = <({RegExpMatch match, String url})>[];
+    final seenUrls = <String>{};
+
+    for (final m in allMatches) {
+      final url = _trimTrailingPunctuation(m.group(0)!);
+      if (_isDouyinLink(url) && seenUrls.add(url)) {
+        douyinEntries.add((match: m, url: url));
+      }
+    }
+
+    if (douyinEntries.isEmpty) {
+      return const ParsedBatchResult(kind: ParsedBatchKind.empty);
+    }
+
+    final workUrls = <String>[];
+    final homeUrls = <String>[];
+
+    for (var i = 0; i < douyinEntries.length; i++) {
+      final current = douyinEntries[i];
+      final prevEnd = i == 0 ? 0 : douyinEntries[i - 1].match.end;
+      final nextStart = i + 1 < douyinEntries.length
+          ? douyinEntries[i + 1].match.start
+          : rawText.length;
+
+      final prefix = rawText.substring(prevEnd, current.match.start);
+      final rawSuffix = rawText.substring(current.match.end, nextStart);
+      final newlineIdx = rawSuffix.indexOf(RegExp(r'[\r\n]'));
+      final suffixLine = newlineIdx == -1
+          ? rawSuffix
+          : rawSuffix.substring(0, newlineIdx);
+
+      final kind = _classifyExtractedLink(
+        url: current.url,
+        prefix: prefix,
+        suffixLine: suffixLine,
+      );
+
+      if (kind == DouyinLinkKind.userHome) {
+        homeUrls.add(current.url);
+      } else {
+        workUrls.add(current.url);
+      }
+    }
+
+    final ParsedBatchKind batchKind;
+    if (workUrls.isNotEmpty && homeUrls.isNotEmpty) {
+      batchKind = ParsedBatchKind.mixed;
+    } else if (homeUrls.isNotEmpty) {
+      batchKind = ParsedBatchKind.userHomes;
+    } else if (workUrls.length == 1) {
+      batchKind = ParsedBatchKind.singleWork;
+    } else {
+      batchKind = ParsedBatchKind.multiWork;
+    }
+
+    return ParsedBatchResult(
+      kind: batchKind,
+      workUrls: workUrls,
+      homeUrls: homeUrls,
+    );
+  }
+
+  static DouyinLinkKind _classifyExtractedLink({
+    required String url,
+    required String prefix,
+    required String suffixLine,
+  }) {
+    if (isUserHomeUrl(url)) {
+      return DouyinLinkKind.userHome;
+    }
+    if (extractAwemeId(url) != null) {
+      return DouyinLinkKind.work;
+    }
+
+    // 短链（口令链接）：以是否包含 MM/dd 日期参数区分口令作品与口令主页
+    if (_shareDateParamRegExp.hasMatch(suffixLine)) {
+      return DouyinLinkKind.work;
+    }
+
+    final prefixTrimmed = _lastLine(prefix).trim();
+    final suffixTrimmed = suffixLine.trim();
+    final hasShareContext =
+        prefixTrimmed.isNotEmpty || suffixTrimmed.isNotEmpty;
+    if (hasShareContext) {
+      return DouyinLinkKind.userHome;
+    }
+
+    // 纯裸短链兜底为单作品，保持向后兼容
+    return DouyinLinkKind.work;
+  }
+
+  static String _lastLine(String text) {
+    final idx = text.lastIndexOf(RegExp(r'[\r\n]'));
+    return idx == -1 ? text : text.substring(idx + 1);
+  }
 
   /// 判断链接是否属于抖音用户主页链接（如 /user/MS4wLj...、/share/user/... 或 /user/self）
   static bool isUserHomeUrl(String? url) {

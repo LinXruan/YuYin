@@ -13,6 +13,7 @@ import '../utils/network_detector.dart';
 import '../utils/save_location_store.dart';
 import '../utils/url_parser.dart';
 import '../widgets/image_preview_sheet.dart';
+import '../widgets/multi_home_preview_sheet.dart';
 import '../models/history_item.dart';
 import '../utils/history_store.dart';
 import '../widgets/video_quality_sheet.dart';
@@ -201,8 +202,8 @@ class _ParsePageState extends State<ParsePage>
     _cancelLogged = false;
     if (mounted) setState(() {});
 
-    final url = UrlParser.extractDouyinUrl(_inputController.text);
-    if (url == null) {
+    final batch = UrlParser.parseBatchInput(_inputController.text);
+    if (batch.kind == ParsedBatchKind.empty) {
       widget.logs.add('未识别到有效的抖音链接，请检查粘贴内容');
       widget.busy.value = false;
       _isParsing = false;
@@ -210,51 +211,29 @@ class _ParsePageState extends State<ParsePage>
       return;
     }
 
-    if (UrlParser.isUserHomeUrl(url)) {
-      bool isLogged = widget.loggedIn.value;
-      if (!isLogged) {
-        try {
-          isLogged = await LoginStateStore.isLoggedIn() &&
-              await LoginStateStore.checkWebViewCookieSession();
-          if (isLogged) widget.loggedIn.value = true;
-        } catch (_) {}
-      }
-
-      if (!isLogged) {
-        widget.logs.add('请登录再进行主页链接解析');
-        widget.busy.value = false;
-        _isParsing = false;
-        if (mounted) setState(() {});
-        return;
-      }
-
-      try {
-        widget.logs.add('正在捕获作者主页作品链接...');
-        final homeResult = await widget.sniffer.sniffUserHomeUrl(url);
-        if (!mounted || !_isParsing) return;
-        _isParsing = false;
-        if (mounted) setState(() {});
-
-        final author = homeResult.nickname.isNotEmpty ? homeResult.nickname : '未知作者';
-        final tagText = (homeResult.tabCount != null && homeResult.tabCount! > 0)
-            ? '，作品总数标注: ${homeResult.tabCount} 个'
-            : '';
-        widget.logs.add('[主页] 成功捕获作者【$author】全部作品链接共 ${homeResult.count} 条$tagText');
-        widget.logs.add('主页作品捕获完成');
-      } catch (e) {
-        if (!mounted || !_isParsing) return;
-        _isParsing = false;
-        if (mounted) setState(() {});
-        widget.logs.add('主页解析失败：${_friendlyError(e)}');
-      } finally {
-        if (mounted) {
-          widget.busy.value = false;
-          _isParsing = false;
-          setState(() {});
-        }
-      }
+    if (batch.kind == ParsedBatchKind.mixed) {
+      widget.logs.add('检测到同时包含主页链接和作品链接，请分开粘贴解析');
+      widget.busy.value = false;
+      _isParsing = false;
+      if (mounted) setState(() {});
       return;
     }
+
+    if (batch.kind == ParsedBatchKind.multiWork) {
+      // 多作品链接：预留跳转至中层保存页（待后续 PLAN 实现）
+      widget.logs.add('已识别 ${batch.workUrls.length} 个作品链接，多作品中层保存页待后续开发');
+      widget.busy.value = false;
+      _isParsing = false;
+      if (mounted) setState(() {});
+      return;
+    }
+
+    if (batch.kind == ParsedBatchKind.userHomes) {
+      await _parseUserHomes(batch.homeUrls);
+      return;
+    }
+
+    final url = batch.workUrls.first;
 
     try {
       widget.logs.add('正在解析作品...');
@@ -364,6 +343,82 @@ class _ParsePageState extends State<ParsePage>
         _isParsing = false;
         widget.busy.value = false;
         _downloadProgress.value = null;
+        setState(() {});
+      }
+    }
+  }
+
+  /// 批量捕获多主页作者头像与昵称，成功后弹出顶层保存页
+  Future<void> _parseUserHomes(List<String> homeUrls) async {
+    bool isLogged = widget.loggedIn.value;
+    if (!isLogged) {
+      try {
+        isLogged = await LoginStateStore.isLoggedIn() &&
+            await LoginStateStore.checkWebViewCookieSession();
+        if (isLogged) widget.loggedIn.value = true;
+      } catch (_) {}
+    }
+
+    if (!isLogged) {
+      widget.logs.add('请登录再进行主页链接解析');
+      widget.busy.value = false;
+      _isParsing = false;
+      if (mounted) setState(() {});
+      return;
+    }
+
+    final authors = <MultiHomeAuthorItem>[];
+    try {
+      for (var i = 0; i < homeUrls.length; i++) {
+        if (!mounted || !_isParsing) return;
+        widget.logs.add('正在捕获作者信息 (${i + 1}/${homeUrls.length})...');
+        try {
+          final profile =
+              await widget.sniffer.userHome.extractProfile(homeUrls[i]);
+          if (!mounted || !_isParsing) return;
+          authors.add(MultiHomeAuthorItem(profile: profile));
+        } catch (e) {
+          if (!mounted || !_isParsing) return;
+          widget.logs.add('第 ${i + 1} 个主页捕获失败：${_friendlyError(e)}');
+        }
+      }
+
+      _isParsing = false;
+      if (mounted) setState(() {});
+
+      if (authors.isEmpty) {
+        widget.logs.add('未捕获到有效作者信息，请检查主页链接或登录状态');
+        return;
+      }
+
+      if (!mounted) return;
+      widget.logs.add('[主页] 成功捕获 ${authors.length} 位作者信息，正在打开顶层保存页');
+      widget.onRequestParseTab();
+      final selection = await MultiHomePreviewSheet.show(
+        context,
+        authors: authors,
+        headers: const {
+          'User-Agent': DouyinSniffer.desktopUserAgent,
+          'Referer': 'https://www.douyin.com/',
+        },
+      );
+      if (!mounted) return;
+      if (selection == null) {
+        widget.logs.add('已取消多主页保存');
+        return;
+      }
+
+      final qualityLabel =
+          selection.qualityMode == BatchVideoQualityMode.highest
+              ? '最高画质'
+              : '最低画质';
+      widget.logs.add(
+        '已选择 ${selection.selectedAuthors.length} 位作者（画质：$qualityLabel），批量下载逻辑待后续接入',
+      );
+    } finally {
+      if (mounted) {
+        widget.busy.value = false;
+        _isParsing = false;
         setState(() {});
       }
     }
