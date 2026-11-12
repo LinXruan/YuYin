@@ -103,6 +103,8 @@ class AgentAutomationServer {
         await _handleStatus(request);
       } else if (path == '/api/parse' && request.method == 'POST') {
         await _handleParse(request);
+      } else if (path == '/api/parse-works' && request.method == 'POST') {
+        await _handleParseWorks(request);
       } else if (path == '/api/download' && request.method == 'POST') {
         await _handleDownload(request);
       } else if (path == '/api/logs' && request.method == 'GET') {
@@ -196,6 +198,7 @@ class AgentAutomationServer {
               'hasCovers': _lastUserHomeResult!.workCovers.isNotEmpty,
               'titlesCount': _lastUserHomeResult!.titlesCount,
               'hasTitles': _lastUserHomeResult!.workTitles.isNotEmpty,
+              'filteredArticleCount': _lastUserHomeResult!.filteredArticleCount,
             },
       'lastUserHomeProfile': _lastUserHomeProfile?.toMap() ??
           _lastUserHomeResult?.profile.toMap(),
@@ -235,14 +238,43 @@ class AgentAutomationServer {
       return;
     }
 
-    final url = UrlParser.extractDouyinUrl(text);
-    if (url == null) {
-      _sendJson(
-        request,
-        HttpStatus.badRequest,
-        {'error': '未识别到有效的抖音链接', 'code': 400, 'raw': text},
-      );
+    final batch = UrlParser.parseBatchInput(text);
+    if (batch.kind == ParsedBatchKind.empty) {
+      _sendJson(request, HttpStatus.badRequest, {
+        'error': '未识别到有效的抖音链接',
+        'code': 400,
+        'raw': text,
+      });
       return;
+    }
+    if (batch.kind == ParsedBatchKind.articlesOnly) {
+      _sendJson(request, HttpStatus.badRequest, {
+        'error': '仅识别到文章作品，暂不支持下载',
+        'code': 400,
+        'filteredArticles': batch.filteredArticleCount,
+      });
+      return;
+    }
+    if (batch.kind == ParsedBatchKind.mixed) {
+      _sendJson(request, HttpStatus.badRequest, {
+        'error': '检测到主页链接与作品链接混合，请分开粘贴解析',
+        'code': 400,
+      });
+      return;
+    }
+    if (batch.kind == ParsedBatchKind.multiWork) {
+      _sendJson(request, HttpStatus.badRequest, {
+        'error': '多作品链接请使用 /api/parse-works 逐条捕获封面',
+        'code': 400,
+      });
+      return;
+    }
+
+    final url = batch.kind == ParsedBatchKind.userHomes
+        ? batch.homeUrls.first
+        : batch.workUrls.first;
+    if (batch.filteredArticleCount > 0) {
+      logs.add('已自动过滤 ${batch.filteredArticleCount} 条文章作品链接');
     }
 
     if (UrlParser.isUserHomeUrl(url)) {
@@ -373,6 +405,92 @@ class AgentAutomationServer {
         HttpStatus.badRequest,
         {'error': '解析失败: $e', 'code': 400},
       );
+    } finally {
+      busy.value = false;
+    }
+  }
+
+  /// POST /api/parse-works：多作品链接逐条捕获封面（中层保存页后端验证）
+  Future<void> _handleParseWorks(HttpRequest request) async {
+    if (busy.value) {
+      _sendJson(request, HttpStatus.conflict, {
+        'error': '应用正在执行其他任务，请稍候',
+        'code': 409,
+      });
+      return;
+    }
+
+    final body = await _readJsonBody(request);
+    final text = body['text']?.toString() ?? body['url']?.toString() ?? '';
+    if (text.trim().isEmpty) {
+      _sendJson(request, HttpStatus.badRequest, {
+        'error': '缺少必要参数: text 或 url',
+        'code': 400,
+      });
+      return;
+    }
+
+    final batch = UrlParser.parseBatchInput(text);
+    if (batch.kind == ParsedBatchKind.empty ||
+        batch.kind == ParsedBatchKind.articlesOnly) {
+      _sendJson(request, HttpStatus.badRequest, {
+        'error': '未识别到可下载的视频/图文作品',
+        'code': 400,
+        'filteredArticles': batch.filteredArticleCount,
+      });
+      return;
+    }
+    if (batch.kind == ParsedBatchKind.userHomes ||
+        batch.kind == ParsedBatchKind.mixed) {
+      _sendJson(request, HttpStatus.badRequest, {
+        'error': '该接口仅支持作品链接（singleWork / multiWork）',
+        'code': 400,
+      });
+      return;
+    }
+
+    busy.value = true;
+    logs.reset('正在提取短链...');
+    logs.add('正在逐条捕获作品封面...');
+    try {
+      final currentSniffer = sniffer;
+      if (currentSniffer == null) {
+        throw StateError('捕获服务未初始化');
+      }
+      final result = await currentSniffer.multiWork.extractWorks(
+        batch.workUrls,
+        onProgress: (current, total, message) {
+          logs.upsertLast('正在捕获作品封面', message);
+        },
+        onLog: logs.add,
+      );
+      _lastRawInput = text;
+      _sendJson(request, HttpStatus.ok, {
+        'success': true,
+        'kind': batch.kind.name,
+        'count': result.works.length,
+        'filteredArticles':
+            batch.filteredArticleCount + result.filteredArticleCount,
+        'failedCount': result.failedCount,
+        'works': [
+          for (final work in result.works)
+            {
+              'url': work.url,
+              'kind': work.kind.name,
+              'isImagePost': work.kind == WorkMediaKind.image,
+              'title': work.title,
+              'coverUrl': work.coverUrl,
+              'itemCount': work.parsedResult?.items.length ?? 0,
+            },
+        ],
+        'logs': logs.logs,
+      });
+    } catch (e) {
+      logs.add('多作品封面捕获失败: $e');
+      _sendJson(request, HttpStatus.internalServerError, {
+        'error': '$e',
+        'code': 500,
+      });
     } finally {
       busy.value = false;
     }

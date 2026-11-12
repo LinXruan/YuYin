@@ -83,6 +83,7 @@
 | `.\tool\agent_cmd.bat setup` | 无 | 自动探测设备并建立 `tcp:9527` 端口映射，检查服务连通性 | `[AgentBridge] [在线] 应用控制台已连接: 余音 v<version>` |
 | `.\tool\agent_cmd.bat status` | 无 | 获取应用运行状态、忙碌标记、登录态与上次解析结果 | 返回结构化 JSON 元数据 |
 | `.\tool\agent_cmd.bat parse "<text>"` | 链接或口令文本 | 触发后台 WebView 捕获，返回文案、资源总数及媒体档位列表 | 终端打印格式化表格（类型、分辨率、码率等） |
+| `.\tool\agent_cmd.bat parse-works "<text>"` | 多个作品链接/口令文本 | 逐条解析作品并抓取封面，自动过滤文章作品 (PLAN_61) | 终端输出作品类型、标题、封面直链与成功/失败统计 |
 | `.\tool\agent_cmd.bat download all` | `all` | 下载当前已解析出的全部资源 | 按智能语义化命名保存至相册，输出落地文件名 |
 | `.\tool\agent_cmd.bat download 0,1` | 逗号分隔索引 | 仅下载指定序号项（如第 0、1 项） | 仅保存指定选中项 |
 | `.\tool\agent_cmd.bat logs [n]` | 可选数字 `n` (如 `20`) | 获取应用日志。提供 `n` 时仅展示最新 `n` 条（防止撑爆上下文） | 输出最近过程日志与保存结果 |
@@ -107,6 +108,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | `/api/status` | `GET` | 无 | `{"app":"余音","version":"...","busy":false,"loggedIn":false,"hasParsedResult":true,...}` | 应用全局状态 |
 | `/api/parse` | `POST` | `{"text":"<url_or_token>"}` | `{"desc":"...","isImagePost":true,"totalItems":8,"items":[...]}` | 捕获解析作品 |
+| `/api/parse-works` | `POST` | `{"text":"<url1> <url2> ..."}` | `{"count":2,"filteredArticles":1,"failedCount":0,"works":[{"kind":"video","title":"...","coverUrl":"...","itemCount":3}]}` | 多作品链接逐条捕获封面并过滤文章 (PLAN_61) |
 | `/api/download` | `POST` | `{"indices":"all"}` 或 `{"indices":[0,1]}` | `{"downloadedCount":2,"savedTypes":["image"],"expectedFiles":["..._1.jpg"]}` | 下载资源落盘 |
 | `/api/logs` | `GET` | 无 (支持 `?tail=20` 或 `?limit=50`) | `{"total":120,"count":20,"logs":["..."]}` | 结构化日志流 (支持尾部/限额截取) |
 | `/api/logs/clear`| `POST` | 无 | `{"success":true,"message":"Logs cleared"}` | 清空日志缓存 |

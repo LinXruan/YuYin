@@ -10,6 +10,7 @@ class UserHomeResult {
     this.workCovers = const {},
     this.workTitles = const {},
     this.tabCount,
+    this.filteredArticleCount = 0,
   });
 
   /// 用户的 sec_uid 唯一标识
@@ -39,6 +40,9 @@ class UserHomeResult {
 
   /// 页面 Tab 标注的作品总数（如无则为 null）
   final int? tabCount;
+
+  /// 已过滤的纯文章作品数量
+  final int filteredArticleCount;
 
   /// 作品数量 Tag 标注总数（若为空则为 0）
   int get worksTotalTag => tabCount ?? 0;
@@ -78,5 +82,6 @@ class UserHomeResult {
         'coversCount': coversCount,
         'workTitles': workTitles,
         'titlesCount': titlesCount,
+        'filteredArticleCount': filteredArticleCount,
       };
 }

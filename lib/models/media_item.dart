@@ -1,5 +1,12 @@
 // 聚合导出按领域拆分后的数据模型，确保向后兼容
 export 'common/work_type.dart';
+export 'save_page/multi_work_extract_result.dart';
+export 'save_page/multi_work_selection.dart';
+export 'save_page/save_work_item.dart';
+export 'save_page/work_detail_selection.dart';
+export 'save_page/work_kind.dart';
+export 'save_page/work_selection_state.dart';
+export 'save_page/work_video_quality_choice.dart';
 export 'single_work/media_download_item.dart';
 export 'single_work/single_work_result.dart';
 export 'user_home/multi_home_selection.dart';

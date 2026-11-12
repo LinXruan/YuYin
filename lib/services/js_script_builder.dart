@@ -312,18 +312,41 @@ const String kDouyinSniffJs = r'''
     return '';
   }
   // 按 url 去重后一次性回传（彻底废除 title 逻辑，专攻真实作品 desc）
+  // 从封面对象中提取可用直链：优先 url_list，其次用 uri 拼接标准 CDN 封面
+  function coverUrlOf(c) {
+    if (!c) return '';
+    if (Array.isArray(c.url_list) && c.url_list.length) {
+      var u = c.url_list[0];
+      if (u) return clean(u);
+    }
+    if (Array.isArray(c.urlList) && c.urlList.length) {
+      var u2 = c.urlList[0];
+      if (u2) return clean(u2);
+    }
+    if (typeof c.uri === 'string' && c.uri) {
+      return clean('https://p3-pc-sign.douyinpic.com/' + c.uri + '~tplv-dy-360p.jpeg');
+    }
+    return '';
+  }
   // 提取作品封面图（优先高清封面 origin_cover，严禁提取视频流）
   function pickCover(node, video) {
     var v = video || (node && node.video);
     if (v) {
-      if (v.origin_cover && Array.isArray(v.origin_cover.url_list) && v.origin_cover.url_list.length) return clean(v.origin_cover.url_list[0]);
-      if (v.cover && Array.isArray(v.cover.url_list) && v.cover.url_list.length) return clean(v.cover.url_list[0]);
-      if (v.dynamic_cover && Array.isArray(v.dynamic_cover.url_list) && v.dynamic_cover.url_list.length) return clean(v.dynamic_cover.url_list[0]);
+      var c1 = coverUrlOf(v.origin_cover);
+      if (c1) return c1;
+      var c2 = coverUrlOf(v.cover);
+      if (c2) return c2;
+      var c3 = coverUrlOf(v.dynamic_cover);
+      if (c3) return c3;
+      var c4 = coverUrlOf(v.cover_original_scale);
+      if (c4) return c4;
       if (typeof v.poster === 'string' && v.poster) return clean(v.poster);
     }
     if (node) {
-      if (node.origin_cover && Array.isArray(node.origin_cover.url_list) && node.origin_cover.url_list.length) return clean(node.origin_cover.url_list[0]);
-      if (node.cover && Array.isArray(node.cover.url_list) && node.cover.url_list.length) return clean(node.cover.url_list[0]);
+      var c5 = coverUrlOf(node.origin_cover);
+      if (c5) return c5;
+      var c6 = coverUrlOf(node.cover);
+      if (c6) return c6;
       if (Array.isArray(node.images) && node.images.length && node.images[0] && Array.isArray(node.images[0].url_list) && node.images[0].url_list.length) {
         return clean(node.images[0].url_list[0]);
       }
@@ -333,8 +356,9 @@ const String kDouyinSniffJs = r'''
           return clean(postImg0.display_image.url_list[0]);
         }
       }
-      if (node.article_info && node.article_info.cover && Array.isArray(node.article_info.cover.url_list) && node.article_info.cover.url_list.length) {
-        return clean(node.article_info.cover.url_list[0]);
+      if (node.article_info) {
+        var c7 = coverUrlOf(node.article_info.cover);
+        if (c7) return c7;
       }
     }
     try {
@@ -342,11 +366,11 @@ const String kDouyinSniffJs = r'''
       if (p && p.config) {
         if (typeof p.config.poster === 'string' && p.config.poster) return clean(p.config.poster);
         var pInfo = p.config.awemeInfo;
-        if (pInfo && pInfo.video && pInfo.video.origin_cover && Array.isArray(pInfo.video.origin_cover.url_list) && pInfo.video.origin_cover.url_list.length) {
-          return clean(pInfo.video.origin_cover.url_list[0]);
-        }
-        if (pInfo && pInfo.video && pInfo.video.cover && Array.isArray(pInfo.video.cover.url_list) && pInfo.video.cover.url_list.length) {
-          return clean(pInfo.video.cover.url_list[0]);
+        if (pInfo && pInfo.video) {
+          var c8 = coverUrlOf(pInfo.video.origin_cover);
+          if (c8) return c8;
+          var c9 = coverUrlOf(pInfo.video.cover);
+          if (c9) return c9;
         }
       }
       var domVideos = document.getElementsByTagName('video');
@@ -890,7 +914,8 @@ const String kDouyinSniffJs = r'''
       var h = a.href || '';
       if (!h) continue;
       var cleanUrl = h.split('?')[0].split('#')[0];
-      if (/\/(?:video|note|article)\/\d{10,25}/.test(cleanUrl)) {
+      // 纯文章作品不进入保存页，主页 DOM 扫描只收视频与图文
+      if (/\/(?:video|note)\/\d{10,25}/.test(cleanUrl)) {
         if (!seen[cleanUrl]) {
           seen[cleanUrl] = true;
           validUrls.push(cleanUrl);
@@ -1070,6 +1095,8 @@ const String kDouyinSniffJs = r'''
         if (!item) continue;
         var awemeId = item.aweme_id || item.item_id;
         if (!awemeId) continue;
+        // 纯文章作品不进入保存页（article_info 为文章节点标志）
+        if (item.article_info) continue;
         var awemeType = item.aweme_type;
         var path = (awemeType === 68 || awemeType === 61 || item.images) ? 'note' : 'video';
         var workUrl = 'https://www.douyin.com/' + path + '/' + awemeId;

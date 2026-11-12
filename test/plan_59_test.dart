@@ -238,7 +238,7 @@ void main() {
     test('混合口令主页与网址主页（/user/...）归类为纯粹的多主页 userHomes', () {
       const text = '''
 5- 长按复制此条消息，打开抖音搜索，查看TA的更多作品。 https://v.douyin.com/1YtriCIWMK0/ 3@1.com :7pm
-https://www.douyin.com/user/MS4wLjABAAAAeBMbdyCfKJbCWbdWN9toLwnJhgkUU4ydTGkOvsRx9v5CWG6uRYQpFqXrxmWF2QFV?from_tab_name=main
+https://www.douyin.com/user/MS4wLjABAAAAVKdwm0VboixgMdyotVl-8jTDdimg5wXZ4c0wSTHOu6FTSKUrAWG6gIqfJC8Eti-g?from_tab_name=main&relation=2&vid=7697159257049500763
 ''';
       final result = UrlParser.parseBatchInput(text);
       expect(result.kind, ParsedBatchKind.userHomes);

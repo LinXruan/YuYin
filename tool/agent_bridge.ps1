@@ -102,6 +102,34 @@ switch ($Action.ToLower()) {
 
 
 
+    "parse-works" {
+
+        if (-not $Arg1) {
+
+            throw "请提供多个作品链接文本，例如: .\tool\agent_cmd.bat parse-works '链接1 链接2'"
+
+        }
+
+        Write-Host "[AgentBridge] 正在逐条捕获作品封面: $Arg1 ..."
+
+        $body = @{ text = $Arg1 } | ConvertTo-Json
+
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/parse-works" -Method Post -Body $body -ContentType "application/json; charset=utf-8"
+
+        Write-Host "=== 作品封面捕获完成 ==="
+
+        Write-Host "可保存作品: $($resp.count) 条，已过滤文章: $($resp.filteredArticles) 条，失败: $($resp.failedCount) 条"
+
+        foreach ($work in $resp.works) {
+
+            Write-Host "[$($work.kind)] $($work.title) | 封面: $($work.coverUrl)"
+
+        }
+
+    }
+
+
+
     "parse" {
 
         if (-not $Arg1) {

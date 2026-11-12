@@ -1,8 +1,8 @@
 /// 抖音作品页面类型（只用于选择兜底策略，不代表作品内容）
-enum DouyinWorkPage { note, video, userHome, unknown }
+enum DouyinWorkPage { note, video, article, userHome, unknown }
 
-/// 单条链接的归类（作品 vs 主页）
-enum DouyinLinkKind { work, userHome }
+/// 单条链接的归类（作品 / 主页 / 纯文章）
+enum DouyinLinkKind { work, userHome, article }
 
 /// 粘贴板批量解析的整段归类结果
 enum ParsedBatchKind {
@@ -20,6 +20,9 @@ enum ParsedBatchKind {
 
   /// 同时混合了主页链接与作品链接
   mixed,
+
+  /// 仅识别到纯文章链接（全部过滤，不进入保存页）
+  articlesOnly,
 }
 
 /// 粘贴板中识别出的单条抖音链接及其类型
@@ -36,11 +39,18 @@ class ParsedBatchResult {
     required this.kind,
     this.workUrls = const [],
     this.homeUrls = const [],
+    this.articleUrls = const [],
   });
 
   final ParsedBatchKind kind;
   final List<String> workUrls;
   final List<String> homeUrls;
+
+  /// 已识别并过滤的纯文章链接
+  final List<String> articleUrls;
+
+  /// 已过滤的文章链接数量
+  int get filteredArticleCount => articleUrls.length;
 }
 
 /// 抖音分享口令解析工具
@@ -75,7 +85,7 @@ class UrlParser {
 
     for (final m in allMatches) {
       final url = _trimTrailingPunctuation(m.group(0)!);
-      if (_isDouyinLink(url) && seenUrls.add(url)) {
+      if (_isDouyinLink(url) && seenUrls.add(_dedupeKeyForUrl(url))) {
         douyinEntries.add((match: m, url: url));
       }
     }
@@ -86,6 +96,8 @@ class UrlParser {
 
     final workUrls = <String>[];
     final homeUrls = <String>[];
+    final articleUrls = <String>[];
+    final nakedShortWorkUrls = <String>[];
 
     for (var i = 0; i < douyinEntries.length; i++) {
       final current = douyinEntries[i];
@@ -101,16 +113,36 @@ class UrlParser {
           ? rawSuffix
           : rawSuffix.substring(0, newlineIdx);
 
-      final kind = _classifyExtractedLink(
+      final classified = _classifyExtractedLink(
         url: current.url,
         prefix: prefix,
         suffixLine: suffixLine,
       );
 
-      if (kind == DouyinLinkKind.userHome) {
+      if (classified.kind == DouyinLinkKind.article) {
+        articleUrls.add(current.url);
+      } else if (classified.kind == DouyinLinkKind.userHome) {
         homeUrls.add(current.url);
       } else {
         workUrls.add(current.url);
+        if (classified.nakedShortLink) {
+          nakedShortWorkUrls.add(current.url);
+        }
+      }
+    }
+
+    // 同一作品/主页的口令短链与网址混贴时，短链常因相邻网址挤占上下文而被当作裸短链。
+    // 若同批次存在明确主页网址且没有任何明确作品网址，则把裸短链归为主页。
+    final explicitHomeCount =
+        homeUrls.where((url) => isUserHomeUrl(url)).length;
+    final explicitWorkCount =
+        workUrls.where((url) => extractAwemeId(url) != null).length;
+    if (explicitHomeCount > 0 &&
+        explicitWorkCount == 0 &&
+        nakedShortWorkUrls.isNotEmpty) {
+      for (final url in nakedShortWorkUrls) {
+        workUrls.remove(url);
+        homeUrls.add(url);
       }
     }
 
@@ -121,32 +153,53 @@ class UrlParser {
       batchKind = ParsedBatchKind.userHomes;
     } else if (workUrls.length == 1) {
       batchKind = ParsedBatchKind.singleWork;
-    } else {
+    } else if (workUrls.isNotEmpty) {
       batchKind = ParsedBatchKind.multiWork;
+    } else if (articleUrls.isNotEmpty) {
+      batchKind = ParsedBatchKind.articlesOnly;
+    } else {
+      batchKind = ParsedBatchKind.empty;
     }
 
     return ParsedBatchResult(
       kind: batchKind,
       workUrls: workUrls,
       homeUrls: homeUrls,
+      articleUrls: articleUrls,
     );
   }
 
-  static DouyinLinkKind _classifyExtractedLink({
+  /// 生成批量去重键：明确主页按 secUid、明确作品按 awemeId 去重；
+  /// 口令短链暂按原始 URL 去重，解析后再由多作品抓取服务按 awemeId 二次去重。
+  static String _dedupeKeyForUrl(String url) {
+    if (isUserHomeUrl(url)) {
+      final secUid = extractSecUid(url);
+      if (secUid != null && secUid.isNotEmpty) return 'home:$secUid';
+    }
+    final awemeId = extractAwemeId(url);
+    if (awemeId != null) return 'work:$awemeId';
+    return 'raw:$url';
+  }
+
+  static ({DouyinLinkKind kind, bool nakedShortLink})
+  _classifyExtractedLink({
     required String url,
     required String prefix,
     required String suffixLine,
   }) {
+    if (isArticleUrl(url)) {
+      return (kind: DouyinLinkKind.article, nakedShortLink: false);
+    }
     if (isUserHomeUrl(url)) {
-      return DouyinLinkKind.userHome;
+      return (kind: DouyinLinkKind.userHome, nakedShortLink: false);
     }
     if (extractAwemeId(url) != null) {
-      return DouyinLinkKind.work;
+      return (kind: DouyinLinkKind.work, nakedShortLink: false);
     }
 
     // 短链（口令链接）：以是否包含 MM/dd 日期参数区分口令作品与口令主页
     if (_shareDateParamRegExp.hasMatch(suffixLine)) {
-      return DouyinLinkKind.work;
+      return (kind: DouyinLinkKind.work, nakedShortLink: false);
     }
 
     final prefixTrimmed = _lastLine(prefix).trim();
@@ -154,11 +207,11 @@ class UrlParser {
     final hasShareContext =
         prefixTrimmed.isNotEmpty || suffixTrimmed.isNotEmpty;
     if (hasShareContext) {
-      return DouyinLinkKind.userHome;
+      return (kind: DouyinLinkKind.userHome, nakedShortLink: false);
     }
 
     // 纯裸短链兜底为单作品，保持向后兼容
-    return DouyinLinkKind.work;
+    return (kind: DouyinLinkKind.work, nakedShortLink: true);
   }
 
   static String _lastLine(String text) {
@@ -180,6 +233,21 @@ class UrlParser {
     return path.startsWith('/user/') ||
         path.startsWith('/share/user/') ||
         path.contains('/user/');
+  }
+
+  /// 判断链接是否属于纯文章作品（如 /article/{id}、/share/article/{id}）
+  ///
+  /// 文章作品不进入保存页，需在所有作品批量流程中过滤。
+  static bool isArticleUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return false;
+    final trimmed = url.trim();
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null) {
+      return RegExp(r'(?:ies)?douyin\.com/(?:share/)?article/\d{10,25}')
+          .hasMatch(trimmed);
+    }
+    if (!_isSupportedHost(uri.host)) return false;
+    return uri.path.toLowerCase().contains('/article/');
   }
 
   /// 从主页链接中提取用户 sec_uid（若为 self 则返回 self）
@@ -218,9 +286,8 @@ class UrlParser {
     }
 
     const idPattern = r'\d{10,25}';
-    final pathMatch =
-        RegExp('/(?:video|note|slides)/($idPattern)(?:/|\$)')
-            .firstMatch(uri.path);
+    final pathMatch = RegExp('/(?:video|note|slides)/($idPattern)(?:/|\$)')
+        .firstMatch(uri.path);
     if (pathMatch != null) return pathMatch.group(1);
 
     final modalId = uri.queryParameters['modal_id'];
@@ -229,8 +296,8 @@ class UrlParser {
     }
 
     // 兜底：对整串 URL 再匹配一次，兼容被重定向/包裹的链接
-    final rawPath =
-        RegExp('/(?:video|note|slides)/($idPattern)').firstMatch(url);
+    final rawPath = RegExp('/(?:video|note|slides)/($idPattern)')
+        .firstMatch(url);
     if (rawPath != null) return rawPath.group(1);
     return RegExp('[?&]modal_id=($idPattern)').firstMatch(url)?.group(1);
   }
@@ -280,7 +347,8 @@ class UrlParser {
     if (uri == null) return DouyinWorkPage.unknown;
 
     final host = uri.host.toLowerCase();
-    final isDouyinHost = host == 'douyin.com' ||
+    final isDouyinHost =
+        host == 'douyin.com' ||
         host.endsWith('.douyin.com') ||
         host == 'iesdouyin.com' ||
         host.endsWith('.iesdouyin.com');
@@ -291,6 +359,9 @@ class UrlParser {
         path.startsWith('/share/user/') ||
         path.contains('/user/')) {
       return DouyinWorkPage.userHome;
+    }
+    if (path.contains('/article/')) {
+      return DouyinWorkPage.article;
     }
     if (path.contains('/note/') || path.contains('/slides/')) {
       return DouyinWorkPage.note;

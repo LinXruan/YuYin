@@ -9,6 +9,9 @@ import '../utils/login_state_store.dart';
 import '../utils/url_parser.dart';
 import 'douyin_share_api.dart';
 import 'js_script_builder.dart';
+import 'multi_work/article_work_exception.dart';
+import 'multi_work/i_multi_work_extractor.dart';
+import 'multi_work/multi_work_extractor.dart';
 import 'single_work/i_single_work_extractor.dart';
 import 'single_work/single_work_extractor.dart';
 import 'user_home/i_user_home_extractor.dart';
@@ -26,12 +29,16 @@ class DouyinSniffer
         ISingleWorkExtractor,
         IUserHomeExtractor,
         ISingleWorkSnifferDelegate,
-        IUserHomeSnifferDelegate {
+        IUserHomeSnifferDelegate,
+        IMultiWorkSnifferDelegate {
   /// 单作品解析领域提取器
   late final ISingleWorkExtractor singleWork = SingleWorkExtractor(this);
 
   /// 主页批量抓取领域提取器
   late final IUserHomeExtractor userHome = UserHomeExtractor(this);
+
+  /// 多作品链接逐条解析领域提取器
+  late final IMultiWorkExtractor multiWork = MultiWorkExtractor(this);
 
   /// 抖音 PC 网页版使用的桌面 Chrome UA
   static const String desktopUserAgent =
@@ -180,6 +187,7 @@ class DouyinSniffer
   String? get sourceUrl => _sourceUrl;
 
   /// 第一次带 awemeId 的主页面 URL（不会记录 C 分享页）
+  @override
   String? get awemePageUrl => _awemePageUrl;
 
   /// 加载分享链接并等待 JS 回传，最长等待 30 秒
@@ -344,6 +352,16 @@ class DouyinSniffer
       return;
     }
     _lastPageUrl = url;
+
+    // 纯文章作品不进入保存页：单作品解析中一旦重定向到 /article/ 立即快速失败
+    if (!_webviewShareFallback &&
+        UrlParser.isArticleUrl(url) &&
+        _completer != null &&
+        !_completer!.isCompleted) {
+      _log('检测到文章作品链接，已自动过滤');
+      _finishWithError(const ArticleWorkException(), taskId: taskId);
+      return;
+    }
 
     // C 分享页自身的 /share/video/ 不能覆盖主页面类型
     if (!_webviewShareFallback) {
@@ -752,6 +770,15 @@ class DouyinSniffer
             }
           }
         }
+        // 过滤纯文章作品及其对应的封面/标题映射，避免进入中层保存页
+        final articleUrls = workUrls.where(UrlParser.isArticleUrl).toSet();
+        if (articleUrls.isNotEmpty) {
+          workUrls.removeWhere(articleUrls.contains);
+          workCovers.removeWhere((key, _) => articleUrls.contains(key));
+          workTitles.removeWhere((key, _) => articleUrls.contains(key));
+          _log('已过滤 ${articleUrls.length} 条文章作品链接');
+        }
+
         final homeResult = UserHomeResult(
           secUid: secUid,
           nickname: nickname,
@@ -760,6 +787,7 @@ class DouyinSniffer
           workCovers: workCovers,
           workTitles: workTitles,
           tabCount: tabCount,
+          filteredArticleCount: articleUrls.length,
         );
         if (_profileCompleter != null && !_profileCompleter!.isCompleted) {
           _finishProfileWithResult(homeResult.profile, _taskId);
@@ -891,13 +919,24 @@ class DouyinSniffer
     }
 
     _acceptLogs = false;
+    // 主 WebView 结果缺失封面时，使用并行分享页兜底结果中的封面
+    var effectiveCover = coverUrl?.trim() ?? '';
+    if (effectiveCover.isEmpty) {
+      final fallbackCover = _shareVideoFallback?.coverUrl?.trim() ?? '';
+      if (fallbackCover.isNotEmpty) {
+        effectiveCover = fallbackCover;
+        if (kDebugMode) {
+          _log('主结果封面缺失，已使用分享页封面兜底');
+        }
+      }
+    }
     final result = SniffResult(
       items: items,
       cookie: cookie,
       isImagePost: isImagePost,
       title: title,
       desc: desc,
-      coverUrl: coverUrl,
+      coverUrl: effectiveCover.isEmpty ? null : effectiveCover,
     );
     final audioPart =
         result.audioCount > 0 ? '、${result.audioCount} 首配乐音频' : '';
@@ -1008,8 +1047,14 @@ class DouyinSniffer
     final avatarText = result.avatarUrl.isNotEmpty ? '已关联头像, ' : '';
     final coverText = result.coversCount > 0 ? '已关联封面: ${result.coversCount} 条, ' : '';
     final titleText = result.titlesCount > 0 ? '已关联标题: ${result.titlesCount} 条' : '';
-    final metaText = (avatarText.isNotEmpty || coverText.isNotEmpty || titleText.isNotEmpty)
-        ? '（$avatarText$coverText$titleText）'
+    final articleText = result.filteredArticleCount > 0
+        ? '已过滤文章: ${result.filteredArticleCount} 条'
+        : '';
+    final metaText = (avatarText.isNotEmpty ||
+            coverText.isNotEmpty ||
+            titleText.isNotEmpty ||
+            articleText.isNotEmpty)
+        ? '（$avatarText$coverText$titleText$articleText）'
         : '';
     _log('主页捕获成功：作者【$author】，共 ${result.count} 条作品$metaText');
     if (_profileCompleter != null && !_profileCompleter!.isCompleted) {

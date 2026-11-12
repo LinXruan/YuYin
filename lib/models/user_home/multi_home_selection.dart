@@ -1,4 +1,7 @@
+import '../common/batch_video_quality.dart';
 import 'user_home_profile.dart';
+
+export '../common/batch_video_quality.dart';
 
 /// 顶层（多主页）保存页中单个作者的选择状态
 enum AuthorSelectionState {
@@ -10,18 +13,6 @@ enum AuthorSelectionState {
 
   /// 全选该作者（实线主色边框）
   all,
-}
-
-/// 多主页/批量下载时的视频保存画质偏好
-enum BatchVideoQualityMode {
-  /// 最高画质
-  highest,
-
-  /// 最低画质
-  lowest,
-
-  /// 混合画质（所有作者的视频作品中存在非统一最高/最低画质时启用）
-  mixed,
 }
 
 /// 顶层保存页中的单个作者条目
