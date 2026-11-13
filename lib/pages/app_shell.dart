@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_this
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -20,6 +22,10 @@ import 'history_page.dart';
 import 'login_webview_page.dart';
 import 'parse_page.dart';
 import 'settings_page.dart';
+
+part 'shell/flow/shell_startup_flow.dart';
+
+part 'shell/widget/shell_update_banner.dart';
 
 /// 应用主框架：底部三个主页面（解析 / 历史 / 设置）
 ///
@@ -98,41 +104,10 @@ class _AppShellState extends State<AppShell> {
     });
 
     // 启动 2 秒后自动静默检查更新（仅在有新版本时提醒用户）
-    _scheduleAutoCheckUpdate();
+    this._scheduleAutoCheckUpdate();
   }
 
   /// 启动 2 秒后执行自动检查更新逻辑
-  void _scheduleAutoCheckUpdate() {
-    _autoCheckUpdateTimer?.cancel();
-    _autoCheckUpdateTimer = Timer(const Duration(seconds: 2), () async {
-      if (!mounted) return;
-      // 1. 读取用户设置：是否开启自动检查更新
-      if (!DownloadSettingsStore.autoCheckUpdate) return;
-      // 2. 若当前已经在下载更新中，不重复触发
-      if (AppUpdateStore.statusNotifier.value.isDownloading) return;
-      // 3. 网络连通性检查
-      final hasNet = await NetworkDetector.hasInternetConnection();
-      if (!mounted || !hasNet) return;
-
-      // 4. 发起静默检查
-      final checker = UpdateChecker();
-      try {
-        final result = await checker.checkUpdate(currentVersion: appVersion);
-        if (!mounted || result.isCancelled || result.errorMessage != null) return;
-        // 仅在明确检测到新版本时主动弹窗提醒
-        if (result.info != null && result.info!.hasUpdate) {
-          final localApk = await AppUpdateStore.findMatchingApk(result.info!.version);
-          if (!mounted) return;
-          UpdateDialog.show(context, result.info!, localApk: localApk);
-        }
-      } catch (_) {
-        // 静默异常吞吐，保证不打扰用户
-      } finally {
-        checker.dispose();
-      }
-    });
-  }
-
   @override
   void dispose() {
     _autoCheckUpdateTimer?.cancel();
@@ -147,61 +122,10 @@ class _AppShellState extends State<AppShell> {
     super.dispose();
   }
 
+  /// 供流程分片调用的状态刷新入口
+  void _refresh(VoidCallback fn) => setState(fn);
+
   /// 打开抖音网页登录页；Cookie 由 WebView 全局共享给捕获器
-  Future<void> _openLoginPage({bool initialLoggedIn = false}) async {
-    final done = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => LoginWebViewPage(initialLoggedIn: initialLoggedIn),
-      ),
-    );
-    if (!mounted) return;
-    if (done == true) {
-      _loggedIn.value = true;
-      _logs.add('登录完成，Cookie 已保存，可重新解析获取高清画质');
-    } else if (done == false) {
-      _loggedIn.value = false;
-      await LoginStateStore.clearLogin();
-      _logs.add('检测到账号已退出登录，恢复未登录状态');
-    }
-  }
-
-  /// 未登录时先说明登录用途；已登录（我的主页）直接进入登录页
-  Future<void> _onAccountTap(bool loggedIn) async {
-    final hasNet = await NetworkDetector.hasInternetConnection();
-    if (!mounted) return;
-    if (!hasNet) {
-      NetworkDetector.showOfflineSnackbar(context);
-      return;
-    }
-
-    if (!loggedIn) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('登录提示'),
-          content: const Text(loginNotice),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('继续登录'),
-            ),
-          ],
-        ),
-      );
-      if (confirmed != true || !mounted) return;
-    }
-    await _openLoginPage(initialLoggedIn: loggedIn);
-  }
-
-  void _selectTab(int index) {
-    if (index == _index) return;
-    setState(() => _index = index);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -219,7 +143,7 @@ class _AppShellState extends State<AppShell> {
                         final theme = Theme.of(context);
                         final isDark = theme.brightness == Brightness.dark;
                         return OutlinedButton.icon(
-                          onPressed: () => _onAccountTap(loggedIn),
+                          onPressed: () => this._onAccountTap(loggedIn),
                           icon: Icon(
                             loggedIn ? Icons.person_rounded : Icons.login_rounded,
                             size: 16,
@@ -269,7 +193,7 @@ class _AppShellState extends State<AppShell> {
                 busy: _busy,
                 loggedIn: _loggedIn,
                 externalUrlNotifier: _pendingInputUrl,
-                onTapAccount: () => _onAccountTap(_loggedIn.value),
+                onTapAccount: () => this._onAccountTap(_loggedIn.value),
                 // 解析出结果、准备弹选择面板前，确保用户看到的是解析页
                 onRequestParseTab: () {
                   if (mounted && _index != 0) setState(() => _index = 0);
@@ -305,10 +229,10 @@ class _AppShellState extends State<AppShell> {
             children: [
               // 底部导航栏上方的悬浮应用内更新进度条
               if (updateStatus.isDownloading)
-                _buildUpdateProgressBar(context, updateStatus),
+                this._buildUpdateProgressBar(context, updateStatus),
               NavigationBar(
                 selectedIndex: _index,
-                onDestinationSelected: _selectTab,
+                onDestinationSelected: this._selectTab,
                 destinations: const [
                   NavigationDestination(
                     icon: Icon(Icons.download_outlined),
@@ -335,106 +259,4 @@ class _AppShellState extends State<AppShell> {
   }
 
   /// 底部更新下载浮动条
-  Widget _buildUpdateProgressBar(BuildContext context, AppUpdateStatus status) {
-    final theme = Theme.of(context);
-    final percent = (status.progress * 100).toInt();
-    final versionStr = status.version != null ? ' v${status.version}' : '';
-    final isRetrying =
-        status.errorMessage != null && status.errorMessage!.contains('重试');
-    final isConnecting = status.progress <= 0 && status.receivedBytes <= 0;
-
-    final String titleText;
-    final String trailingText;
-    if (isRetrying) {
-      titleText = status.errorMessage!;
-      trailingText = '重试中';
-    } else if (isConnecting) {
-      titleText = '正在连接更新服务器$versionStr...';
-      trailingText = '连接中';
-    } else {
-      titleText = '正在下载新版本$versionStr';
-      trailingText = '$percent%';
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.95),
-        border: Border(
-          top: BorderSide(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
-            width: 1.0,
-          ),
-          bottom: BorderSide(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
-            width: 0.5,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.download_rounded,
-            size: 20,
-            color: theme.colorScheme.primary,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        titleText,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      trailingText,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 5),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: (!isConnecting && !isRetrying && status.progress > 0)
-                        ? status.progress
-                        : null,
-                    minHeight: 5,
-                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.close_rounded, size: 20),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            tooltip: '取消下载',
-            onPressed: AppUpdateStore.cancelDownload,
-          ),
-        ],
-      ),
-    );
-  }
 }

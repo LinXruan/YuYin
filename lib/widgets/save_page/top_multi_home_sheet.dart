@@ -11,6 +11,20 @@ import '../../utils/save_selection_tree.dart';
 import '../../utils/selection_mode_store.dart';
 import 'save_page_common.dart';
 
+part 'top/flow/top_author_selection_flow.dart';
+
+part 'top/flow/top_quality_flow.dart';
+
+part 'top/flow/top_selection_memory.dart';
+
+part 'top/flow/top_sheet_action_flow.dart';
+
+part 'top/debug/top_debug_snapshot.dart';
+
+part 'top/widget/top_author_tile.dart';
+
+part 'top/widget/top_avatar.dart';
+
 /// 进入中层页面（单主页作品列表）的回调
 typedef OnOpenAuthorCallback = FutureOr<AuthorWorksSelection?> Function(
   MultiHomeAuthorItem author,
@@ -137,17 +151,20 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
       return copy;
     }).toList();
 
-    _refreshAuthorStates();
+    this._refreshAuthorStates();
     _qualityMode =
-        widget.initialQualityMode ?? _aggregateAll() ?? rememberedQuality;
-    _publishDebugState();
+        widget.initialQualityMode ?? this._aggregateAll() ?? rememberedQuality;
+    this._publishDebugState();
   }
 
   @override
   void dispose() {
-    _recordSelectionMode();
+    this._recordSelectionMode();
     super.dispose();
   }
+
+  /// 供流程分片调用的状态刷新入口
+  void _refresh(VoidCallback fn) => setState(fn);
 
   List<SaveWorkItem> _worksOf(String secUid) =>
       _worksBySecUid[secUid] ?? const [];
@@ -155,36 +172,6 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
   List<SaveWorkItem> get _allWorks => [
     for (final author in _authors) ..._worksOf(author.profile.secUid),
   ];
-
-  BatchVideoQualityMode? _aggregateAll() =>
-      SaveSelectionTree.aggregateQuality(_allWorks);
-
-  void _refreshAuthorStates() {
-    _authors = [
-      for (final author in _authors)
-        _worksOf(author.profile.secUid).isEmpty
-            ? author
-            : author.copyWith(
-                selectionState: SaveSelectionTree.deriveAuthorState(
-                  _worksOf(author.profile.secUid),
-                ),
-              ),
-    ];
-  }
-
-  void _recordSelectionMode() {
-    if (_hasRecordedSelection) return;
-    _hasRecordedSelection = true;
-    SelectionModeStore.updateFromHomeSelections(
-      _authors.map((author) => author.selectionState).toList(),
-    );
-    unawaited(
-      DownloadSettingsStore.recordBatchQualitySelection(
-        widget.memoryScope,
-        _qualityMode,
-      ),
-    );
-  }
 
   bool get _hasAuthors => _authors.isNotEmpty;
 
@@ -197,115 +184,6 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
       .length;
 
   /// 上层控制下层：作者全选/全不选，递归设置其全部作品。
-  void _toggleAuthor(int index) {
-    final author = _authors[index];
-    final secUid = author.profile.secUid.trim();
-    final next = author.selectionState == AuthorSelectionState.all
-        ? AuthorSelectionState.none
-        : AuthorSelectionState.all;
-    setState(() {
-      final works = _worksOf(secUid);
-      if (works.isNotEmpty) {
-        _worksBySecUid[secUid] =
-            SaveSelectionTree.applyAuthorSelection(works, next);
-      }
-      _authors[index] = author.copyWith(selectionState: next);
-      _refreshAuthorStates();
-      _qualityMode = _aggregateAll() ?? _qualityMode;
-    });
-    _publishDebugState();
-  }
-
-  /// 上层控制下层：全部作者全选/全不选，递归设置所有作品。
-  void _toggleSelectAll() {
-    if (!_hasAuthors) return;
-    final target = _isAllSelected
-        ? AuthorSelectionState.none
-        : AuthorSelectionState.all;
-    setState(() {
-      for (var i = 0; i < _authors.length; i++) {
-        final secUid = _authors[i].profile.secUid.trim();
-        final works = _worksOf(secUid);
-        if (works.isNotEmpty) {
-          _worksBySecUid[secUid] =
-              SaveSelectionTree.applyAuthorSelection(works, target);
-        }
-        _authors[i] = _authors[i].copyWith(selectionState: target);
-      }
-      _refreshAuthorStates();
-      _qualityMode = _aggregateAll() ?? _qualityMode;
-    });
-    _publishDebugState();
-  }
-
-  /// 上层控制下层：顶层画质切换递归应用到所有作者的全部视频作品。
-  void _toggleQualityMode() {
-    final next = _qualityMode == BatchVideoQualityMode.highest
-        ? BatchVideoQualityMode.lowest
-        : BatchVideoQualityMode.highest;
-    setState(() {
-      for (final author in _authors) {
-        final secUid = author.profile.secUid.trim();
-        final works = _worksOf(secUid);
-        if (works.isEmpty) continue;
-        _worksBySecUid[secUid] =
-            SaveSelectionTree.applyQualityToWorks(works, next);
-      }
-      _qualityMode = next;
-    });
-    unawaited(
-      DownloadSettingsStore.setBatchQuality(widget.memoryScope, next),
-    );
-    widget.onQualityChanged?.call(next);
-    _publishDebugState();
-  }
-
-  Future<void> _handleOpenAuthor(int index) async {
-    final callback = widget.onOpenAuthor;
-    if (callback == null || _openingIndex != null) return;
-    setState(() => _openingIndex = index);
-    try {
-      final secUid = _authors[index].profile.secUid.trim();
-      final updated = await callback(
-        _authors[index],
-        index,
-        List<SaveWorkItem>.from(_worksOf(secUid)),
-        _qualityMode,
-      );
-      if (!mounted || updated == null) return;
-      setState(() {
-        _worksBySecUid[secUid] = List<SaveWorkItem>.from(updated.works);
-        _authors[index] = _authors[index].copyWith(
-          selectionState: SaveSelectionTree.deriveAuthorState(updated.works),
-        );
-        _qualityMode = _aggregateAll() ?? updated.qualityMode;
-      });
-      _publishDebugState();
-    } finally {
-      if (mounted) setState(() => _openingIndex = null);
-    }
-  }
-
-  void _confirm() {
-    _refreshAuthorStates();
-    _recordSelectionMode();
-    final selected = _authors
-        .where((author) => author.selectionState != AuthorSelectionState.none)
-        .toList();
-    _publishDebugState();
-    Navigator.pop(
-      context,
-      MultiHomeSelectionResult(
-        selectedAuthors: selected,
-        qualityMode: _qualityMode,
-        worksBySecUid: {
-          for (final entry in _worksBySecUid.entries)
-            entry.key: List<SaveWorkItem>.unmodifiable(entry.value),
-        },
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -330,7 +208,7 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
                   SaveQualityToggleChip(
                     key: const ValueKey('quality_toggle_btn'),
                     mode: _qualityMode,
-                    onTap: _toggleQualityMode,
+                    onTap: this._toggleQualityMode,
                   ),
                   const SizedBox(width: 6),
                   SaveCategoryFilterButton(
@@ -338,7 +216,7 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
                     label: '全选',
                     hasItems: _hasAuthors,
                     isSelected: _isAllSelected,
-                    onTap: _toggleSelectAll,
+                    onTap: this._toggleSelectAll,
                   ),
                 ],
               ),
@@ -353,7 +231,7 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
                       mainAxisSpacing: 8,
                     ),
                 itemCount: _authors.length,
-                itemBuilder: (context, index) => _buildAuthorTile(index),
+                itemBuilder: (context, index) => this._buildAuthorTile(index),
               ),
             ),
             Padding(
@@ -362,7 +240,7 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
                 width: double.infinity,
                 child: FilledButton.icon(
                   key: const ValueKey('multi_home_confirm_btn'),
-                  onPressed: _selectedCount == 0 ? null : _confirm,
+                  onPressed: _selectedCount == 0 ? null : this._confirm,
                   icon: const Icon(Icons.save_alt),
                   label: Text('保存选中项 ($_selectedCount)'),
                 ),
@@ -373,188 +251,6 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
       ),
     );
   }
-
-  void _publishDebugState() {
-    SavePageDebugStore.update('top', {
-      'qualityMode': _qualityMode.name,
-      'authors': [
-        for (var index = 0; index < _authors.length; index++)
-          _authorDebug(index),
-      ],
-    });
-  }
-
-  Map<String, dynamic> _authorDebug(int index) {
-    final author = _authors[index];
-    final works = _worksOf(author.profile.secUid.trim());
-    return {
-      'index': index,
-      'secUid': author.profile.secUid,
-      'nickname': author.profile.nickname,
-      'state': author.selectionState.name,
-      'worksCount': works.length,
-      'selectedWorks': works.where((work) => work.selectionState.isSelected).length,
-      'works': [for (final work in works) _workDebug(work)],
-    };
-  }
-
-  Map<String, dynamic> _workDebug(SaveWorkItem work) {
-    return {
-      'url': work.url,
-      'kind': work.kind.name,
-      'state': work.selectionState.name,
-      'quality': work.qualityChoice.level.name,
-      'selectedResourceCount': work.selectedResources.length,
-      'selectedResourceUrls': [
-        for (final item in work.selectedResources) item.url,
-      ],
-    };
-  }
-
-  Widget _buildAuthorTile(int index) {
-    final author = _authors[index];
-    final state = author.selectionState;
-    final isPartial = state == AuthorSelectionState.partial;
-    final isAll = state == AuthorSelectionState.all;
-
-    final Widget clippedAvatar = ClipRRect(
-      borderRadius: BorderRadius.circular(9),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          _AuthorAvatarContent(
-            avatarUrl: author.profile.avatarUrl,
-            headers: widget.headers,
-          ),
-          if (author.profile.nickname.isNotEmpty)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(6, 14, 28, 4),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.65),
-                    ],
-                  ),
-                ),
-                child: Text(
-                  author.profile.nickname,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ),
-          Positioned(
-            bottom: 4,
-            right: 4,
-            child: SaveOpenBadge(
-              key: ValueKey('open_author_button_$index'),
-              semanticLabel: '打开作者作品列表',
-              onTap: () => _handleOpenAuthor(index),
-            ),
-          ),
-          if (_openingIndex == index)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.35),
-                child: const Center(
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-
-    final tile = GestureDetector(
-      key: ValueKey('author_tile_$index'),
-      behavior: HitTestBehavior.opaque,
-      onTap: () => _toggleAuthor(index),
-      child: SaveSelectionFrame(
-        selected: isAll,
-        partial: isPartial,
-        partialKey: ValueKey('author_partial_border_$index'),
-        child: clippedAvatar,
-      ),
-    );
-
-    return Semantics(
-      container: true,
-      button: true,
-      selected: isAll,
-      value: isPartial ? '部分选择' : (isAll ? '全选' : '未选'),
-      label: author.profile.nickname.isNotEmpty
-          ? author.profile.nickname
-          : '作者 ${index + 1}',
-      child: tile,
-    );
-  }
 }
 
-/// 作者头像内容组件（带加载中与兜底占位）
-class _AuthorAvatarContent extends StatelessWidget {
-  const _AuthorAvatarContent({required this.avatarUrl, required this.headers});
-
-  final String avatarUrl;
-  final Map<String, String> headers;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final placeholderColor = isDark
-        ? theme.colorScheme.surfaceContainerHighest
-        : theme.colorScheme.surfaceContainerHigh;
-
-    if (avatarUrl.trim().isEmpty) {
-      return Container(
-        color: placeholderColor,
-        child: Icon(
-          Icons.person_outline_rounded,
-          size: 36,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      );
-    }
-
-    return Image.network(
-      avatarUrl,
-      headers: headers,
-      cacheWidth: 360,
-      fit: BoxFit.cover,
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        return Container(
-          color: placeholderColor,
-          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-        );
-      },
-      errorBuilder: (_, _, _) => Container(
-        color: placeholderColor,
-        child: Icon(
-          Icons.person_outline_rounded,
-          size: 36,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}
+// ignore_for_file: unnecessary_this

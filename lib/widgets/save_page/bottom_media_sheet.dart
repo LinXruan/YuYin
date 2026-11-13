@@ -8,6 +8,20 @@ import '../../utils/selection_mode_store.dart';
 import 'bottom_media_widgets.dart';
 import 'save_page_common.dart';
 
+part 'bottom/flow/bottom_media_selection_flow.dart';
+
+part 'bottom/flow/bottom_audio_flow.dart';
+
+part 'bottom/flow/bottom_selection_memory.dart';
+
+part 'bottom/flow/bottom_confirm_flow.dart';
+
+part 'bottom/flow/bottom_preview_flow.dart';
+
+part 'bottom/debug/bottom_debug_snapshot.dart';
+
+part 'bottom/widget/bottom_media_tile.dart';
+
 /// 图片/实况图/配乐音频预览面板：网格展示所有资源，支持分类快速筛选、音频试听、放大预览与批量保存。
 class ImagePreviewSheet extends StatefulWidget {
   const ImagePreviewSheet({
@@ -105,12 +119,12 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
       _audioService = AudioPreviewService();
       _createdOwnAudioService = true;
     }
-    _publishDebugState();
+    this._publishDebugState();
   }
 
   @override
   void dispose() {
-    _recordSelectionMode();
+    this._recordSelectionMode();
     if (_createdOwnAudioService) {
       _audioService.dispose();
     } else {
@@ -119,18 +133,10 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
     super.dispose();
   }
 
-  /// 根据当前选择情况，按标签分别计算判断值 b 并驱动各标签 a 状态转移
-  void _recordSelectionMode() {
-    if (_hasRecordedSelection) return;
-    _hasRecordedSelection = true;
-    SelectionModeStore.updateFromSheetItems(
-      allItems: widget.items,
-      selectedIndices: _selectedIndices,
-      scope: widget.memoryScope,
-    );
-  }
+  /// 供流程分片调用的状态刷新入口
+  void _refresh(VoidCallback fn) => setState(fn);
 
-  // --- 分类资源索引 ---
+  /// 根据当前选择情况，按标签分别计算判断值 b 并驱动各标签 a 状态转移
   List<int> get _imageIndices => [
     for (var i = 0; i < widget.items.length; i++)
       if (widget.items[i].type == MediaType.image) i,
@@ -158,113 +164,6 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
       _hasAudio && _audioIndices.every(_selectedIndices.contains);
 
   /// 切换单个资源的选中状态
-  void _toggleSelected(int index) {
-    setState(() {
-      if (!_selectedIndices.remove(index)) _selectedIndices.add(index);
-    });
-    _publishDebugState();
-  }
-
-  /// 按分类一键切换全选/全不选
-  void _toggleCategory(List<int> indices, bool isAllSelected, bool hasItems) {
-    if (!hasItems) return; // 缺少该类型，点击不响应
-    setState(() {
-      if (isAllSelected) {
-        _selectedIndices.removeAll(indices);
-      } else {
-        _selectedIndices.addAll(indices);
-      }
-    });
-    _publishDebugState();
-  }
-
-  /// 切换指定配乐的试听状态
-  void _togglePlayAudio(MediaItem item) {
-    if (_currentPlayingItem?.url == item.url) {
-      if (_audioService.isPlaying) {
-        _audioService.pause();
-      } else {
-        _audioService.play(item.url, headers: widget.headers);
-      }
-    } else {
-      _currentPlayingItem = item;
-      _showAudioPlayerBar = true;
-      _audioService.play(item.url, headers: widget.headers);
-    }
-    setState(() {});
-  }
-
-  /// 关闭底部播放条并停止播放
-  void _closeAudioPlayerBar() {
-    _audioService.stop();
-    setState(() {
-      _showAudioPlayerBar = false;
-      _currentPlayingItem = null;
-    });
-  }
-
-  /// 返回按原始顺序排列的选中资源
-  void _confirm() {
-    _recordSelectionMode();
-    _publishDebugState();
-    _audioService.stop();
-    final selected = _selectedIndices.toList()..sort();
-    Navigator.pop(context, [for (final index in selected) widget.items[index]]);
-  }
-
-  /// 全屏放大预览图片
-  void _showPreview(MediaItem item) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => Dialog.fullscreen(
-        backgroundColor: Colors.black,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: InteractiveViewer(
-                minScale: 0.8,
-                maxScale: 4,
-                child: Image.network(
-                  item.url,
-                  headers: widget.headers,
-                  fit: BoxFit.contain,
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) return child;
-                    final total = progress.expectedTotalBytes;
-                    final loaded = progress.cumulativeBytesLoaded;
-                    final value = total != null && total > 0
-                        ? loaded / total
-                        : null;
-                    return Center(
-                      child: CircularProgressIndicator(
-                        value: value,
-                        strokeWidth: 2,
-                      ),
-                    );
-                  },
-                  errorBuilder: (_, _, _) => const Center(
-                    child: Icon(
-                      Icons.broken_image_outlined,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 12,
-              right: 12,
-              child: IconButton.filledTonal(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -293,7 +192,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
                     label: '图片',
                     hasItems: _hasImages,
                     isSelected: _isAllImagesSelected,
-                    onTap: () => _toggleCategory(
+                    onTap: () => this._toggleCategory(
                       _imageIndices,
                       _isAllImagesSelected,
                       _hasImages,
@@ -305,7 +204,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
                     label: '实况',
                     hasItems: _hasLive,
                     isSelected: _isAllLiveSelected,
-                    onTap: () => _toggleCategory(
+                    onTap: () => this._toggleCategory(
                       _liveIndices,
                       _isAllLiveSelected,
                       _hasLive,
@@ -317,7 +216,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
                     label: '音频',
                     hasItems: _hasAudio,
                     isSelected: _isAllAudioSelected,
-                    onTap: () => _toggleCategory(
+                    onTap: () => this._toggleCategory(
                       _audioIndices,
                       _isAllAudioSelected,
                       _hasAudio,
@@ -336,7 +235,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
                   mainAxisSpacing: 8,
                 ),
                 itemCount: widget.items.length,
-                itemBuilder: (context, index) => _buildTile(index),
+                itemBuilder: (context, index) => this._buildTile(index),
               ),
             ),
             // 底部配乐播放条（点击音频播放按钮后呼出）
@@ -345,7 +244,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
                 audioService: _audioService,
                 item: _currentPlayingItem!,
                 headers: widget.headers,
-                onClose: _closeAudioPlayerBar,
+                onClose: this._closeAudioPlayerBar,
               ),
             // 保存按钮
             Padding(
@@ -357,8 +256,8 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
                     widget.nested ? 'bottom_back_button' : 'bottom_save_button',
                   ),
                   onPressed: widget.nested
-                      ? _confirm
-                      : (_selectedIndices.isEmpty ? null : _confirm),
+                      ? this._confirm
+                      : (_selectedIndices.isEmpty ? null : this._confirm),
                   icon: Icon(
                     widget.nested ? Icons.arrow_back_rounded : Icons.save_alt,
                   ),
@@ -375,156 +274,6 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
   }
 
   /// 单个网格项：点击缩略图本身切换勾选，选中状态体现为 3.0dp 边框，右下角提供专属微型预览/播放按钮
-  void _publishDebugState() {
-    SavePageDebugStore.update('bottom', {
-      'memoryScope': widget.memoryScope.name,
-      'nested': widget.nested,
-      'selectedCount': _selectedIndices.length,
-      'totalCount': widget.items.length,
-      'items': [
-        for (var index = 0; index < widget.items.length; index++)
-          {
-            'index': index,
-            'url': widget.items[index].url,
-            'type': widget.items[index].type.name,
-            'selected': _selectedIndices.contains(index),
-          },
-      ],
-    });
-  }
-
-  Widget _buildTile(int index) {
-    final item = widget.items[index];
-    final selected = _selectedIndices.contains(index);
-    final theme = Theme.of(context);
-    final isImage = item.type == MediaType.image;
-    final isAudio = item.type == MediaType.audio;
-
-    final Widget content;
-    if (isImage) {
-      content = Image.network(
-        item.url,
-        headers: widget.headers,
-        cacheWidth: 360,
-        fit: BoxFit.cover,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-        },
-        errorBuilder: (_, _, _) =>
-            const Center(child: Icon(Icons.broken_image_outlined)),
-      );
-    } else if (isAudio) {
-      content = const MediaAudioTile();
-    } else {
-      content = MediaLiveVideoTile(item: item);
-    }
-
-    final tile = GestureDetector(
-      key: ValueKey('media_tile_$index'),
-      behavior: HitTestBehavior.opaque,
-      onTap: () => _toggleSelected(index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? theme.colorScheme.primary : Colors.transparent,
-            width: 3.0,
-          ),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(9),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              content,
-              // 图片资源右下角：微缩版小眼睛按钮（22x22，贴近右下边缘），点击查看大图
-              if (isImage)
-                Positioned(
-                  bottom: 4,
-                  right: 4,
-                  child: GestureDetector(
-                    key: ValueKey('eye_button_$index'),
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => _showPreview(item),
-                    child: Container(
-                      width: 22,
-                      height: 22,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.55),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.visibility_rounded,
-                        color: Colors.white,
-                        size: 13,
-                      ),
-                    ),
-                  ),
-                ),
-              // 配乐资源右下角：微缩版播放/暂停按钮（22x22，相对位置与小眼睛完全一致）
-              if (isAudio)
-                Positioned(
-                  bottom: 4,
-                  right: 4,
-                  child: GestureDetector(
-                    key: const ValueKey('audio_play_button'),
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => _togglePlayAudio(item),
-                    child: ValueListenableBuilder<AudioPreviewState>(
-                      valueListenable: _audioService.state,
-                      builder: (context, state, _) {
-                        final isThisPlaying =
-                            _currentPlayingItem?.url == item.url &&
-                            state == AudioPreviewState.playing;
-                        final isThisBuffering =
-                            _currentPlayingItem?.url == item.url &&
-                            state == AudioPreviewState.buffering;
-
-                        return Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: isThisBuffering
-                                ? SizedBox(
-                                    width: 10,
-                                    height: 10,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 1.5,
-                                      color: theme.colorScheme.onPrimary,
-                                    ),
-                                  )
-                                : Icon(
-                                    isThisPlaying
-                                        ? Icons.pause_rounded
-                                        : Icons.play_arrow_rounded,
-                                    color: theme.colorScheme.onPrimary,
-                                    size: 13,
-                                  ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    final typeLabel = isImage ? '图片' : (isAudio ? '音频' : '实况');
-    return Semantics(
-      container: true,
-      button: true,
-      selected: selected,
-      label: '$typeLabel ${index + 1}',
-      child: tile,
-    );
-  }
 }
+
+// ignore_for_file: unnecessary_this

@@ -10,6 +10,22 @@ import '../../utils/save_selection_tree.dart';
 import '../../utils/selection_mode_store.dart';
 import 'save_page_common.dart';
 
+part 'middle/flow/middle_work_selection_flow.dart';
+
+part 'middle/flow/middle_quality_flow.dart';
+
+part 'middle/flow/middle_work_open_flow.dart';
+
+part 'middle/flow/middle_selection_memory.dart';
+
+part 'middle/flow/middle_confirm_flow.dart';
+
+part 'middle/debug/middle_debug_snapshot.dart';
+
+part 'middle/widget/middle_work_tile.dart';
+
+part 'middle/widget/middle_cover.dart';
+
 /// 进入底层（单作品资源/画质）的回调
 ///
 /// 返回 [WorkDetailSelection] 时，中层卡片会自动同步实线/虚线/无框状态与画质语义。
@@ -131,15 +147,18 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
       );
     }).toList();
 
-    _recomputeQualityMode();
-    _publishDebugState();
+    this._recomputeQualityMode();
+    this._publishDebugState();
   }
 
   @override
   void dispose() {
-    _recordSelectionMode();
+    this._recordSelectionMode();
     super.dispose();
   }
+
+  /// 供流程分片调用的状态刷新入口
+  void _refresh(VoidCallback fn) => setState(fn);
 
   // --- 分类索引 ---
   List<int> get _videoIndices => [
@@ -164,164 +183,6 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
       _works.where((work) => work.selectionState.isSelected).length;
 
   /// 根据视频作品的画质选择重新聚合“最高/最低/混合”
-  void _recomputeQualityMode() {
-    final choices = [
-      for (final work in _works)
-        if (work.isVideo) work.qualityChoice,
-    ];
-    if (choices.isEmpty) return;
-    final aggregate = SaveSelectionTree.aggregateQuality(_works);
-    if (aggregate != null) _qualityMode = aggregate;
-  }
-
-  /// 单击作品缩略图：未选/部分选 -> 全选，全选 -> 全不选
-  void _toggleWork(int index) {
-    setState(() {
-      final current = _works[index].selectionState;
-      final next = current.isAll
-          ? WorkSelectionState.none
-          : WorkSelectionState.all;
-      _works[index] = SaveSelectionTree.applyWorkSelection(
-        _works[index],
-        next,
-      );
-      _recomputeQualityMode();
-    });
-    _publishDebugState();
-  }
-
-  /// 按分类一键切换全选/全不选
-  void _toggleCategory(List<int> indices, bool isAllSelected, bool hasItems) {
-    if (!hasItems) return;
-    final target = isAllSelected
-        ? WorkSelectionState.none
-        : WorkSelectionState.all;
-    setState(() {
-      for (final index in indices) {
-        _works[index] = SaveSelectionTree.applyWorkSelection(
-          _works[index],
-          target,
-        );
-      }
-      _recomputeQualityMode();
-    });
-    _publishDebugState();
-  }
-
-  /// 切换“最高/最低/混合画质”
-  ///
-  /// 规则与顶层一致：mixed -> highest；highest -> lowest；lowest -> highest。
-  /// 每次切换都会批量重置所有视频作品的画质选择。
-  void _toggleQualityMode() {
-    final next = _qualityMode == BatchVideoQualityMode.highest
-        ? BatchVideoQualityMode.lowest
-        : BatchVideoQualityMode.highest;
-    setState(() {
-      _qualityMode = next;
-      _works = SaveSelectionTree.applyQualityToWorks(_works, next);
-    });
-    unawaited(
-      DownloadSettingsStore.setBatchQuality(widget.memoryScope, next),
-    );
-    widget.onQualityChanged?.call(next);
-    _publishDebugState();
-  }
-
-  /// 进入底层并回传资源/画质选择
-  Future<void> _handleOpenWork(int index) async {
-    final callback = widget.onOpenWork;
-    if (callback == null || _openingIndex != null) return;
-    setState(() => _openingIndex = index);
-    try {
-      final result = await callback(_works[index], index);
-      if (!mounted || result == null) return;
-      setState(() {
-        final current = _works[index];
-        var updated = SaveSelectionTree.applyBottomSelection(
-          current,
-          result.selectedResources,
-          result.parsedResult,
-        ).copyWith(
-          selectionState: result.state,
-          qualityChoice: result.qualityChoice ?? current.qualityChoice,
-        );
-        final parsedCover = result.parsedResult?.coverUrl?.trim() ?? '';
-        if (updated.coverUrl.trim().isEmpty && parsedCover.isNotEmpty) {
-          updated = updated.copyWith(coverUrl: parsedCover);
-        }
-        _works[index] = updated;
-        _recomputeQualityMode();
-      });
-      _publishDebugState();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.maybeOf(context)
-            ?.showSnackBar(SnackBar(content: Text('打开作品失败：$e')));
-      }
-    } finally {
-      if (mounted) setState(() => _openingIndex = null);
-    }
-  }
-
-  /// 记录“视频/图文”分类与画质偏好，供下次解析复用
-  void _recordSelectionMode() {
-    if (_hasRecordedSelection) return;
-    _hasRecordedSelection = true;
-
-    final videoTotal = _videoIndices.length;
-    final videoSelected = _videoIndices
-        .where((i) => _works[i].selectionState.isSelected)
-        .length;
-    SelectionModeStore.updateFromWorkCategorySelection(
-      kind: WorkMediaKind.video,
-      total: videoTotal,
-      selected: videoSelected,
-      allSelected:
-          videoTotal > 0 &&
-          videoSelected == videoTotal &&
-          _videoIndices.every((i) => _works[i].selectionState.isAll),
-      scope: widget.memoryScope,
-    );
-
-    final imageTotal = _imageIndices.length;
-    final imageSelected = _imageIndices
-        .where((i) => _works[i].selectionState.isSelected)
-        .length;
-    SelectionModeStore.updateFromWorkCategorySelection(
-      kind: WorkMediaKind.image,
-      total: imageTotal,
-      selected: imageSelected,
-      allSelected:
-          imageTotal > 0 &&
-          imageSelected == imageTotal &&
-          _imageIndices.every((i) => _works[i].selectionState.isAll),
-      scope: widget.memoryScope,
-    );
-
-    unawaited(
-      DownloadSettingsStore.recordBatchQualitySelection(
-        widget.memoryScope,
-        _qualityMode,
-      ),
-    );
-  }
-
-  void _confirm() {
-    _recordSelectionMode();
-    _publishDebugState();
-    final selected = _works
-        .where((work) => work.selectionState.isSelected)
-        .toList();
-    Navigator.pop(
-      context,
-      MultiWorkSelectionResult(
-        selectedWorks: selected,
-        qualityMode: _qualityMode,
-        allWorks: List.unmodifiable(_works),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -348,7 +209,7 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
                     SaveQualityToggleChip(
                       key: const ValueKey('middle_quality_toggle_btn'),
                       mode: _qualityMode,
-                      onTap: _toggleQualityMode,
+                      onTap: this._toggleQualityMode,
                     ),
                   if (_hasVideo) const SizedBox(width: 6),
                   SaveCategoryFilterButton(
@@ -356,7 +217,7 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
                     label: '视频',
                     hasItems: _hasVideo,
                     isSelected: _isAllVideoSelected,
-                    onTap: () => _toggleCategory(
+                    onTap: () => this._toggleCategory(
                       _videoIndices,
                       _isAllVideoSelected,
                       _hasVideo,
@@ -368,7 +229,7 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
                     label: '图文',
                     hasItems: _hasImage,
                     isSelected: _isAllImageSelected,
-                    onTap: () => _toggleCategory(
+                    onTap: () => this._toggleCategory(
                       _imageIndices,
                       _isAllImageSelected,
                       _hasImage,
@@ -397,7 +258,7 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
                             mainAxisSpacing: 8,
                           ),
                       itemCount: _works.length,
-                      itemBuilder: (context, index) => _buildWorkTile(index),
+                      itemBuilder: (context, index) => this._buildWorkTile(index),
                     ),
             ),
             // 底部按钮：nested 模式返回上层，根层保存选中项
@@ -410,8 +271,8 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
                     widget.nested ? 'middle_back_button' : 'middle_save_button',
                   ),
                   onPressed: widget.nested
-                      ? _confirm
-                      : (_selectedCount == 0 ? null : _confirm),
+                      ? this._confirm
+                      : (_selectedCount == 0 ? null : this._confirm),
                   icon: Icon(
                     widget.nested ? Icons.arrow_back_rounded : Icons.save_alt,
                   ),
@@ -424,169 +285,6 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
       ),
     );
   }
-
-  void _publishDebugState() {
-    SavePageDebugStore.update('middle', {
-      'memoryScope': widget.memoryScope.name,
-      'qualityMode': _qualityMode.name,
-      'selectedCount': _selectedCount,
-      'totalCount': _works.length,
-      'works': [
-        for (var index = 0; index < _works.length; index++)
-          {
-            'index': index,
-            'url': _works[index].url,
-            'title': _works[index].title,
-            'kind': _works[index].kind.name,
-            'state': _works[index].selectionState.name,
-            'quality': _works[index].qualityChoice.level.name,
-            'selectedResourceCount':
-                _works[index].selectedResources.length,
-            'selectedResourceUrls': [
-              for (final item in _works[index].selectedResources) item.url,
-            ],
-          },
-      ],
-    });
-  }
-
-  Widget _buildWorkTile(int index) {
-    final work = _works[index];
-    final state = work.selectionState;
-    final isPartial = state == WorkSelectionState.partial;
-    final isAll = state.isAll;
-
-    final cover = ClipRRect(
-      borderRadius: BorderRadius.circular(9),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          _WorkCoverContent(coverUrl: work.coverUrl, headers: widget.headers),
-          // 左上角作品类型小标志
-          Positioned(
-            top: 4,
-            left: 4,
-            child: Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.5),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                work.isVideo
-                    ? Icons.play_arrow_rounded
-                    : Icons.photo_library_rounded,
-                color: Colors.white,
-                size: 12,
-              ),
-            ),
-          ),
-          // 右下角“打开”标志，进入底层
-          Positioned(
-            bottom: 4,
-            right: 4,
-            child: SaveOpenBadge(
-              key: ValueKey('open_work_button_$index'),
-              semanticLabel: '打开作品 ${index + 1}',
-              onTap: () => _handleOpenWork(index),
-            ),
-          ),
-          // 进入底层期间展示局部加载遮罩
-          if (_openingIndex == index)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.35),
-                child: const Center(
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-
-    final tile = GestureDetector(
-      key: ValueKey('work_tile_$index'),
-      behavior: HitTestBehavior.opaque,
-      onTap: () => _toggleWork(index),
-      child: SaveSelectionFrame(
-        selected: isAll,
-        partial: isPartial,
-        partialKey: ValueKey('work_partial_border_$index'),
-        child: cover,
-      ),
-    );
-
-    return Semantics(
-      container: true,
-      button: true,
-      selected: isAll,
-      value: isPartial
-          ? '部分选择'
-          : (isAll ? '全选' : '未选'),
-      label: work.title.trim().isNotEmpty
-          ? work.title.trim()
-          : '作品 ${index + 1}',
-      child: tile,
-    );
-  }
 }
 
-/// 作品封面内容（填充显示，不拉伸；缺失时展示占位图标）
-class _WorkCoverContent extends StatelessWidget {
-  const _WorkCoverContent({required this.coverUrl, required this.headers});
-
-  final String coverUrl;
-  final Map<String, String> headers;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final placeholderColor = isDark
-        ? theme.colorScheme.surfaceContainerHighest
-        : theme.colorScheme.surfaceContainerHigh;
-
-    if (coverUrl.trim().isEmpty) {
-      return Container(
-        color: placeholderColor,
-        child: Icon(
-          Icons.image_outlined,
-          size: 34,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      );
-    }
-
-    return Image.network(
-      coverUrl,
-      headers: headers,
-      cacheWidth: 360,
-      // 保持原始宽高比，按容器裁剪填充，绝不强制拉伸成正方形
-      fit: BoxFit.cover,
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        return Container(
-          color: placeholderColor,
-          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-        );
-      },
-      errorBuilder: (_, _, _) => Container(
-        color: placeholderColor,
-        child: Icon(
-          Icons.broken_image_outlined,
-          size: 34,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}
+// ignore_for_file: unnecessary_this
