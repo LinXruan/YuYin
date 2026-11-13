@@ -29,6 +29,10 @@ void main() {
       expect(find.text('/Pictures/YuYin/'), findsOneWidget);
       expect(find.text('音频保存位置'), findsOneWidget);
       expect(find.text('/Music/YuYin/'), findsOneWidget);
+      expect(find.text('主页视频保存位置'), findsOneWidget);
+      expect(find.text('主页图片保存位置'), findsOneWidget);
+      expect(find.text('主页音频保存位置'), findsOneWidget);
+      expect(find.text('/Download/YuYin/'), findsNWidgets(3));
       expect(find.text('重置为默认'), findsOneWidget);
       expect(find.text('完成'), findsOneWidget);
     });

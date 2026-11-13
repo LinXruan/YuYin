@@ -5,10 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/media_item.dart';
+import '../services/batch_work/work_batch_saver.dart';
 import '../services/douyin_sniffer.dart';
 import '../services/multi_work/article_work_exception.dart';
+import '../services/user_home/user_home_batch_saver.dart';
 import '../services/video_downloader.dart';
 import '../utils/download_settings_store.dart';
+import '../utils/file_name_formatter.dart';
 import '../utils/log_controller.dart';
 import '../utils/login_state_store.dart';
 import '../utils/network_detector.dart';
@@ -75,6 +78,12 @@ class _ParsePageState extends State<ParsePage>
     'User-Agent': DouyinSniffer.desktopUserAgent,
     'Referer': 'https://www.douyin.com/',
   };
+
+  /// 批量作品保存器（下载器与嗅探器均实现对应代理）
+  WorkBatchSaver get _workBatchSaver => WorkBatchSaver(
+        downloader: widget.downloader,
+        sniffer: widget.sniffer,
+      );
 
   @override
   bool get wantKeepAlive => true;
@@ -337,17 +346,20 @@ class _ParsePageState extends State<ParsePage>
           : UrlParser.extractShareText(_inputController.text);
 
       widget.logs.add('开始下载 ${selected.length} 个选中资源...');
+      final baseName = FileNameFormatter.sanitize(
+        FileNameFormatter.buildBaseName(candidateDesc),
+      );
       _downloadCancelToken = CancelToken();
       final savedTypes = await widget.downloader.downloadItems(
         selected,
         cookie: result.cookie,
-        baseTitle: candidateDesc,
+        baseTitle: baseName,
         cancelToken: _downloadCancelToken,
         onProgress: _updateBatchProgress,
       );
       if (!mounted) return;
       if (savedTypes.isNotEmpty) {
-        HistoryStore.markSaved(url, true);
+        HistoryStore.markSavedWithMeta(url, savedBaseName: baseName);
       }
       if (savedTypes.contains(MediaType.image)) {
         widget.logs.add(
@@ -447,6 +459,20 @@ class _ParsePageState extends State<ParsePage>
             continue;
           }
           _authorWorksCache[secUid] = works;
+          HistoryStore.addRecord(
+            HistoryItem(
+              id: 'home:$secUid',
+              url: 'https://www.douyin.com/user/$secUid',
+              rawInput: homeUrl,
+              fullDesc: homeResult.nickname,
+              title: homeResult.nickname,
+              coverUrl: homeResult.avatarUrl,
+              mediaSummary: '作者主页',
+              itemCount: works.length,
+              recordType: HistoryRecordType.userHome,
+              authorSecUid: secUid,
+            ),
+          );
           authors.add(
             MultiHomeAuthorItem(
               profile: homeResult.profile,
@@ -490,13 +516,51 @@ class _ParsePageState extends State<ParsePage>
         return;
       }
 
-      widget.logs.add(
-        '已选择 ${selection.selectedAuthors.length} 位作者（画质：${_qualityLabel(selection.qualityMode)}），批量下载逻辑待后续接入',
+      final selectedAuthors = selection.selectedAuthors;
+      if (selectedAuthors.isEmpty) {
+        widget.logs.add('未选择任何作者');
+        return;
+      }
+
+      final homeSaver = UserHomeBatchSaver(
+        workSaver: _workBatchSaver,
+        delegate: _HomeWorksDelegate(_extractWorksForBatch),
       );
+      widget.busy.value = true;
+      _downloadCancelToken = CancelToken();
+      widget.logs.add(
+        '开始保存 ${selectedAuthors.length} 位作者（${_qualityLabel(selection.qualityMode)}）...',
+      );
+
+      final result = await homeSaver.saveAuthors(
+        authors: selectedAuthors,
+        worksBySecUid: _authorWorksCache,
+        qualityMode: selection.qualityMode,
+        cancelToken: _downloadCancelToken,
+        onProgress: _updateBatchSaveProgress,
+        onLog: (message) {
+          if (mounted) widget.logs.add(message);
+        },
+      );
+      if (!mounted) return;
+
+      for (final author in result.authors) {
+        if (author.success) {
+          HistoryStore.markSaved('home:${author.secUid}', true);
+        }
+      }
+
+      final successCount = result.authors.where((a) => a.success).length;
+      widget.logs.add(
+        '主页批量保存完成：成功 $successCount/${result.authors.length} 位作者，共 ${result.totalSaved} 项资源',
+      );
+    } on DouyinDownloadCancelledException {
+      if (mounted) widget.logs.add('已取消主页批量保存');
     } finally {
       if (mounted) {
         widget.busy.value = false;
         _isParsing = false;
+        _downloadProgress.value = null;
         setState(() {});
       }
     }
@@ -529,6 +593,27 @@ class _ParsePageState extends State<ParsePage>
         return;
       }
 
+      // 多作品链接解析：每个作品写入一条独立历史记录
+      for (final work in extractResult.works) {
+        final parsed = work.parsedResult;
+        final desc = (parsed?.desc?.trim().isNotEmpty ?? false)
+            ? parsed!.desc!.trim()
+            : (work.title.trim().isNotEmpty ? work.title.trim() : work.url);
+        HistoryStore.addRecord(
+          HistoryItem(
+            id: work.url,
+            url: work.url,
+            rawInput: _inputController.text,
+            fullDesc: desc,
+            title: work.title,
+            coverUrl: work.coverUrl,
+            isImagePost: work.kind == WorkMediaKind.image,
+            mediaSummary: _mediaSummaryFor(parsed, work.kind),
+            itemCount: parsed?.items.length ?? 1,
+          ),
+        );
+      }
+
       _isParsing = false;
       if (mounted) setState(() {});
       widget.onRequestParseTab();
@@ -545,10 +630,42 @@ class _ParsePageState extends State<ParsePage>
         return;
       }
 
+      final selectedWorks = selection.selectedWorks;
+      if (selectedWorks.isEmpty) {
+        widget.logs.add('未选择任何作品');
+        return;
+      }
+
+      widget.busy.value = true;
+      _downloadCancelToken = CancelToken();
       widget.logs.add(
-        '已选择 ${selection.selectedWorks.length} 个作品（画质：${_qualityLabel(selection.qualityMode)}），'
-        '批量下载逻辑待后续接入',
+        '开始保存 ${selectedWorks.length} 个作品（${_qualityLabel(selection.qualityMode)}）...',
       );
+
+      final results = await _workBatchSaver.saveWorks(
+        selectedWorks,
+        qualityMode: selection.qualityMode,
+        cancelToken: _downloadCancelToken,
+        onProgress: _updateBatchSaveProgress,
+        onLog: (message) {
+          if (mounted) widget.logs.add(message);
+        },
+      );
+      if (!mounted) return;
+
+      for (final item in results) {
+        if (item.success) {
+          HistoryStore.markSavedWithMeta(
+            item.url,
+            savedBaseName: item.savedBaseName,
+          );
+        }
+      }
+
+      final successCount = results.where((item) => item.success).length;
+      widget.logs.add('多作品保存完成：成功 $successCount/${results.length}');
+    } on DouyinDownloadCancelledException {
+      if (mounted) widget.logs.add('已取消多作品保存');
     } catch (e) {
       if (mounted) {
         widget.logs.add('多作品捕获失败：${_friendlyError(e)}');
@@ -557,6 +674,7 @@ class _ParsePageState extends State<ParsePage>
       if (mounted) {
         widget.busy.value = false;
         _isParsing = false;
+        _downloadProgress.value = null;
         setState(() {});
       }
     }
@@ -655,6 +773,14 @@ class _ParsePageState extends State<ParsePage>
       );
     }
     return works;
+  }
+
+  /// 顶层保存时补抓某个作者的作品列表
+  Future<List<SaveWorkItem>> _extractWorksForBatch(String secUid) async {
+    final homeResult = await widget.sniffer.userHome.extractAllWorks(
+      'https://www.douyin.com/user/$secUid',
+    );
+    return _buildHomeWorks(homeResult);
   }
 
   /// 中层点击作品“打开”：按需解析作品并进入底层资源/画质选择
@@ -758,6 +884,21 @@ class _ParsePageState extends State<ParsePage>
     );
   }
 
+  /// 生成历史记录的媒体摘要
+  String _mediaSummaryFor(SingleWorkResult? parsed, WorkMediaKind kind) {
+    if (parsed == null) {
+      return kind == WorkMediaKind.image ? '图集/文案' : '视频/文案';
+    }
+    final tags = <String>[];
+    if (parsed.videoCount > 0) {
+      tags.add(parsed.isImagePost ? '实况' : '视频');
+    }
+    if (parsed.imageCount > 0) tags.add('图集');
+    if (parsed.audioCount > 0) tags.add('音频');
+    tags.add('文案');
+    return tags.join('/');
+  }
+
   /// 画质模式中文文案
   String _qualityLabel(BatchVideoQualityMode mode) {
     switch (mode) {
@@ -789,6 +930,14 @@ class _ParsePageState extends State<ParsePage>
         : (picked.resolution ?? picked.gearName ?? '默认画质');
     widget.logs.add('已选择 $quality（${picked.formattedSize}）');
     return [picked];
+  }
+
+  /// 刷新批量保存进度（作品级）
+  void _updateBatchSaveProgress(int current, int total, String message) {
+    if (!mounted) return;
+    widget.logs.upsertLast('正在保存', message);
+    final overall = total == 0 ? 0.0 : current / total;
+    _downloadProgress.value = overall.clamp(0.0, 1.0).toDouble();
   }
 
   /// 刷新批量下载进度（仅驱动局部进度条更新，避免触发整体界面重绘）
@@ -1194,4 +1343,14 @@ class _LoginPromptBannerState extends State<_LoginPromptBanner> {
       },
     );
   }
+}
+
+/// 主页作品补抓代理：把解析页的补抓逻辑注入顶层保存器
+class _HomeWorksDelegate implements IUserHomeBatchDelegate {
+  _HomeWorksDelegate(this._extract);
+
+  final Future<List<SaveWorkItem>> Function(String secUid) _extract;
+
+  @override
+  Future<List<SaveWorkItem>> extractWorks(String secUid) => _extract(secUid);
 }

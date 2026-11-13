@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/history_item.dart';
 import 'package:yuyin/pages/history_page.dart';
@@ -19,9 +20,9 @@ void main() {
     HistoryThumbnailCache.resetForTesting();
   });
 
-  Widget buildTestWidget({void Function(HistoryItem)? onSelectRecord}) {
+  Widget buildTestWidget() {
     return MaterialApp(
-      home: HistoryPage(onSelectRecord: onSelectRecord),
+      home: HistoryPage(),
     );
   }
 
@@ -31,10 +32,10 @@ void main() {
 
     expect(find.text('历史'), findsOneWidget);
     expect(find.text('暂无历史记录'), findsOneWidget);
-    expect(find.text('成功解析的作品会自动记录在这里，点一下即可重新载入'), findsOneWidget);
+    expect(find.text('成功解析的作品会自动记录在这里，点一下即可复制链接'), findsOneWidget);
     expect(find.text('选择'), findsNothing);
     expect(find.text('清空'), findsNothing);
-    expect(find.text('长按进入选择模式'), findsNothing);
+    expect(find.text('单击复制链接，长按进入选择模式'), findsNothing);
   });
 
   testWidgets('列表展示：有数据时展示标题、提示栏、时间、媒体摘要且无选择按钮', (tester) async {
@@ -76,12 +77,12 @@ void main() {
     expect(find.text('清空'), findsNothing);
 
     // PLAN_42: 搜索框下方展示 PLAN_22 质感的提示栏（包含“关闭”与“不再显示”两个按钮）
-    expect(find.text('长按进入选择模式'), findsOneWidget);
+    expect(find.text('单击复制链接，长按进入选择模式'), findsOneWidget);
     expect(find.text('关闭'), findsOneWidget);
     expect(find.text('不再显示'), findsOneWidget);
 
     // PLAN_43: 提示栏单行对齐校验，文案与右侧按钮严格处于同一水平线（dy 差值在 5px 内）
-    final promptTextY = tester.getCenter(find.text('长按进入选择模式')).dy;
+    final promptTextY = tester.getCenter(find.text('单击复制链接，长按进入选择模式')).dy;
     final closeBtnY = tester.getCenter(find.text('关闭')).dy;
     final neverShowBtnY = tester.getCenter(find.text('不再显示')).dy;
     expect((promptTextY - closeBtnY).abs() < 5.0, isTrue);
@@ -90,14 +91,28 @@ void main() {
     // 点击提示栏右侧【关闭】按钮可以关闭该提示
     await tester.tap(find.text('关闭'));
     await tester.pumpAndSettle();
-    expect(find.text('长按进入选择模式'), findsNothing);
+    expect(find.text('单击复制链接，长按进入选择模式'), findsNothing);
 
     // 确保界面上任何位置均不包含“抖音”二字
     expect(find.textContaining('抖音'), findsNothing);
   });
 
-  testWidgets('点击条目：常规模式下触发 onSelectRecord 回调', (tester) async {
-    HistoryItem? selectedItem;
+  testWidgets('点击条目：复制链接并提示已复制', (tester) async {
+    final calls = <MethodCall>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        calls.add(call);
+        return null;
+      },
+    );
+    addTearDown(() {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      );
+    });
+
     final item = HistoryItem(
       id: 'target_id',
       url: 'https://v.douyin.com/target/',
@@ -105,21 +120,19 @@ void main() {
     );
     await HistoryStore.addRecord(item);
 
-    await tester.pumpWidget(
-      buildTestWidget(
-        onSelectRecord: (selected) {
-          selectedItem = selected;
-        },
-      ),
-    );
+    await tester.pumpWidget(buildTestWidget());
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('要点击的目标作品文案').first);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
 
-    expect(selectedItem, isNotNull);
-    expect(selectedItem!.id, 'target_id');
-    expect(selectedItem!.url, 'https://v.douyin.com/target/');
+    expect(find.text('已复制'), findsOneWidget);
+    final setDataCalls =
+        calls.where((call) => call.method == 'Clipboard.setData').toList();
+    expect(setDataCalls, isNotEmpty);
+    final arguments = setDataCalls.last.arguments as Map<Object?, Object?>;
+    expect(arguments['text'], 'https://v.douyin.com/target/');
   });
 
   testWidgets('搜索功能：输入关键字防抖过滤，支持清空恢复', (tester) async {
@@ -235,13 +248,13 @@ void main() {
     await tester.pumpWidget(buildTestWidget());
     await tester.pumpAndSettle();
 
-    expect(find.text('长按进入选择模式'), findsOneWidget);
+    expect(find.text('单击复制链接，长按进入选择模式'), findsOneWidget);
     expect(find.text('不再显示'), findsOneWidget);
 
     await tester.tap(find.text('不再显示'));
     await tester.pumpAndSettle();
 
-    expect(find.text('长按进入选择模式'), findsNothing);
+    expect(find.text('单击复制链接，长按进入选择模式'), findsNothing);
   });
 
   testWidgets('历史卡片封面缩略图使用 BoxFit.cover 裁切填满且不拉伸变形（对齐保存页）', (tester) async {

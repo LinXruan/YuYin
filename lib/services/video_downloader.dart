@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/media_item.dart';
 import '../utils/file_name_formatter.dart';
 import '../utils/save_location_store.dart';
+import 'batch_work/i_work_batch_saver.dart';
 import 'douyin_sniffer.dart';
 import 'media_saver.dart';
 
@@ -19,7 +20,7 @@ class DouyinDownloadCancelledException implements Exception {
 }
 
 /// 视频/图片/音频下载与分类保存服务
-class VideoDownloader {
+class VideoDownloader implements IWorkDownloadDelegate {
   VideoDownloader({Dio? dio})
       : _dio = dio ??
             Dio(
@@ -42,11 +43,13 @@ class VideoDownloader {
   /// 下载用户选中的资源列表（单个画质档位或勾选的图片/实况/音频）。
   /// 返回本次成功保存的多媒体类型集合 [Set<MediaType>]。
   /// [onProgress] 参数依次为：当前序号（从 1 开始）、总数、当前文件进度（0.0 ~ 1.0）。
+  @override
   Future<Set<MediaType>> downloadItems(
     List<MediaItem> items, {
     String? cookie,
     String? baseTitle,
     CancelToken? cancelToken,
+    MediaSaveTargetResolver? targetResolver,
     required void Function(int current, int total, double itemProgress)
         onProgress,
   }) async {
@@ -90,13 +93,18 @@ class VideoDownloader {
           throw const DouyinDownloadCancelledException();
         }
 
-        // 调用原生分类保存（支持默认 MediaStore 与自定义 SAF 文件夹）
-        final treeUri = SaveLocationStore.getTreeUri(item.type);
+        // 调用原生分类保存（支持默认 MediaStore、自定义 SAF 与主页作者目录）
+        final target = targetResolver?.call(item.type);
+        final treeUri =
+            target != null ? target.treeUri : SaveLocationStore.getTreeUri(item.type);
         await MediaSaver.saveMedia(
           tempFilePath: tempPath,
           type: item.type,
           treeUri: treeUri,
           fileName: fileName,
+          relativePath: target?.relativePath,
+          subDirNames: target?.subDirNames ?? const [],
+          collection: target?.collectionName ?? 'auto',
         );
         savedTypes.add(item.type);
 

@@ -1,3 +1,5 @@
+import 'history/history_record_type.dart';
+
 /// 单条历史解析记录数据模型
 class HistoryItem {
   HistoryItem({
@@ -12,13 +14,16 @@ class HistoryItem {
     this.itemCount = 1,
     DateTime? createdAt,
     this.isSaved = false,
+    this.recordType = HistoryRecordType.work,
+    this.authorSecUid,
+    this.savedBaseName,
   })  : coverUrl = (coverUrl != null && !isVideoUrl(coverUrl)) ? coverUrl : null,
         createdAt = createdAt ?? DateTime.now();
 
-  /// 记录唯一标识（通常为作品短链或原始链接）
+  /// 记录唯一标识（作品通常为有效链接；主页为 home:secUid）
   final String id;
 
-  /// 用于重新填入解析输入框的有效链接
+  /// 用于复制/重新解析的有效链接
   final String url;
 
   /// 用户最初粘贴的原始文本或口令
@@ -36,10 +41,10 @@ class HistoryItem {
   /// 是否为图文/实况作品（true=图文，false=纯视频）
   final bool isImagePost;
 
-  /// 媒体类型摘要（如“图集/音频/文案”或“视频/文案”）
+  /// 媒体类型摘要（如“图集/音频/文案”或“视频/文案”或“作者主页”）
   final String mediaSummary;
 
-  /// 包含的资源总数
+  /// 包含的资源总数（主页记录为作品数）
   final int itemCount;
 
   /// 解析成功的时间戳
@@ -47,6 +52,47 @@ class HistoryItem {
 
   /// 是否已下载保存至本地存储（false=仅解析，true=已保存）
   final bool isSaved;
+
+  /// 记录类型：作品 / 作者主页
+  final HistoryRecordType recordType;
+
+  /// 主页记录专用：作者 secUid
+  final String? authorSecUid;
+
+  /// 作品记录专用：保存时使用的文件基名
+  final String? savedBaseName;
+
+  bool get isUserHome => recordType == HistoryRecordType.userHome;
+
+  /// 卡片主标题
+  String get displayTitle {
+    if (isUserHome) {
+      if (fullDesc.trim().isNotEmpty) return fullDesc.trim();
+      if (title?.trim().isNotEmpty == true) return title!.trim();
+      return '未知作者';
+    }
+    if (fullDesc.trim().isNotEmpty) return fullDesc.trim();
+    if (title?.trim().isNotEmpty == true) return title!.trim();
+    return '无描述';
+  }
+
+  /// 卡片副信息
+  String get displaySubtitle {
+    if (isUserHome) return '作者主页 · $itemCount 个作品';
+    return mediaSummary;
+  }
+
+  /// 单击复制的内容：主页优先用 secUid 生成规范链接
+  String get copyText {
+    if (isUserHome) {
+      final secUid = authorSecUid?.trim() ?? '';
+      if (secUid.isNotEmpty) {
+        return 'https://www.douyin.com/user/$secUid';
+      }
+    }
+    if (url.trim().isNotEmpty) return url.trim();
+    return rawInput.trim();
+  }
 
   /// 人性化相对/绝对时间展示（严格不显示“抖音”两个字）
   String get formattedTime {
@@ -93,6 +139,9 @@ class HistoryItem {
         'itemCount': itemCount,
         'createdAt': createdAt.toIso8601String(),
         'isSaved': isSaved,
+        'recordType': recordType.name,
+        if (authorSecUid != null) 'authorSecUid': authorSecUid,
+        if (savedBaseName != null) 'savedBaseName': savedBaseName,
       };
 
   HistoryItem copyWith({
@@ -107,6 +156,9 @@ class HistoryItem {
     int? itemCount,
     DateTime? createdAt,
     bool? isSaved,
+    HistoryRecordType? recordType,
+    String? authorSecUid,
+    String? savedBaseName,
   }) {
     return HistoryItem(
       id: id ?? this.id,
@@ -120,6 +172,9 @@ class HistoryItem {
       itemCount: itemCount ?? this.itemCount,
       createdAt: createdAt ?? this.createdAt,
       isSaved: isSaved ?? this.isSaved,
+      recordType: recordType ?? this.recordType,
+      authorSecUid: authorSecUid ?? this.authorSecUid,
+      savedBaseName: savedBaseName ?? this.savedBaseName,
     );
   }
 
@@ -137,6 +192,11 @@ class HistoryItem {
   }
 
   factory HistoryItem.fromJson(Map<String, dynamic> json) {
+    final rawType = json['recordType']?.toString() ?? '';
+    final recordType = HistoryRecordType.values.firstWhere(
+      (item) => item.name == rawType,
+      orElse: () => HistoryRecordType.work,
+    );
     return HistoryItem(
       id: json['id']?.toString() ?? '',
       url: json['url']?.toString() ?? '',
@@ -151,6 +211,9 @@ class HistoryItem {
           ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
           : DateTime.now(),
       isSaved: json['isSaved'] == true,
+      recordType: recordType,
+      authorSecUid: json['authorSecUid']?.toString(),
+      savedBaseName: json['savedBaseName']?.toString(),
     );
   }
 }

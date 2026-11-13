@@ -27,8 +27,8 @@ class DownloadSettingsPage extends StatelessWidget {
                 title: const Text('自定义保存位置'),
                 subtitle: Text(
                   isDefault
-                      ? '当前为默认路径'
-                      : '已自定义保存路径',
+                      ? '单作品与主页链接均为默认路径'
+                      : '已自定义单作品或主页保存路径',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => SaveLocationDialog.show(context),

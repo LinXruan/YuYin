@@ -10,10 +10,13 @@ rem   agent_cmd.bat status
 rem   agent_cmd.bat display
 rem   agent_cmd.bat parse "<url_or_text>"
 rem   agent_cmd.bat parse-works "<url_or_text>"
+rem   agent_cmd.bat save-works "<url_or_text>"
+rem   agent_cmd.bat save-home "<home_url>"
 rem   agent_cmd.bat download [all|0,1]
 rem   agent_cmd.bat logs
 rem   agent_cmd.bat clear-logs
 rem   agent_cmd.bat history [query]
+rem   agent_cmd.bat history-scan "<id>"
 rem   agent_cmd.bat clear-history
 rem   agent_cmd.bat thumbnails
 rem   agent_cmd.bat clear-thumbnails

@@ -16,8 +16,12 @@ import '../utils/history_thumbnail_cache.dart';
 import '../utils/log_controller.dart';
 import '../utils/login_state_store.dart';
 import '../utils/save_location_store.dart';
+import '../utils/author_folder_name.dart';
+import '../utils/home_save_path.dart';
 import '../utils/url_parser.dart';
+import 'batch_work/work_batch_saver.dart';
 import 'douyin_sniffer.dart';
+import 'history/album_locator.dart';
 import 'video_downloader.dart';
 
 /// 专为 Agent 自动化操控设计的本地无头调试服务（仅在 Debug 模式下启用）
@@ -105,6 +109,10 @@ class AgentAutomationServer {
         await _handleParse(request);
       } else if (path == '/api/parse-works' && request.method == 'POST') {
         await _handleParseWorks(request);
+      } else if (path == '/api/save/works' && request.method == 'POST') {
+        await _handleSaveWorks(request);
+      } else if (path == '/api/save/home' && request.method == 'POST') {
+        await _handleSaveHome(request);
       } else if (path == '/api/download' && request.method == 'POST') {
         await _handleDownload(request);
       } else if (path == '/api/logs' && request.method == 'GET') {
@@ -119,6 +127,10 @@ class AgentAutomationServer {
         await _handleSetQualitySetting(request);
       } else if (path == '/api/history' && request.method == 'GET') {
         await _handleGetHistory(request);
+      } else if (path == '/api/history/scan' && request.method == 'POST') {
+        await _handleScanHistory(request);
+      } else if (path == '/api/history/open' && request.method == 'POST') {
+        await _handleOpenHistory(request);
       } else if (path == '/api/history/clear' && request.method == 'POST') {
         await _handleClearHistory(request);
       } else if (path == '/api/login/mock' && request.method == 'POST') {
@@ -496,6 +508,224 @@ class AgentAutomationServer {
     }
   }
 
+  /// 将画质字符串转换为批量保存模式
+  BatchVideoQualityMode _qualityModeFrom(String? raw) {
+    if (raw == 'lowest') return BatchVideoQualityMode.lowest;
+    if (raw == 'mixed') return BatchVideoQualityMode.mixed;
+    return BatchVideoQualityMode.highest;
+  }
+
+  Map<String, dynamic> _serializeWorkSaveResult(WorkSaveResult result) {
+    return {
+      'url': result.url,
+      'success': result.success,
+      'savedTypes': result.savedTypes.map((type) => type.name).toList(),
+      'savedBaseName': result.savedBaseName,
+      if (result.error != null) 'error': result.error,
+    };
+  }
+
+  /// POST /api/save/works：解析多作品链接并批量保存到当前单作品路径
+  Future<void> _handleSaveWorks(HttpRequest request) async {
+    final sniffer = this.sniffer;
+    final downloader = this.downloader;
+    if (sniffer == null || downloader == null) {
+      _sendJson(request, HttpStatus.serviceUnavailable, {
+        'error': '捕获服务未初始化',
+      });
+      return;
+    }
+
+    final body = await _readJsonBody(request);
+    final text = body['text']?.toString() ?? '';
+    if (text.trim().isEmpty) {
+      _sendJson(request, HttpStatus.badRequest, {'error': 'text is required'});
+      return;
+    }
+
+    final batch = UrlParser.parseBatchInput(text);
+    if (batch.workUrls.isEmpty) {
+      _sendJson(request, HttpStatus.badRequest, {
+        'error': '未识别到作品链接',
+      });
+      return;
+    }
+
+    busy.value = true;
+    try {
+      logs.add('[AgentBridge] 批量保存作品：${batch.workUrls.length} 条');
+      final extract = await sniffer.multiWork.extractWorks(
+        batch.workUrls,
+        onLog: logs.add,
+      );
+      for (final work in extract.works) {
+        final parsed = work.parsedResult;
+        final desc = (parsed?.desc?.trim().isNotEmpty ?? false)
+            ? parsed!.desc!.trim()
+            : (work.title.trim().isNotEmpty ? work.title.trim() : work.url);
+        await HistoryStore.addRecord(
+          HistoryItem(
+            id: work.url,
+            url: work.url,
+            rawInput: text,
+            fullDesc: desc,
+            title: work.title,
+            coverUrl: work.coverUrl,
+            isImagePost: work.kind == WorkMediaKind.image,
+            mediaSummary: work.kind == WorkMediaKind.image ? '图集/文案' : '视频/文案',
+            itemCount: parsed?.items.length ?? 1,
+          ),
+        );
+      }
+      final saver = WorkBatchSaver(
+        downloader: downloader,
+        sniffer: sniffer,
+      );
+      final results = await saver.saveWorks(
+        extract.works,
+        qualityMode: _qualityModeFrom(body['quality']?.toString()),
+        onLog: logs.add,
+      );
+      for (final result in results) {
+        if (result.success) {
+          await HistoryStore.markSavedWithMeta(
+            result.url,
+            savedBaseName: result.savedBaseName,
+          );
+        }
+      }
+      _sendJson(request, HttpStatus.ok, {
+        'count': results.length,
+        'successCount': results.where((item) => item.success).length,
+        'results': results.map(_serializeWorkSaveResult).toList(),
+        'logs': logs.logs,
+      });
+    } catch (e) {
+      logs.add('批量保存作品失败: $e');
+      _sendJson(request, HttpStatus.internalServerError, {
+        'error': '$e',
+      });
+    } finally {
+      busy.value = false;
+    }
+  }
+
+  /// POST /api/save/home：解析主页并批量保存到作者分类目录
+  Future<void> _handleSaveHome(HttpRequest request) async {
+    if (!loggedIn.value) {
+      _sendJson(request, HttpStatus.forbidden, {
+        'error': '请登录再进行主页链接解析',
+        'code': 403,
+      });
+      return;
+    }
+
+    final sniffer = this.sniffer;
+    final downloader = this.downloader;
+    if (sniffer == null || downloader == null) {
+      _sendJson(request, HttpStatus.serviceUnavailable, {
+        'error': '捕获服务未初始化',
+      });
+      return;
+    }
+
+    final body = await _readJsonBody(request);
+    final url = body['url']?.toString() ?? '';
+    if (url.trim().isEmpty) {
+      _sendJson(request, HttpStatus.badRequest, {'error': 'url is required'});
+      return;
+    }
+
+    busy.value = true;
+    try {
+      logs.add('[AgentBridge] 主页批量保存：$url');
+      final home = await sniffer.userHome.extractAllWorks(url);
+      final works = <SaveWorkItem>[];
+      for (final workUrl in home.workUrls) {
+        if (UrlParser.isArticleUrl(workUrl)) continue;
+        final kind = UrlParser.classifyWorkPage(workUrl) == DouyinWorkPage.note
+            ? WorkMediaKind.image
+            : WorkMediaKind.video;
+        works.add(
+          SaveWorkItem(
+            url: workUrl,
+            kind: kind,
+            title: home.getTitle(workUrl) ?? '',
+            coverUrl: home.getCover(workUrl) ?? '',
+          ),
+        );
+      }
+
+      final totalWorks = works.length;
+      final limit = (body['limit'] as num?)?.toInt() ?? 0;
+      if (limit > 0 && works.length > limit) {
+        works.removeRange(limit, works.length);
+      }
+
+      if (works.isEmpty) {
+        _sendJson(request, HttpStatus.ok, {
+          'secUid': home.secUid,
+          'nickname': home.nickname,
+          'count': 0,
+          'successCount': 0,
+          'results': const [],
+        });
+        return;
+      }
+
+      await HistoryStore.addRecord(
+        HistoryItem(
+          id: 'home:${home.secUid}',
+          url: 'https://www.douyin.com/user/${home.secUid}',
+          rawInput: url,
+          fullDesc: home.nickname,
+          title: home.nickname,
+          coverUrl: home.avatarUrl,
+          mediaSummary: '作者主页',
+          itemCount: totalWorks,
+          recordType: HistoryRecordType.userHome,
+          authorSecUid: home.secUid,
+        ),
+      );
+
+      final authorFolder = AuthorFolderName.resolve(
+        home.nickname,
+        home.secUid,
+      );
+      final config = SaveLocationStore.current;
+      final saver = WorkBatchSaver(
+        downloader: downloader,
+        sniffer: sniffer,
+      );
+      final results = await saver.saveWorks(
+        works,
+        qualityMode: _qualityModeFrom(body['quality']?.toString()),
+        targetResolver: (type) =>
+            HomeSavePath.buildTarget(config, type, authorFolder),
+        onLog: logs.add,
+      );
+      if (results.any((item) => item.success)) {
+        await HistoryStore.markSaved('home:${home.secUid}', true);
+      }
+      _sendJson(request, HttpStatus.ok, {
+        'secUid': home.secUid,
+        'nickname': home.nickname,
+        'authorFolder': authorFolder,
+        'count': results.length,
+        'successCount': results.where((item) => item.success).length,
+        'results': results.map(_serializeWorkSaveResult).toList(),
+        'logs': logs.logs,
+      });
+    } catch (e) {
+      logs.add('主页批量保存失败: $e');
+      _sendJson(request, HttpStatus.internalServerError, {
+        'error': '$e',
+      });
+    } finally {
+      busy.value = false;
+    }
+  }
+
   /// POST /api/download：执行资源下载与落盘
   Future<void> _handleDownload(HttpRequest request) async {
     final result = _lastResult;
@@ -717,6 +947,90 @@ class AgentAutomationServer {
     _sendJson(request, HttpStatus.ok, {
       'count': records.length,
       'records': records.map((r) => r.toJson()).toList(),
+    });
+  }
+
+  /// POST /api/history/scan：按历史 id 扫描当前保存位置，返回三类可用性
+  Future<void> _handleScanHistory(HttpRequest request) async {
+    final body = await _readJsonBody(request);
+    final id = body['id']?.toString() ?? '';
+    if (id.isEmpty) {
+      _sendJson(request, HttpStatus.badRequest, {'error': 'id is required'});
+      return;
+    }
+
+    HistoryItem? record;
+    for (final item in HistoryStore.records) {
+      if (item.id == id || item.url == id) {
+        record = item;
+        break;
+      }
+    }
+    if (record == null) {
+      _sendJson(request, HttpStatus.notFound, {
+        'error': 'history record not found',
+      });
+      return;
+    }
+
+    final results = await AlbumLocator.scan(record);
+    _sendJson(request, HttpStatus.ok, {
+      'id': record.id,
+      'type': record.recordType.name,
+      'displayTitle': record.displayTitle,
+      'records': results.map((item) => item.toMap()).toList(),
+    });
+  }
+
+  /// POST /api/history/open：打开历史记录对应类型的文件管理器文件夹/文件
+  Future<void> _handleOpenHistory(HttpRequest request) async {
+    final body = await _readJsonBody(request);
+    final id = body['id']?.toString() ?? '';
+    final typeName = body['type']?.toString() ?? '';
+    if (id.isEmpty || typeName.isEmpty) {
+      _sendJson(request, HttpStatus.badRequest, {
+        'error': 'id and type are required',
+      });
+      return;
+    }
+
+    HistoryItem? record;
+    for (final item in HistoryStore.records) {
+      if (item.id == id || item.url == id) {
+        record = item;
+        break;
+      }
+    }
+    if (record == null) {
+      _sendJson(request, HttpStatus.notFound, {
+        'error': 'history record not found',
+      });
+      return;
+    }
+
+    final results = await AlbumLocator.scan(record);
+    SavedMediaAvailability? target;
+    for (final item in results) {
+      if (item.type.name == typeName) {
+        target = item;
+        break;
+      }
+    }
+    if (target == null || !target.available) {
+      _sendJson(request, HttpStatus.ok, {
+        'opened': false,
+        'reason': 'resource not found',
+        'records': results.map((item) => item.toMap()).toList(),
+      });
+      return;
+    }
+
+    final opened = await AlbumLocator.open(target);
+    _sendJson(request, HttpStatus.ok, {
+      'opened': opened,
+      'type': target.type.name,
+      'uri': target.contentUri,
+      'folderUri': target.folderUri,
     });
   }
 

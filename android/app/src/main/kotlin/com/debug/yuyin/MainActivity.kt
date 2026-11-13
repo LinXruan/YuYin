@@ -22,6 +22,7 @@ import androidx.documentfile.provider.DocumentFile
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import com.debug.yuyin.storage.StorageBridge
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
@@ -157,6 +158,9 @@ class MainActivity : FlutterActivity() {
                         val filePath = call.argument<String>("filePath")
                         val mediaType = call.argument<String>("mediaType") ?: "video"
                         val treeUri = call.argument<String>("treeUri")
+                        val relativePath = call.argument<String>("relativePath")
+                        val subDirNames = call.argument<List<String>>("subDirNames") ?: emptyList()
+                        val collection = call.argument<String>("collection") ?: "auto"
                         val fileName = call.argument<String>("fileName") ?: "file_${System.currentTimeMillis()}"
 
                         if (filePath.isNullOrBlank()) {
@@ -173,9 +177,19 @@ class MainActivity : FlutterActivity() {
                                 }
 
                                 if (!treeUri.isNullOrBlank()) {
-                                    // 自定义 SAF 目录保存
-                                    val targetDir = DocumentFile.fromTreeUri(this, Uri.parse(treeUri))
+                                    // 自定义 SAF 目录保存（支持逐级作者/分类子目录）
+                                    var targetDir = DocumentFile.fromTreeUri(this, Uri.parse(treeUri))
                                         ?: throw IOException("无法访问目标自定义文件夹")
+                                    for (name in subDirNames) {
+                                        if (name.isBlank()) continue
+                                        val existing = targetDir.findFile(name)
+                                        targetDir = if (existing != null && existing.isDirectory) {
+                                            existing
+                                        } else {
+                                            targetDir.createDirectory(name)
+                                                ?: throw IOException("无法创建子文件夹: $name")
+                                        }
+                                    }
                                     val mimeType = getMimeType(fileName, mediaType)
                                     val targetDoc = targetDir.createFile(mimeType, fileName)
                                         ?: throw IOException("无法在目标文件夹创建文件: $fileName")
@@ -189,6 +203,15 @@ class MainActivity : FlutterActivity() {
                                     try {
                                         MediaScannerConnection.scanFile(this, arrayOf(targetDoc.uri.path), arrayOf(mimeType), null)
                                     } catch (_: Exception) {}
+                                } else if (collection == "downloads" && !relativePath.isNullOrBlank()) {
+                                    // 主页链接：Download/YuYin/<作者>/<Movies|Pictures|Music>/
+                                    StorageBridge.saveToDownloads(
+                                        this,
+                                        srcFile,
+                                        fileName,
+                                        getMimeType(fileName, mediaType),
+                                        relativePath
+                                    )
                                 } else {
                                     // 默认分类目录保存 (Movies/YuYin/, Pictures/YuYin/, Music/YuYin/)
                                     saveToDefaultDirectory(srcFile, mediaType, fileName)
@@ -198,6 +221,37 @@ class MainActivity : FlutterActivity() {
                                 runOnUiThread { result.error("SAVE_FAILED", e.message, null) }
                             }
                         }.start()
+                    }
+                    "querySavedMedia" -> {
+                        val rawQueries = (call.arguments as? Map<*, *>)?.get("queries") as? List<*>
+                            ?: emptyList<Any>()
+                        val queries = rawQueries.mapNotNull { it as? Map<*, *> }.map { raw ->
+                            raw.entries.associate { it.key.toString() to it.value }
+                        }
+                        Thread {
+                            try {
+                                val results = StorageBridge.querySavedMedia(this, queries)
+                                runOnUiThread { result.success(results) }
+                            } catch (e: Exception) {
+                                runOnUiThread { result.error("QUERY_FAILED", e.message, null) }
+                            }
+                        }.start()
+                    }
+                    "openMediaLocation" -> {
+                        val contentUri = call.argument<String>("contentUri")
+                        val folderUri = call.argument<String>("folderUri")
+                        val mimeType = call.argument<String>("mimeType") ?: "*/*"
+                        try {
+                            val opened = StorageBridge.openMediaLocation(
+                                this,
+                                contentUri,
+                                folderUri,
+                                mimeType
+                            )
+                            result.success(opened)
+                        } catch (e: Exception) {
+                            result.error("OPEN_FAILED", e.message, null)
+                        }
                     }
                     else -> result.notImplemented()
                 }

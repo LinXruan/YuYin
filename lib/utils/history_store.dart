@@ -79,10 +79,12 @@ class HistoryStore {
     var toInsert = item;
     if (existingIndex != -1) {
       final existing = _records[existingIndex];
-      // 若已有记录且已经保存过，新解析保留已保存状态
-      if (existing.isSaved && !item.isSaved) {
-        toInsert = item.copyWith(isSaved: true);
-      }
+      // 重复解析时保留旧的已保存状态、文件基名与作者 secUid
+      toInsert = item.copyWith(
+        isSaved: existing.isSaved || item.isSaved,
+        savedBaseName: item.savedBaseName ?? existing.savedBaseName,
+        authorSecUid: item.authorSecUid ?? existing.authorSecUid,
+      );
       _records.removeAt(existingIndex);
     }
 
@@ -104,21 +106,36 @@ class HistoryStore {
   }
 
   /// 标记指定历史记录的保存状态（true=已保存到本地，false=仅解析）
-  static Future<void> markSaved(String id, [bool isSaved = true]) async {
+  static Future<void> markSaved(String id, [bool isSaved = true]) {
+    return markSavedWithMeta(id, isSaved: isSaved);
+  }
+
+  /// 标记保存状态，并可同时写入文件基名（用于历史页定位）
+  static Future<void> markSavedWithMeta(
+    String id, {
+    bool isSaved = true,
+    String? savedBaseName,
+  }) async {
     final index = _records.indexWhere(
       (item) => item.id == id || (item.url.isNotEmpty && item.url == id),
     );
-    if (index != -1) {
-      final current = _records[index];
-      if (current.isSaved != isSaved) {
-        _records[index] = current.copyWith(isSaved: isSaved);
-        recordsNotifier.value = List.unmodifiable(_records);
-        await _save();
-      }
-      // PLAN_53：标记已保存时确保缩略图离线缓存就绪，与“已保存”筛选模式完全对齐
-      if (isSaved && current.coverUrl != null && current.coverUrl!.isNotEmpty) {
-        HistoryThumbnailCache.cacheThumbnail(current.id, current.coverUrl!);
-      }
+    if (index == -1) return;
+
+    final current = _records[index];
+    final nextBaseName = savedBaseName ?? current.savedBaseName;
+    final changed =
+        current.isSaved != isSaved || current.savedBaseName != nextBaseName;
+    if (changed) {
+      _records[index] = current.copyWith(
+        isSaved: isSaved,
+        savedBaseName: nextBaseName,
+      );
+      recordsNotifier.value = List.unmodifiable(_records);
+      await _save();
+    }
+    // PLAN_53：标记已保存时确保缩略图离线缓存就绪，与“已保存”筛选模式完全对齐
+    if (isSaved && current.coverUrl != null && current.coverUrl!.isNotEmpty) {
+      HistoryThumbnailCache.cacheThumbnail(current.id, current.coverUrl!);
     }
   }
 

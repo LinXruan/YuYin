@@ -228,6 +228,48 @@ switch ($Action.ToLower()) {
 
 
 
+    "save-works" {
+
+        if (-not $Arg1) {
+
+            throw "请提供作品链接文本，例如: .\tool\agent_cmd.bat save-works '链接1 链接2'"
+
+        }
+
+        $body = @{ text = $Arg1; quality = "highest" } | ConvertTo-Json
+
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/save/works" -Method Post -Body $body -ContentType "application/json; charset=utf-8"
+
+        Write-Host "=== 批量保存作品：成功 $($resp.successCount)/$($resp.count) ==="
+
+        $resp.results | Format-Table -Property url, success, savedBaseName, savedTypes -AutoSize
+
+    }
+
+
+
+    "save-home" {
+
+        if (-not $Arg1) {
+
+            throw "请提供主页链接，例如: .\tool\agent_cmd.bat save-home 'https://www.douyin.com/user/xxx'"
+
+        }
+
+        $body = @{ url = $Arg1; quality = "highest" } | ConvertTo-Json
+
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/save/home" -Method Post -Body $body -ContentType "application/json; charset=utf-8"
+
+        Write-Host "=== 主页批量保存：$($resp.nickname) 成功 $($resp.successCount)/$($resp.count) ==="
+
+        Write-Host "作者目录: $($resp.authorFolder)"
+
+        $resp.results | Format-Table -Property url, success, savedBaseName, savedTypes -AutoSize
+
+    }
+
+
+
     "history" {
 
         $q = if ($Arg1) { "?q=$([System.Uri]::EscapeDataString($Arg1))" } else { "" }
@@ -245,6 +287,26 @@ switch ($Action.ToLower()) {
             Write-Host "暂无历史记录"
 
         }
+
+    }
+
+
+
+    "history-scan" {
+
+        if (-not $Arg1) {
+
+            throw "请提供历史记录 id，例如: .\tool\agent_cmd.bat history-scan 'home:xxx'"
+
+        }
+
+        $body = @{ id = $Arg1 } | ConvertTo-Json
+
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/history/scan" -Method Post -Body $body -ContentType "application/json; charset=utf-8"
+
+        Write-Host "=== 保存位置扫描: $($resp.displayTitle) ==="
+
+        $resp.records | Format-Table -Property type, found, count, displayPath, uri, folderUri -AutoSize
 
     }
 

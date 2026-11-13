@@ -9,6 +9,7 @@ import '../utils/login_state_store.dart';
 import '../utils/url_parser.dart';
 import 'douyin_share_api.dart';
 import 'js_script_builder.dart';
+import 'batch_work/i_work_batch_saver.dart';
 import 'multi_work/article_work_exception.dart';
 import 'multi_work/i_multi_work_extractor.dart';
 import 'multi_work/multi_work_extractor.dart';
@@ -30,7 +31,8 @@ class DouyinSniffer
         IUserHomeExtractor,
         ISingleWorkSnifferDelegate,
         IUserHomeSnifferDelegate,
-        IMultiWorkSnifferDelegate {
+        IMultiWorkSnifferDelegate,
+        IWorkSniffDelegate {
   /// 单作品解析领域提取器
   late final ISingleWorkExtractor singleWork = SingleWorkExtractor(this);
 
@@ -191,6 +193,11 @@ class DouyinSniffer
   String? get awemePageUrl => _awemePageUrl;
 
   /// 加载分享链接并等待 JS 回传，最长等待 30 秒
+  @override
+  /// 批量保存代理：按作品链接补解析
+  @override
+  Future<SingleWorkResult> sniffWork(String url) => sniffVideoUrl(url);
+
   @override
   Future<SniffResult> sniffVideoUrl(String shareUrl) async {
     // 先取消旧任务（此时 _taskId 仍是旧值）

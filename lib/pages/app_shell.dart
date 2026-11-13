@@ -275,15 +275,7 @@ class _AppShellState extends State<AppShell> {
                   if (mounted && _index != 0) setState(() => _index = 0);
                 },
               ),
-              HistoryPage(
-                onSelectRecord: (record) {
-                  _pendingInputUrl.value = null;
-                  _pendingInputUrl.value = record.url;
-                  if (mounted && _index != 0) {
-                    setState(() => _index = 0);
-                  }
-                },
-              ),
+              HistoryPage(),
               SettingsPage(logs: _logs, sniffer: _sniffer),
             ],
           ),

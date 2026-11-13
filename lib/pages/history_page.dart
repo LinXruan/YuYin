@@ -7,16 +7,12 @@ import 'package:flutter/services.dart';
 import '../models/history_item.dart';
 import '../utils/history_store.dart';
 import '../utils/history_thumbnail_cache.dart';
+import '../widgets/history/history_open_sheet.dart';
+import '../widgets/save_page/save_page_common.dart';
 
-/// 历史记录页：支持全文模糊检索、多选批量删除与一键载入解析
+/// 历史记录页：支持全文模糊检索、多选批量删除、复制链接与保存位置定位
 class HistoryPage extends StatefulWidget {
-  const HistoryPage({
-    super.key,
-    this.onSelectRecord,
-  });
-
-  /// 点击历史条目时的回调：切换至解析 Tab 并将链接自动粘贴上去
-  final void Function(HistoryItem item)? onSelectRecord;
+  const HistoryPage({super.key});
 
   @override
   State<HistoryPage> createState() => _HistoryPageState();
@@ -89,6 +85,35 @@ class _HistoryPageState extends State<HistoryPage>
     _searchController.clear();
     _debounceTimer?.cancel();
     setState(() => _searchQuery = '');
+  }
+
+  /// 单击历史：复制链接并轻量提示，不阻断当前操作
+  void _copyLink(HistoryItem item) {
+    final messenger = ScaffoldMessenger.of(context);
+    final text = item.copyText;
+    if (text.isEmpty) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('暂无可复制的链接'),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(milliseconds: 1500),
+          ),
+        );
+      return;
+    }
+
+    Clipboard.setData(ClipboardData(text: text));
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('已复制'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(milliseconds: 1200),
+        ),
+      );
   }
 
   void _exitSelectionMode() {
@@ -299,6 +324,7 @@ class _HistoryPageState extends State<HistoryPage>
                           item: item,
                           isSelectionMode: _isSelectionMode,
                           isSelected: isSelected,
+                          onOpen: () => HistoryOpenSheet.show(context, item),
                           onTap: () {
                             if (_isSelectionMode) {
                               setState(() {
@@ -309,7 +335,7 @@ class _HistoryPageState extends State<HistoryPage>
                                 }
                               });
                             } else {
-                              widget.onSelectRecord?.call(item);
+                              _copyLink(item);
                             }
                           },
                           onLongPress: () {
@@ -394,7 +420,7 @@ class _HistoryPageState extends State<HistoryPage>
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                '长按进入选择模式',
+                '单击复制链接，长按进入选择模式',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: textColor,
                   fontWeight: FontWeight.w500,
@@ -455,7 +481,7 @@ class _HistoryPageState extends State<HistoryPage>
 
     if (!hasAnyRecord) {
       title = '暂无历史记录';
-      subtitle = '成功解析的作品会自动记录在这里，点一下即可重新载入';
+      subtitle = '成功解析的作品会自动记录在这里，点一下即可复制链接';
       icon = Icons.history_rounded;
     } else if (_filterOnlySaved) {
       title = '暂无已保存的记录';
@@ -586,6 +612,7 @@ class _HistoryCard extends StatelessWidget {
     required this.item,
     required this.isSelectionMode,
     required this.isSelected,
+    required this.onOpen,
     required this.onTap,
     required this.onLongPress,
   });
@@ -593,6 +620,7 @@ class _HistoryCard extends StatelessWidget {
   final HistoryItem item;
   final bool isSelectionMode;
   final bool isSelected;
+  final VoidCallback onOpen;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
@@ -638,7 +666,7 @@ class _HistoryCard extends StatelessWidget {
                     children: [
                       // 1. 作品文案（最大两行，截断省略）
                       Text(
-                        item.fullDesc.isNotEmpty ? item.fullDesc : (item.title ?? '无描述'),
+                        item.displayTitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodyMedium?.copyWith(
@@ -660,18 +688,22 @@ class _HistoryCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
 
-                      // 3. 媒体标签摘要与已保存状态标记
+                      // 3. 媒体标签摘要、已保存标记与右下角打开按钮
                       Row(
                         children: [
-                          Text(
-                            item.mediaSummary,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: theme.colorScheme.outline,
+                          Expanded(
+                            child: Text(
+                              item.displaySubtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: theme.colorScheme.outline,
+                              ),
                             ),
                           ),
                           if (item.isSaved) ...[
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 6,
@@ -692,6 +724,11 @@ class _HistoryCard extends StatelessWidget {
                               ),
                             ),
                           ],
+                          const SizedBox(width: 8),
+                          SaveOpenBadge(
+                            semanticLabel: '打开保存位置',
+                            onTap: onOpen,
+                          ),
                         ],
                       ),
                     ],
@@ -782,7 +819,7 @@ class _HistoryCard extends StatelessWidget {
           errorBuilder: (context, error, stackTrace) =>
               _buildFallbackThumbnail(theme),
         ),
-        if (!item.isImagePost)
+        if (!item.isUserHome && !item.isImagePost)
           Positioned(
             right: 4,
             bottom: 4,
@@ -810,10 +847,8 @@ class _HistoryCard extends StatelessWidget {
 
   /// 兜底缩略图（根据媒体类型渲染专属矢量图标与文案，避免重复请求并保持视觉优雅）
   Widget _buildFallbackThumbnail(ThemeData theme) {
-    final isVideo = !item.isImagePost;
-    final display = item.fullDesc.isNotEmpty
-        ? item.fullDesc
-        : (item.title?.isNotEmpty == true ? item.title! : '作品');
+    final isVideo = !item.isUserHome && !item.isImagePost;
+    final display = item.displayTitle;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
@@ -823,9 +858,11 @@ class _HistoryCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            isVideo
-                ? Icons.movie_creation_outlined
-                : Icons.photo_library_outlined,
+            item.isUserHome
+                ? Icons.person_outline_rounded
+                : (isVideo
+                    ? Icons.movie_creation_outlined
+                    : Icons.photo_library_outlined),
             size: 20,
             color: Colors.white54,
           ),
