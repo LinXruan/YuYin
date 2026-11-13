@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../models/common/save_memory_scope.dart';
 import '../models/media_item.dart';
 
 /// 下载与画质、自动更新相关配置持久化存储器
@@ -18,9 +19,12 @@ class DownloadSettingsStore {
   /// 是否在启动 2 秒后自动检查更新（默认开启）
   static bool _autoCheckUpdate = true;
 
-  /// 多主页/批量下载时的视频保存画质偏好（默认最高画质）
-  static BatchVideoQualityMode _batchVideoQualityMode =
-      BatchVideoQualityMode.highest;
+  /// 各保存流作用域的视频画质偏好（默认最高画质）
+  static final Map<SaveMemoryScope, BatchVideoQualityMode> _qualityModes = {
+    SaveMemoryScope.homeTop: BatchVideoQualityMode.highest,
+    SaveMemoryScope.homeMiddle: BatchVideoQualityMode.highest,
+    SaveMemoryScope.multiMiddle: BatchVideoQualityMode.highest,
+  };
 
   /// 监听画质选项切换的 Notifier
   static final ValueNotifier<bool> onlyHighestQualityNotifier =
@@ -41,9 +45,13 @@ class DownloadSettingsStore {
   /// 当前是否自动检查更新
   static bool get autoCheckUpdate => _autoCheckUpdate;
 
-  /// 当前批量下载视频画质偏好
+  /// 当前多作品中层画质偏好（兼容旧入口）
   static BatchVideoQualityMode get batchVideoQualityMode =>
-      _batchVideoQualityMode;
+      getBatchQuality(SaveMemoryScope.multiMiddle);
+
+  /// 获取指定保存流作用域的批量画质偏好
+  static BatchVideoQualityMode getBatchQuality(SaveMemoryScope scope) =>
+      _qualityModes[scope] ?? BatchVideoQualityMode.highest;
 
   /// 测试重置
   @visibleForTesting
@@ -58,7 +66,9 @@ class DownloadSettingsStore {
     onlyHighestQualityNotifier.value = effectiveOnlyHighest;
     _autoCheckUpdate = defaultAutoCheck;
     autoCheckUpdateNotifier.value = defaultAutoCheck;
-    _batchVideoQualityMode = defaultBatchQuality;
+    for (final scope in _qualityModes.keys) {
+      _qualityModes[scope] = defaultBatchQuality;
+    }
     batchVideoQualityNotifier.value = defaultBatchQuality;
   }
 
@@ -93,20 +103,43 @@ class DownloadSettingsStore {
         autoCheckUpdateNotifier.value = true;
       }
 
-      final valBatchQuality = map['batchVideoQualityMode'];
-      if (valBatchQuality == BatchVideoQualityMode.lowest.name) {
-        _batchVideoQualityMode = BatchVideoQualityMode.lowest;
-        batchVideoQualityNotifier.value = BatchVideoQualityMode.lowest;
+      final scopedKeys = [
+        'quality.homeTop',
+        'quality.homeMiddle',
+        'quality.multiMiddle',
+      ];
+      final hasScoped = scopedKeys.any(map.containsKey);
+      if (hasScoped) {
+        for (final scope in [
+          SaveMemoryScope.homeTop,
+          SaveMemoryScope.homeMiddle,
+          SaveMemoryScope.multiMiddle,
+        ]) {
+          final raw = map['quality.${scope.name}'];
+          _qualityModes[scope] = raw == BatchVideoQualityMode.lowest.name
+              ? BatchVideoQualityMode.lowest
+              : BatchVideoQualityMode.highest;
+        }
       } else {
-        _batchVideoQualityMode = BatchVideoQualityMode.highest;
-        batchVideoQualityNotifier.value = BatchVideoQualityMode.highest;
+        // 旧版本只有单一画质记忆，迁移时复制到三个作用域，之后各自独立
+        final legacy = map['batchVideoQualityMode'];
+        final mode = legacy == BatchVideoQualityMode.lowest.name
+            ? BatchVideoQualityMode.lowest
+            : BatchVideoQualityMode.highest;
+        for (final scope in _qualityModes.keys) {
+          _qualityModes[scope] = mode;
+        }
       }
+      batchVideoQualityNotifier.value =
+          getBatchQuality(SaveMemoryScope.multiMiddle);
     } catch (_) {
       _onlyHighestQualityPerResolution = true;
       onlyHighestQualityNotifier.value = true;
       _autoCheckUpdate = true;
       autoCheckUpdateNotifier.value = true;
-      _batchVideoQualityMode = BatchVideoQualityMode.highest;
+      for (final scope in _qualityModes.keys) {
+        _qualityModes[scope] = BatchVideoQualityMode.highest;
+      }
       batchVideoQualityNotifier.value = BatchVideoQualityMode.highest;
     }
   }
@@ -127,25 +160,45 @@ class DownloadSettingsStore {
     await _save();
   }
 
-  /// 切换并持久化“批量下载视频画质偏好（最高/最低画质）”
-  static Future<void> setBatchVideoQualityMode(
+  /// 切换并持久化指定作用域的画质偏好
+  static Future<void> setBatchQuality(
+    SaveMemoryScope scope,
     BatchVideoQualityMode mode,
   ) async {
-    // 记忆状态仅保存 highest(1) / lowest(2)，mixed(3) 保持原记忆不变
+    // mixed 只是当前会话状态，不写入记忆
     if (mode == BatchVideoQualityMode.mixed) return;
-    if (_batchVideoQualityMode == mode) return;
-    _batchVideoQualityMode = mode;
-    batchVideoQualityNotifier.value = mode;
+    if (getBatchQuality(scope) == mode) return;
+    _qualityModes[scope] = mode;
+    if (scope == SaveMemoryScope.multiMiddle) {
+      batchVideoQualityNotifier.value = mode;
+    }
     await _save();
   }
 
-  /// 按“全选”同款 a/b 状态机规则记录顶层画质选择：
-  /// highest(b=1) -> a=highest；lowest(b=2) -> a=lowest；mixed(b=3) -> a 保持不变
+  /// 兼容旧入口：多作品中层
+  static Future<void> setBatchVideoQualityMode(
+    BatchVideoQualityMode mode,
+  ) {
+    return setBatchQuality(SaveMemoryScope.multiMiddle, mode);
+  }
+
+  /// 按 a/b 规则记录指定作用域画质：highest/lowest 持久化，mixed 不覆盖
+  static Future<void> recordBatchQualitySelection(
+    SaveMemoryScope scope,
+    BatchVideoQualityMode mode,
+  ) {
+    if (mode == BatchVideoQualityMode.mixed) return Future.value();
+    return setBatchQuality(scope, mode);
+  }
+
+  /// 兼容旧入口
   static Future<void> recordBatchVideoQualitySelection(
     BatchVideoQualityMode mode,
-  ) async {
-    if (mode == BatchVideoQualityMode.mixed) return;
-    await setBatchVideoQualityMode(mode);
+  ) {
+    return recordBatchQualitySelection(
+      SaveMemoryScope.multiMiddle,
+      mode,
+    );
   }
 
   /// 根据全局设置对视频画质列表进行过滤
@@ -229,10 +282,13 @@ class DownloadSettingsStore {
   static Future<void> _save() async {
     try {
       final file = await _file();
-      final map = {
+      final map = <String, dynamic>{
         'onlyHighestQualityPerResolution': _onlyHighestQualityPerResolution,
         'autoCheckUpdate': _autoCheckUpdate,
-        'batchVideoQualityMode': _batchVideoQualityMode.name,
+        for (final scope in _qualityModes.keys)
+          'quality.${scope.name}': getBatchQuality(scope).name,
+        'batchVideoQualityMode':
+            getBatchQuality(SaveMemoryScope.multiMiddle).name,
       };
       await file.writeAsString(jsonEncode(map));
     } catch (_) {

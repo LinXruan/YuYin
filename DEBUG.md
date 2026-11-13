@@ -90,6 +90,7 @@
 | `.\tool\agent_cmd.bat download 0,1` | 逗号分隔索引 | 仅下载指定序号项（如第 0、1 项） | 仅保存指定选中项 |
 | `.\tool\agent_cmd.bat logs [n]` | 可选数字 `n` (如 `20`) | 获取应用日志。提供 `n` 时仅展示最新 `n` 条（防止撑爆上下文） | 输出最近过程日志与保存结果 |
 | `.\tool\agent_cmd.bat clear-logs` | 无 | 清空应用内当前日志缓存 | `[AgentBridge] [成功] 日志已清空` |
+| `.\tool\agent_cmd.bat save-debug` | 无 | 读取当前保存页选择树快照 (PLAN_63) | 输出 layer、画质、作者/作品/资源的选择状态 |
 | `.\tool\agent_cmd.bat history [query]` | 可选搜索词 | 查看历史记录，支持关键词模糊搜索 | 终端输出历史记录表格（标题、媒体摘要、时间） |
 | `.\tool\agent_cmd.bat history-scan "<id>"` | 历史记录 id | 扫描当前保存位置下视频/图片/音频是否存在 (PLAN_62) | 输出 type、found、count、displayPath、uri、folderUri |
 | `.\tool\agent_cmd.bat clear-history` | 无 | 清空应用内所有历史记录 | `[AgentBridge] [成功] 历史记录已清空` |
@@ -117,6 +118,7 @@
 | `/api/download` | `POST` | `{"indices":"all"}` 或 `{"indices":[0,1]}` | `{"downloadedCount":2,"savedTypes":["image"],"expectedFiles":["..._1.jpg"]}` | 下载资源落盘 |
 | `/api/logs` | `GET` | 无 (支持 `?tail=20` 或 `?limit=50`) | `{"total":120,"count":20,"logs":["..."]}` | 结构化日志流 (支持尾部/限额截取) |
 | `/api/logs/clear`| `POST` | 无 | `{"success":true,"message":"Logs cleared"}` | 清空日志缓存 |
+| `/api/save-debug` | `GET` | 无 | `{"snapshot":{"layer":"top|middle|bottom","qualityMode":"...","authors":[...],"works":[...],"items":[...]}}` | 读取保存页选择树快照 (PLAN_63) |
 | `/api/history` | `GET` | 无 (支持 `?q=关键词`) | `{"count":10,"records":[{"id":"...","title":"...","fullDesc":"..."},...]}` | 查询或模糊搜索历史记录 |
 | `/api/history/scan`| `POST` | `{"id":"home:<secUid>"}` 或作品 id | `{"id":"...","type":"userHome","displayTitle":"...","records":[{"type":"video","found":true,"count":2,"uri":"...","folderUri":"...","displayPath":"..."}]}` | 扫描历史记录在当前保存位置的可用性 (PLAN_62) |
 | `/api/history/open`| `POST` | `{"id":"...","type":"video|image|audio"}` | `{"opened":true,"type":"video","uri":"...","folderUri":"..."}` | 优先跳转文件管理器文件夹，失败打开文件 (PLAN_62) |

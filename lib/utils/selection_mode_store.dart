@@ -4,165 +4,101 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../models/common/save_memory_scope.dart';
 import '../models/media_item.dart';
 
-/// 保存页媒体标签（图片、实况、音频）选择状态记忆存储器
+/// 保存页媒体标签与分类的全选记忆。
 ///
-/// 核心状态机定义（按每种媒体标签类型独立管理）：
-/// - a：对应标签用于下次解析的判断值
-///     1 = 默认全选该标签下的资源（初始默认值）
-///     2 = 默认全不选该标签下的资源
-/// - b：对应标签在当前解析中最终做出的选择状态
-///     1 = 全选该标签资源
-///     2 = 全不选该标签资源
-///     3 = 半选（该标签资源选了一部分）
-///
-/// 状态转移逻辑（对每个标签分别独立应用）：
-/// - 若 b == 1 则 a = 1
-/// - 若 b == 2 则 a = 2
-/// - 若 b == 3 则 a 保持不变
+/// 记忆按「解析来源 + 层级」隔离，互不串扰：
+/// - homeTop：顶层作者全选
+/// - homeMiddle / multiMiddle：中层视频、图文分类
+/// - homeBottom / multiBottom / singleBottom：底层图片、实况、音频
 class SelectionModeStore {
   SelectionModeStore._();
 
   static const String _fileName = 'selection_mode.json';
 
-  /// 每个媒体标签的 a 值映射（默认均为 1: 全选）
-  static final Map<MediaType, int> _aMap = {
-    MediaType.image: 1,
-    MediaType.video: 1,
-    MediaType.audio: 1,
+  static const List<SaveMemoryScope> bottomScopes = [
+    SaveMemoryScope.homeBottom,
+    SaveMemoryScope.multiBottom,
+    SaveMemoryScope.singleBottom,
+  ];
+
+  static const List<SaveMemoryScope> middleScopes = [
+    SaveMemoryScope.homeMiddle,
+    SaveMemoryScope.multiMiddle,
+  ];
+
+  /// 每个底层作用域下各媒体标签的 a 值（1=默认全选，2=默认全不选）
+  static final Map<SaveMemoryScope, Map<MediaType, int>> _bottomModes = {
+    for (final scope in bottomScopes)
+      scope: {
+        MediaType.image: 1,
+        MediaType.video: 1,
+        MediaType.audio: 1,
+      },
   };
 
-  /// 顶层（多主页）“全选”按钮用于下次解析的判断值 a (1 = 全选, 2 = 全不选)
-  static int _homeSelectAllMode = 1;
+  /// 每个中层作用域下视频/图文分类的 a 值
+  static final Map<SaveMemoryScope, Map<WorkMediaKind, int>> _middleModes = {
+    for (final scope in middleScopes)
+      scope: {
+        WorkMediaKind.video: 1,
+        WorkMediaKind.image: 1,
+      },
+  };
 
-  /// 中层（作品列表）“视频”分类用于下次解析的判断值 a
-  static int _workVideoMode = 1;
+  /// 顶层作者全选 a 值（1=全选，2=全不选）
+  static int _homeTopSelectAllMode = 1;
 
-  /// 中层（作品列表）“图文”分类用于下次解析的判断值 a
-  static int _workImageMode = 1;
+  // ---------- 新 API：带作用域 ----------
 
-  /// 获取指定媒体标签用于下次解析的判断值 a (1 = 全选, 2 = 全不选)
-  static int getMode(MediaType type) => _aMap[type] ?? 1;
+  static int getBottomMode(MediaType type, SaveMemoryScope scope) =>
+      _bottomModes[scope]?[type] ?? 1;
 
-  /// 获取顶层（多主页）“全选”按钮用于下次解析的判断值 a (1 = 全选, 2 = 全不选)
-  static int getHomeSelectAllMode() => _homeSelectAllMode;
+  static int getMiddleCategoryMode(
+    WorkMediaKind kind,
+    SaveMemoryScope scope,
+  ) {
+    if (kind == WorkMediaKind.article) return 2;
+    return _middleModes[scope]?[kind] ?? 1;
+  }
 
-  /// 获取中层“视频/图文”分类用于下次解析的判断值 a (1 = 全选, 2 = 全不选)
-  static int getWorkCategoryMode(WorkMediaKind kind) {
-    switch (kind) {
-      case WorkMediaKind.video:
-        return _workVideoMode;
-      case WorkMediaKind.image:
-        return _workImageMode;
-      case WorkMediaKind.article:
-        return 2;
+  static int getHomeTopSelectAllMode() => _homeTopSelectAllMode;
+
+  /// 顶层作者全选 a/b 状态转移
+  static void updateFromHomeSelections(List<AuthorSelectionState> states) {
+    if (states.isEmpty) return;
+    final int b;
+    if (states.every((state) => state == AuthorSelectionState.all)) {
+      b = 1;
+    } else if (states.every((state) => state == AuthorSelectionState.none)) {
+      b = 2;
+    } else {
+      b = 3;
     }
+    recordHomeSelectAllSelection(b);
   }
 
-  /// 供测试或调试直接设置指定标签类型的 a
-  @visibleForTesting
-  static void setMode(MediaType type, int value) {
-    _aMap[type] = value;
-  }
-
-  /// 供测试或调试直接设置顶层（多主页）“全选”的 a
-  @visibleForTesting
-  static void setHomeSelectAllMode(int value) {
-    _homeSelectAllMode = value == 2 ? 2 : 1;
-  }
-
-  /// 供测试或调试直接设置中层分类的 a
-  @visibleForTesting
-  static void setWorkCategoryMode(WorkMediaKind kind, int value) {
-    _applyWorkCategoryMode(kind, value == 2 ? 2 : 1);
-  }
-
-  /// 内部写入中层分类的 a（不做持久化）
-  static void _applyWorkCategoryMode(WorkMediaKind kind, int value) {
-    final normalized = value == 2 ? 2 : 1;
-    switch (kind) {
-      case WorkMediaKind.video:
-        _workVideoMode = normalized;
-      case WorkMediaKind.image:
-        _workImageMode = normalized;
-      case WorkMediaKind.article:
-        break;
-    }
-  }
-
-  /// 重置所有标签的判断值为初始状态 (1: 全选)，方便单元测试
-  @visibleForTesting
-  static void reset() {
-    _aMap[MediaType.image] = 1;
-    _aMap[MediaType.video] = 1;
-    _aMap[MediaType.audio] = 1;
-    _homeSelectAllMode = 1;
-    _workVideoMode = 1;
-    _workImageMode = 1;
-  }
-
-  /// 启动时从本地文件恢复上次保存的各标签记忆
-  static Future<void> init() async {
-    try {
-      final file = await _file();
-      if (!await file.exists()) {
-        reset();
-        return;
-      }
-      final content = await file.readAsString();
-      final dynamic decoded = jsonDecode(content);
-      if (decoded is Map) {
-        for (final type in MediaType.values) {
-          final val = decoded[type.name];
-          if (val == 2) {
-            _aMap[type] = 2;
-          } else {
-            _aMap[type] = 1;
-          }
-        }
-        final homeVal = decoded['home_all'];
-        _homeSelectAllMode = homeVal == 2 ? 2 : 1;
-        final workVideoVal = decoded['work_video'];
-        _workVideoMode = workVideoVal == 2 ? 2 : 1;
-        final workImageVal = decoded['work_image'];
-        _workImageMode = workImageVal == 2 ? 2 : 1;
-      }
-    } catch (_) {
-      reset();
-    }
-  }
-
-  /// 计算给定选中数量和总数量对应的当前解析判断值 b
-  /// 1 = 全选, 2 = 全不选, 3 = 半选
-  static int calculateB(int selectedCount, int totalCount) {
-    if (totalCount <= 0) return 1;
-    if (selectedCount >= totalCount) return 1;
-    if (selectedCount <= 0) return 2;
-    return 3;
-  }
-
-  /// 根据当前解析标签的判断值 b 更新对应类型的 a 并异步持久化
-  static void recordCategorySelection(MediaType type, int b) {
+  static void recordHomeSelectAllSelection(int b) {
     if (b == 1) {
-      if (_aMap[type] != 1) {
-        _aMap[type] = 1;
+      if (_homeTopSelectAllMode != 1) {
+        _homeTopSelectAllMode = 1;
         _saveToFile();
       }
     } else if (b == 2) {
-      if (_aMap[type] != 2) {
-        _aMap[type] = 2;
+      if (_homeTopSelectAllMode != 2) {
+        _homeTopSelectAllMode = 2;
         _saveToFile();
       }
-    } else if (b == 3) {
-      // a 保持不变
     }
   }
 
-  /// 根据本次保存页的所有资源与已选集合，按标签分别计算 b 并完成状态转移
+  /// 底层作用域：按媒体标签结算 b 并写入对应作用域
   static void updateFromSheetItems({
     required List<MediaItem> allItems,
     required Set<int> selectedIndices,
+    SaveMemoryScope scope = SaveMemoryScope.singleBottom,
   }) {
     if (allItems.isEmpty) return;
 
@@ -177,7 +113,8 @@ class SelectionModeStore {
       }
     }
 
-    bool changed = false;
+    var changed = false;
+    final modes = _bottomModes[scope]!;
     for (final entry in totalCounts.entries) {
       final type = entry.key;
       final total = entry.value;
@@ -185,63 +122,47 @@ class SelectionModeStore {
       final selected = selectedCounts[type] ?? 0;
       final b = calculateB(selected, total);
 
-      if (b == 1 && _aMap[type] != 1) {
-        _aMap[type] = 1;
+      if (b == 1 && modes[type] != 1) {
+        modes[type] = 1;
         changed = true;
-      } else if (b == 2 && _aMap[type] != 2) {
-        _aMap[type] = 2;
+      } else if (b == 2 && modes[type] != 2) {
+        modes[type] = 2;
         changed = true;
       }
-      // b == 3 => a 保持不变
     }
 
-    if (changed) {
-      _saveToFile();
-    }
+    if (changed) _saveToFile();
   }
 
-  /// 根据顶层（多主页）当前作者选择状态计算 b 并驱动“全选”记忆状态转移
-  static void updateFromHomeSelections(List<AuthorSelectionState> states) {
-    if (states.isEmpty) return;
-    final int b;
-    if (states.every((s) => s == AuthorSelectionState.all)) {
-      b = 1;
-    } else if (states.every((s) => s == AuthorSelectionState.none)) {
-      b = 2;
-    } else {
-      b = 3;
-    }
-    recordHomeSelectAllSelection(b);
-  }
-
-  /// 根据顶层“全选”判断值 b 更新 a 并异步持久化
-  static void recordHomeSelectAllSelection(int b) {
+  /// 单个媒体标签结算（兼容旧测试/旧调用，默认 singleBottom）
+  static void recordCategorySelection(
+    MediaType type,
+    int b, {
+    SaveMemoryScope scope = SaveMemoryScope.singleBottom,
+  }) {
+    final modes = _bottomModes[scope]!;
     if (b == 1) {
-      if (_homeSelectAllMode != 1) {
-        _homeSelectAllMode = 1;
+      if (modes[type] != 1) {
+        modes[type] = 1;
         _saveToFile();
       }
     } else if (b == 2) {
-      if (_homeSelectAllMode != 2) {
-        _homeSelectAllMode = 2;
+      if (modes[type] != 2) {
+        modes[type] = 2;
         _saveToFile();
       }
     }
-    // b == 3 => a 保持不变
   }
 
-  /// 根据中层“视频/图文”分类的选择情况计算 b 并驱动 a 状态转移
-  ///
-  /// - 该分类全部作品均为“全选” -> b=1
-  /// - 该分类全部作品均为“未选” -> b=2
-  /// - 其余（含部分选择） -> b=3，保持原 a 不变
+  /// 中层分类结算
   static void updateFromWorkCategorySelection({
     required WorkMediaKind kind,
     required int total,
     required int selected,
     required bool allSelected,
+    SaveMemoryScope scope = SaveMemoryScope.multiMiddle,
   }) {
-    if (total <= 0) return;
+    if (total <= 0 || kind == WorkMediaKind.article) return;
     final int b;
     if (allSelected) {
       b = 1;
@@ -251,30 +172,176 @@ class SelectionModeStore {
       b = 3;
     }
     if (b == 1) {
-      if (getWorkCategoryMode(kind) != 1) {
-        _applyWorkCategoryMode(kind, 1);
+      if (getMiddleCategoryMode(kind, scope) != 1) {
+        _applyMiddleCategoryMode(kind, 1, scope);
         _saveToFile();
       }
     } else if (b == 2) {
-      if (getWorkCategoryMode(kind) != 2) {
-        _applyWorkCategoryMode(kind, 2);
+      if (getMiddleCategoryMode(kind, scope) != 2) {
+        _applyMiddleCategoryMode(kind, 2, scope);
         _saveToFile();
       }
     }
   }
 
+  static int calculateB(int selectedCount, int totalCount) {
+    if (totalCount <= 0) return 1;
+    if (selectedCount >= totalCount) return 1;
+    if (selectedCount <= 0) return 2;
+    return 3;
+  }
+
+  // ---------- 兼容旧 API（映射到默认作用域） ----------
+
+  static int getMode(MediaType type) =>
+      getBottomMode(type, SaveMemoryScope.singleBottom);
+
+  static int getHomeSelectAllMode() => getHomeTopSelectAllMode();
+
+  static int getWorkCategoryMode(WorkMediaKind kind) =>
+      getMiddleCategoryMode(kind, SaveMemoryScope.multiMiddle);
+
+  @visibleForTesting
+  static void setMode(MediaType type, int value) {
+    _bottomModes[SaveMemoryScope.singleBottom]![type] = value == 2 ? 2 : 1;
+  }
+
+  @visibleForTesting
+  static void setHomeSelectAllMode(int value) {
+    _homeTopSelectAllMode = value == 2 ? 2 : 1;
+  }
+
+  @visibleForTesting
+  static void setWorkCategoryMode(WorkMediaKind kind, int value) {
+    _applyMiddleCategoryMode(
+      kind,
+      value == 2 ? 2 : 1,
+      SaveMemoryScope.multiMiddle,
+    );
+  }
+
+  @visibleForTesting
+  static void reset() {
+    for (final scope in bottomScopes) {
+      for (final type in MediaType.values) {
+        _bottomModes[scope]![type] = 1;
+      }
+    }
+    for (final scope in middleScopes) {
+      for (final kind in [WorkMediaKind.video, WorkMediaKind.image]) {
+        _middleModes[scope]![kind] = 1;
+      }
+    }
+    _homeTopSelectAllMode = 1;
+  }
+
+  static void _applyMiddleCategoryMode(
+    WorkMediaKind kind,
+    int value,
+    SaveMemoryScope scope,
+  ) {
+    if (kind == WorkMediaKind.article) return;
+    _middleModes[scope]![kind] = value == 2 ? 2 : 1;
+  }
+
+  // ---------- 持久化与迁移 ----------
+
+  static Future<void> init() async {
+    try {
+      final file = await _file();
+      if (!await file.exists()) {
+        reset();
+        return;
+      }
+      final content = await file.readAsString();
+      final dynamic decoded = jsonDecode(content);
+      if (decoded is! Map) {
+        reset();
+        return;
+      }
+
+      final hasScopedKeys = decoded.keys.any(
+        (key) => key.toString().startsWith('bottom.') ||
+            key.toString().startsWith('middle.') ||
+            key.toString() == 'homeTop.selectAll',
+      );
+
+      if (hasScopedKeys) {
+        _loadScoped(decoded);
+      } else {
+        _migrateLegacy(decoded);
+      }
+    } catch (_) {
+      reset();
+    }
+  }
+
+  static void _loadScoped(Map decoded) {
+    for (final scope in bottomScopes) {
+      for (final type in MediaType.values) {
+        final key = 'bottom.${scope.name}.${type.name}';
+        _bottomModes[scope]![type] = decoded[key] == 2 ? 2 : 1;
+      }
+    }
+    for (final scope in middleScopes) {
+      for (final kind in [WorkMediaKind.video, WorkMediaKind.image]) {
+        final key = 'middle.${scope.name}.${kind.name}';
+        _middleModes[scope]![kind] = decoded[key] == 2 ? 2 : 1;
+      }
+    }
+    _homeTopSelectAllMode =
+        decoded['homeTop.selectAll'] == 2 ? 2 : 1;
+  }
+
+  /// 旧版本只有一套全局值，迁移时复制到对应的所有新作用域，之后各自独立。
+  static void _migrateLegacy(Map decoded) {
+    for (final scope in bottomScopes) {
+      for (final type in MediaType.values) {
+        _bottomModes[scope]![type] = decoded[type.name] == 2 ? 2 : 1;
+      }
+    }
+    for (final scope in middleScopes) {
+      _middleModes[scope]![WorkMediaKind.video] =
+          decoded['work_video'] == 2 ? 2 : 1;
+      _middleModes[scope]![WorkMediaKind.image] =
+          decoded['work_image'] == 2 ? 2 : 1;
+    }
+    _homeTopSelectAllMode = decoded['home_all'] == 2 ? 2 : 1;
+    _saveToFile();
+  }
+
   static Future<void> _saveToFile() async {
     try {
       final file = await _file();
-      final data = {
-        for (final type in MediaType.values) type.name: _aMap[type] ?? 1,
-        'home_all': _homeSelectAllMode,
-        'work_video': _workVideoMode,
-        'work_image': _workImageMode,
-      };
+      final data = <String, dynamic>{};
+      for (final scope in bottomScopes) {
+        for (final type in MediaType.values) {
+          data['bottom.${scope.name}.${type.name}'] =
+              _bottomModes[scope]![type] ?? 1;
+        }
+      }
+      for (final scope in middleScopes) {
+        for (final kind in [WorkMediaKind.video, WorkMediaKind.image]) {
+          data['middle.${scope.name}.${kind.name}'] =
+              _middleModes[scope]![kind] ?? 1;
+        }
+      }
+      data['homeTop.selectAll'] = _homeTopSelectAllMode;
+
+      // 兼容旧版本读取
+      for (final type in MediaType.values) {
+        data[type.name] =
+            _bottomModes[SaveMemoryScope.singleBottom]![type] ?? 1;
+      }
+      data['home_all'] = _homeTopSelectAllMode;
+      data['work_video'] =
+          _middleModes[SaveMemoryScope.multiMiddle]![WorkMediaKind.video] ?? 1;
+      data['work_image'] =
+          _middleModes[SaveMemoryScope.multiMiddle]![WorkMediaKind.image] ?? 1;
+
       await file.writeAsString(jsonEncode(data), flush: true);
     } catch (_) {
-      // 写入失败不影响内存中即时生效
+      // 写入失败不影响内存状态
     }
   }
 

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../models/common/save_memory_scope.dart';
 import '../../models/media_item.dart';
 import '../../services/audio_preview_service.dart';
+import '../../utils/save_page_debug_store.dart';
 import '../../utils/selection_mode_store.dart';
 import 'bottom_media_widgets.dart';
 import 'save_page_common.dart';
@@ -15,6 +17,7 @@ class ImagePreviewSheet extends StatefulWidget {
     this.audioService,
     this.nested = false,
     this.initialSelectedUrls,
+    this.memoryScope = SaveMemoryScope.singleBottom,
   });
 
   final List<MediaItem> items;
@@ -31,6 +34,9 @@ class ImagePreviewSheet extends StatefulWidget {
   /// 再次进入底层时用于恢复已选资源；为 null 时按分类记忆默认值初始化
   final Set<String>? initialSelectedUrls;
 
+  /// 底层记忆作用域：homeBottom / multiBottom / singleBottom
+  final SaveMemoryScope memoryScope;
+
   /// 弹出面板，返回用户勾选的资源；用户取消时返回 null。
   static Future<List<MediaItem>?> show(
     BuildContext context, {
@@ -39,6 +45,7 @@ class ImagePreviewSheet extends StatefulWidget {
     AudioPreviewService? audioService,
     bool nested = false,
     Set<String>? initialSelectedUrls,
+    SaveMemoryScope memoryScope = SaveMemoryScope.singleBottom,
   }) {
     return showModalBottomSheet<List<MediaItem>>(
       context: context,
@@ -50,6 +57,7 @@ class ImagePreviewSheet extends StatefulWidget {
         audioService: audioService,
         nested: nested,
         initialSelectedUrls: initialSelectedUrls,
+        memoryScope: memoryScope,
       ),
     );
   }
@@ -85,7 +93,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
       // 首次进入：按图片/实况/音频各自的记忆默认值初始化
       for (var i = 0; i < widget.items.length; i++) {
         final type = widget.items[i].type;
-        if (SelectionModeStore.getMode(type) != 2) {
+        if (SelectionModeStore.getBottomMode(type, widget.memoryScope) != 2) {
           _selectedIndices.add(i);
         }
       }
@@ -97,6 +105,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
       _audioService = AudioPreviewService();
       _createdOwnAudioService = true;
     }
+    _publishDebugState();
   }
 
   @override
@@ -117,6 +126,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
     SelectionModeStore.updateFromSheetItems(
       allItems: widget.items,
       selectedIndices: _selectedIndices,
+      scope: widget.memoryScope,
     );
   }
 
@@ -152,6 +162,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
     setState(() {
       if (!_selectedIndices.remove(index)) _selectedIndices.add(index);
     });
+    _publishDebugState();
   }
 
   /// 按分类一键切换全选/全不选
@@ -164,6 +175,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
         _selectedIndices.addAll(indices);
       }
     });
+    _publishDebugState();
   }
 
   /// 切换指定配乐的试听状态
@@ -194,6 +206,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
   /// 返回按原始顺序排列的选中资源
   void _confirm() {
     _recordSelectionMode();
+    _publishDebugState();
     _audioService.stop();
     final selected = _selectedIndices.toList()..sort();
     Navigator.pop(context, [for (final index in selected) widget.items[index]]);
@@ -362,6 +375,24 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
   }
 
   /// 单个网格项：点击缩略图本身切换勾选，选中状态体现为 3.0dp 边框，右下角提供专属微型预览/播放按钮
+  void _publishDebugState() {
+    SavePageDebugStore.update('bottom', {
+      'memoryScope': widget.memoryScope.name,
+      'nested': widget.nested,
+      'selectedCount': _selectedIndices.length,
+      'totalCount': widget.items.length,
+      'items': [
+        for (var index = 0; index < widget.items.length; index++)
+          {
+            'index': index,
+            'url': widget.items[index].url,
+            'type': widget.items[index].type.name,
+            'selected': _selectedIndices.contains(index),
+          },
+      ],
+    });
+  }
+
   Widget _buildTile(int index) {
     final item = widget.items[index];
     final selected = _selectedIndices.contains(index);

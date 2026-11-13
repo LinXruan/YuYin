@@ -51,7 +51,7 @@ class UserHomeBatchSaver {
         continue;
       }
 
-      onProgress?.call(index + 1, authors.length, '正在准备作者 $nickname');
+      onProgress?.call(index + 1, authors.length, '正在准备 ${index + 1}/${authors.length}');
 
       try {
         var works = worksBySecUid[secUid];
@@ -70,17 +70,15 @@ class UserHomeBatchSaver {
         MediaSaveTarget resolveTarget(MediaType type) =>
             HomeSavePath.buildTarget(config, type, folder);
 
+        onLog?.call('作者【$nickname】开始保存（${selected.length} 个作品）');
+
         final workResults = await workSaver.saveWorks(
           selected,
           qualityMode: qualityMode,
           targetResolver: resolveTarget,
           cancelToken: cancelToken,
           onProgress: (current, total, message) {
-            onProgress?.call(
-              index + 1,
-              authors.length,
-              '作者 $nickname：$message',
-            );
+            onProgress?.call(index + 1, authors.length, message);
           },
           onLog: onLog,
         );

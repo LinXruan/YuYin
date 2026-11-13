@@ -15,6 +15,7 @@ rem   agent_cmd.bat save-home "<home_url>"
 rem   agent_cmd.bat download [all|0,1]
 rem   agent_cmd.bat logs
 rem   agent_cmd.bat clear-logs
+rem   agent_cmd.bat save-debug
 rem   agent_cmd.bat history [query]
 rem   agent_cmd.bat history-scan "<id>"
 rem   agent_cmd.bat clear-history

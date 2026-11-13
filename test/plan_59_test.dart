@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yuyin/models/common/save_memory_scope.dart';
 import 'package:yuyin/models/media_item.dart';
+import 'package:yuyin/models/save_page/author_works_selection.dart';
 import 'package:yuyin/utils/download_settings_store.dart';
 import 'package:yuyin/utils/selection_mode_store.dart';
 import 'package:yuyin/utils/url_parser.dart';
@@ -169,7 +171,7 @@ void main() {
       expect(find.text('最高画质'), findsNothing);
       expect(latestMode, BatchVideoQualityMode.lowest);
       expect(
-        DownloadSettingsStore.batchVideoQualityMode,
+        DownloadSettingsStore.getBatchQuality(SaveMemoryScope.homeTop),
         BatchVideoQualityMode.lowest,
       );
 
@@ -192,10 +194,24 @@ void main() {
               state2: AuthorSelectionState.none,
             ),
             useMemoryDefault: false,
-            onOpenAuthor: (author, index) async {
+            onOpenAuthor: (author, index, works, qualityMode) async {
               openedIndex = index;
-              // 模拟从中层返回后变为部分选择状态
-              return AuthorSelectionState.partial;
+              // 模拟从中层返回后：一个作品选中、一个作品未选 -> 作者部分选择
+              return const AuthorWorksSelection(
+                works: [
+                  SaveWorkItem(
+                    url: 'https://example.com/w1',
+                    kind: WorkMediaKind.video,
+                    selectionState: WorkSelectionState.none,
+                  ),
+                  SaveWorkItem(
+                    url: 'https://example.com/w2',
+                    kind: WorkMediaKind.video,
+                    selectionState: WorkSelectionState.all,
+                  ),
+                ],
+                qualityMode: BatchVideoQualityMode.highest,
+              );
             },
           ),
         ),

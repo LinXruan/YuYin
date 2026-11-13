@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../models/media_item.dart';
 import '../../utils/file_name_formatter.dart';
+import '../../utils/save_selection_tree.dart';
 import '../../utils/video_quality_utils.dart';
 import '../video_downloader.dart';
 import 'i_work_batch_saver.dart';
@@ -107,25 +108,19 @@ class WorkBatchSaver implements IWorkBatchSaver {
     SingleWorkResult parsed,
     BatchVideoQualityMode qualityMode,
   ) {
-    if (work.selectedResources.isNotEmpty) {
-      if (work.isVideo) {
-        final videos = work.selectedResources
-            .where((item) => item.type == MediaType.video)
-            .toList();
-        if (videos.isNotEmpty) return videos;
-      } else {
-        return work.selectedResources;
-      }
-    }
-
     if (work.isVideo) {
-      final choice = work.qualityChoice.level == WorkVideoQualityLevel.specific
-          ? work.qualityChoice
-          : (qualityMode == BatchVideoQualityMode.lowest
-              ? const WorkVideoQualityChoice.lowest()
-              : const WorkVideoQualityChoice.highest());
+      final explicit = work.selectedResources
+          .where((item) => item.type == MediaType.video)
+          .toList();
+      if (explicit.isNotEmpty) return explicit;
+
+      final choice = SaveSelectionTree.resolveWorkQuality(work, qualityMode);
       final picked = VideoQualityUtils.resolveChoice(choice, parsed.videoItems);
       return picked == null ? const [] : [picked];
+    }
+
+    if (work.selectedResources.isNotEmpty) {
+      return work.selectedResources;
     }
 
     // 图文/实况：未显式选择时保存全部资源（图片、实况视频、音频）

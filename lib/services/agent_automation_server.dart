@@ -16,6 +16,7 @@ import '../utils/history_thumbnail_cache.dart';
 import '../utils/log_controller.dart';
 import '../utils/login_state_store.dart';
 import '../utils/save_location_store.dart';
+import '../utils/save_page_debug_store.dart';
 import '../utils/author_folder_name.dart';
 import '../utils/home_save_path.dart';
 import '../utils/url_parser.dart';
@@ -125,6 +126,10 @@ class AgentAutomationServer {
         await _handleEval(request);
       } else if (path == '/api/settings/quality' && request.method == 'POST') {
         await _handleSetQualitySetting(request);
+      } else if (path == '/api/save-debug' && request.method == 'GET') {
+        _sendJson(request, HttpStatus.ok, {
+          'snapshot': SavePageDebugStore.snapshot ?? {'layer': 'none'},
+        });
       } else if (path == '/api/history' && request.method == 'GET') {
         await _handleGetHistory(request);
       } else if (path == '/api/history/scan' && request.method == 'POST') {

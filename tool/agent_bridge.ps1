@@ -270,6 +270,18 @@ switch ($Action.ToLower()) {
 
 
 
+    "save-debug" {
+
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/save-debug" -Method Get
+
+        Write-Host "=== 保存页状态: $($resp.snapshot.layer) ==="
+
+        $resp.snapshot | ConvertTo-Json -Depth 8
+
+    }
+
+
+
     "history" {
 
         $q = if ($Arg1) { "?q=$([System.Uri]::EscapeDataString($Arg1))" } else { "" }

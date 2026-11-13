@@ -4,7 +4,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../models/common/save_memory_scope.dart';
 import '../models/media_item.dart';
+import '../models/save_page/author_works_selection.dart';
 import '../services/batch_work/work_batch_saver.dart';
 import '../services/douyin_sniffer.dart';
 import '../services/multi_work/article_work_exception.dart';
@@ -69,9 +71,6 @@ class _ParsePageState extends State<ParsePage>
 
   /// 作者主页作品列表缓存（key: secUid），用于重复进入中层时恢复选择
   final Map<String, List<SaveWorkItem>> _authorWorksCache = {};
-
-  /// 已经打开过中层并产生选择状态的作者，用于区分“预加载”与“已访问”
-  final Set<String> _visitedAuthorSecUids = {};
 
   /// 加载封面/头像所需的统一请求头
   static const Map<String, String> _mediaHeaders = {
@@ -508,6 +507,8 @@ class _ParsePageState extends State<ParsePage>
         context,
         authors: authors,
         headers: _mediaHeaders,
+        initialWorksBySecUid: _authorWorksCache,
+        memoryScope: SaveMemoryScope.homeTop,
         onOpenAuthor: _openAuthorWorks,
       );
       if (!mounted) return;
@@ -534,7 +535,7 @@ class _ParsePageState extends State<ParsePage>
 
       final result = await homeSaver.saveAuthors(
         authors: selectedAuthors,
-        worksBySecUid: _authorWorksCache,
+        worksBySecUid: selection.worksBySecUid,
         qualityMode: selection.qualityMode,
         cancelToken: _downloadCancelToken,
         onProgress: _updateBatchSaveProgress,
@@ -622,7 +623,12 @@ class _ParsePageState extends State<ParsePage>
         works: extractResult.works,
         headers: _mediaHeaders,
         nested: false,
-        onOpenWork: _openWorkDetail,
+        initialQualityMode: DownloadSettingsStore.getBatchQuality(
+          SaveMemoryScope.multiMiddle,
+        ),
+        memoryScope: SaveMemoryScope.multiMiddle,
+        onOpenWork: (work, index) =>
+            _openWorkDetail(work, index, SaveMemoryScope.multiBottom),
       );
       if (!mounted) return;
       if (selection == null) {
@@ -680,10 +686,12 @@ class _ParsePageState extends State<ParsePage>
     }
   }
 
-  /// 顶层点击作者“打开”：抓取该主页全部作品并进入中层保存页
-  Future<AuthorSelectionState?> _openAuthorWorks(
+  /// 顶层点击作者“打开”：使用顶层当前作品树与画质进入中层
+  Future<AuthorWorksSelection?> _openAuthorWorks(
     MultiHomeAuthorItem author,
     int index,
+    List<SaveWorkItem> topWorks,
+    BatchVideoQualityMode topQuality,
   ) async {
     final secUid = author.profile.secUid.trim();
     if (secUid.isEmpty) {
@@ -691,14 +699,11 @@ class _ParsePageState extends State<ParsePage>
       return null;
     }
 
-    final cachedWorks = _authorWorksCache[secUid];
-    final isVisited = _visitedAuthorSecUids.contains(secUid);
-    List<SaveWorkItem> works;
-    if (cachedWorks != null) {
-      // 主页解析阶段已预加载全部作品与封面，这里直接进入中层，无需再次等待
-      works = cachedWorks;
-      widget.logs.add('已使用预加载的作者作品列表（${works.length} 条）');
-    } else {
+    var works = topWorks;
+    if (works.isEmpty) {
+      works = _authorWorksCache[secUid] ?? const [];
+    }
+    if (works.isEmpty) {
       final nickname = author.profile.nickname.isNotEmpty
           ? author.profile.nickname
           : '未知作者';
@@ -735,24 +740,20 @@ class _ParsePageState extends State<ParsePage>
       works: works,
       headers: _mediaHeaders,
       nested: true,
-      useMemoryDefault: !isVisited,
-      initialQualityMode: DownloadSettingsStore.batchVideoQualityMode,
-      onOpenWork: _openWorkDetail,
+      // 顶层已经应用过记忆与用户操作，禁止中层再用记忆覆盖
+      useMemoryDefault: false,
+      initialQualityMode: topQuality,
+      memoryScope: SaveMemoryScope.homeMiddle,
+      onOpenWork: (work, index) =>
+          _openWorkDetail(work, index, SaveMemoryScope.homeBottom),
     );
     if (!mounted || selection == null) return null;
 
-    // 缓存作品的全部最新状态，支持重复进入时恢复
-    _visitedAuthorSecUids.add(secUid);
     _authorWorksCache[secUid] = selection.allWorks;
-    final allWorks = selection.allWorks;
-    if (allWorks.isEmpty) return null;
-    if (allWorks.every((work) => work.selectionState.isAll)) {
-      return AuthorSelectionState.all;
-    }
-    if (allWorks.every((work) => !work.selectionState.isSelected)) {
-      return AuthorSelectionState.none;
-    }
-    return AuthorSelectionState.partial;
+    return AuthorWorksSelection(
+      works: selection.allWorks,
+      qualityMode: selection.qualityMode,
+    );
   }
 
   /// 将主页捕获结果转换为中层作品条目（过滤文章并区分视频/图文）
@@ -787,6 +788,7 @@ class _ParsePageState extends State<ParsePage>
   Future<WorkDetailSelection?> _openWorkDetail(
     SaveWorkItem work,
     int index,
+    SaveMemoryScope bottomScope,
   ) async {
     var result = work.parsedResult;
     if (result == null) {
@@ -815,10 +817,10 @@ class _ParsePageState extends State<ParsePage>
     }
 
     if (result.isImagePost) {
-      final initialUrls =
-          work.selectedResources.isEmpty &&
-              work.selectionState == WorkSelectionState.all
-          ? null
+      // 中层全选 -> 底层必须全选；未选 -> 全不选；部分 -> 恢复已选资源。
+      // 不能传 null，否则底层会使用自己的记忆覆盖中层选择。
+      final initialUrls = work.selectionState == WorkSelectionState.all
+          ? result.items.map((item) => item.url).toSet()
           : work.selectedResourceUrls;
       final selected = await ImagePreviewSheet.show(
         context,
@@ -826,6 +828,7 @@ class _ParsePageState extends State<ParsePage>
         headers: _mediaHeaders,
         nested: true,
         initialSelectedUrls: initialUrls,
+        memoryScope: bottomScope,
       );
       if (!mounted) return null;
       if (selected == null) {
@@ -877,7 +880,11 @@ class _ParsePageState extends State<ParsePage>
         : (picked.resolution ?? picked.gearName ?? '默认画质');
     widget.logs.add('已选择 $qualityText（${picked.formattedSize}）');
     return WorkDetailSelection(
-      state: WorkSelectionState.all,
+      // 特定档位表示只选了资源中的一档 -> 中层显示部分选择虚线；
+      // 最高/最低档位是该作品的代表选择 -> 全选。
+      state: choice.level == WorkVideoQualityLevel.specific
+          ? WorkSelectionState.partial
+          : WorkSelectionState.all,
       selectedResources: [picked],
       qualityChoice: choice,
       parsedResult: result,
@@ -919,6 +926,7 @@ class _ParsePageState extends State<ParsePage>
         context,
         items: result.items,
         headers: _mediaHeaders,
+        memoryScope: SaveMemoryScope.singleBottom,
       );
     }
 
@@ -935,7 +943,8 @@ class _ParsePageState extends State<ParsePage>
   /// 刷新批量保存进度（作品级）
   void _updateBatchSaveProgress(int current, int total, String message) {
     if (!mounted) return;
-    widget.logs.upsertLast('正在保存', message);
+    final prefix = message.startsWith('正在准备') ? '正在准备' : '正在保存';
+    widget.logs.upsertLast(prefix, message);
     final overall = total == 0 ? 0.0 : current / total;
     _downloadProgress.value = overall.clamp(0.0, 1.0).toDouble();
   }

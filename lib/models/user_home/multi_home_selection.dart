@@ -1,4 +1,5 @@
 import '../common/batch_video_quality.dart';
+import '../save_page/save_work_item.dart';
 import 'user_home_profile.dart';
 
 export '../common/batch_video_quality.dart';
@@ -56,6 +57,7 @@ class MultiHomeSelectionResult {
   const MultiHomeSelectionResult({
     required this.selectedAuthors,
     required this.qualityMode,
+    this.worksBySecUid = const {},
   });
 
   /// 已选中的作者列表（包含全选与部分选择）
@@ -63,4 +65,7 @@ class MultiHomeSelectionResult {
 
   /// 用户选择的视频保存画质偏好
   final BatchVideoQualityMode qualityMode;
+
+  /// 所有作者的最新作品选择树（保存时唯一数据源）
+  final Map<String, List<SaveWorkItem>> worksBySecUid;
 }

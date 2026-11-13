@@ -2,26 +2,26 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../models/common/save_memory_scope.dart';
 import '../../models/media_item.dart';
+import '../../models/save_page/author_works_selection.dart';
 import '../../utils/download_settings_store.dart';
+import '../../utils/save_page_debug_store.dart';
+import '../../utils/save_selection_tree.dart';
 import '../../utils/selection_mode_store.dart';
 import 'save_page_common.dart';
 
-/// 进入中层页面（单主页作品列表）的预留回调接口
-///
-/// 返回更新后的 [AuthorSelectionState] 时，顶层卡片将自动同步实线/虚线/无框状态。
-typedef OnOpenAuthorCallback = FutureOr<AuthorSelectionState?> Function(
+/// 进入中层页面（单主页作品列表）的回调
+typedef OnOpenAuthorCallback = FutureOr<AuthorWorksSelection?> Function(
   MultiHomeAuthorItem author,
   int index,
+  List<SaveWorkItem> works,
+  BatchVideoQualityMode qualityMode,
 );
 
 /// 三层结构保存页 — 顶层（多主页）预览与选择面板
 ///
-/// 视觉风格与底层 [ImagePreviewSheet] 保持一致：
-/// - 缩略图展示作者头像，支持实线（全选）/ 虚线（部分选择）/ 无框（未选）三种状态；
-/// - 右下角提供“打开”图标按钮（无汉字），预留进入中层页面的接口；
-/// - 右上角提供与底层“图片/实况/音频”同款风格及记忆逻辑的“全选”按钮；
-/// - “全选”左侧提供风格明显区分的“最高画质 / 最低画质”切换按钮。
+/// 顶层始终位于主页解析流程：作者 -> 作品。作品的具体资源只有进入中层再打开底层后才会出现。
 class MultiHomePreviewSheet extends StatefulWidget {
   const MultiHomePreviewSheet({
     super.key,
@@ -29,35 +29,34 @@ class MultiHomePreviewSheet extends StatefulWidget {
     this.headers = const {},
     this.useMemoryDefault = true,
     this.initialQualityMode,
+    this.initialWorksBySecUid = const {},
+    this.memoryScope = SaveMemoryScope.homeTop,
     this.onOpenAuthor,
     this.onQualityChanged,
   });
 
-  /// 多主页作者条目列表
   final List<MultiHomeAuthorItem> authors;
-
-  /// 加载头像图片所需的请求头
   final Map<String, String> headers;
-
-  /// 是否使用 [SelectionModeStore] 记忆的默认全选/全不选状态初始化
   final bool useMemoryDefault;
-
-  /// 可选初始画质模式（未指定时读取 [DownloadSettingsStore.batchVideoQualityMode]）
   final BatchVideoQualityMode? initialQualityMode;
 
-  /// 点击缩略图右下角“打开”标志时的回调接口（用于进入中层页面）
-  final OnOpenAuthorCallback? onOpenAuthor;
+  /// 解析页预加载或上次进入中层后的作者作品树
+  final Map<String, List<SaveWorkItem>> initialWorksBySecUid;
 
-  /// 画质切换回调
+  /// 顶层记忆作用域（主页流程固定 homeTop）
+  final SaveMemoryScope memoryScope;
+
+  final OnOpenAuthorCallback? onOpenAuthor;
   final ValueChanged<BatchVideoQualityMode>? onQualityChanged;
 
-  /// 弹出顶层保存面板，返回选中的作者列表及画质偏好；取消时返回 null。
   static Future<MultiHomeSelectionResult?> show(
     BuildContext context, {
     required List<MultiHomeAuthorItem> authors,
     Map<String, String> headers = const {},
     bool useMemoryDefault = true,
     BatchVideoQualityMode? initialQualityMode,
+    Map<String, List<SaveWorkItem>> initialWorksBySecUid = const {},
+    SaveMemoryScope memoryScope = SaveMemoryScope.homeTop,
     OnOpenAuthorCallback? onOpenAuthor,
     ValueChanged<BatchVideoQualityMode>? onQualityChanged,
   }) {
@@ -70,6 +69,8 @@ class MultiHomePreviewSheet extends StatefulWidget {
         headers: headers,
         useMemoryDefault: useMemoryDefault,
         initialQualityMode: initialQualityMode,
+        initialWorksBySecUid: initialWorksBySecUid,
+        memoryScope: memoryScope,
         onOpenAuthor: onOpenAuthor,
         onQualityChanged: onQualityChanged,
       ),
@@ -82,31 +83,64 @@ class MultiHomePreviewSheet extends StatefulWidget {
 
 class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
   late List<MultiHomeAuthorItem> _authors;
+  late Map<String, List<SaveWorkItem>> _worksBySecUid;
   late BatchVideoQualityMode _qualityMode;
   bool _hasRecordedSelection = false;
-
-  /// 正在打开中层页面的作者索引（用于展示局部加载遮罩）
   int? _openingIndex;
 
   @override
   void initState() {
     super.initState();
-    final defaultMode = SelectionModeStore.getHomeSelectAllMode();
+    _worksBySecUid = {
+      for (final entry in widget.initialWorksBySecUid.entries)
+        entry.key: List<SaveWorkItem>.from(entry.value),
+    };
+
+    final rememberedQuality =
+        widget.initialQualityMode ??
+        DownloadSettingsStore.getBatchQuality(widget.memoryScope);
+    // 新解析的主页作品默认 highest，需要先用 homeTop 记忆覆盖未显式选择的视频作品
+    if (widget.initialQualityMode == null) {
+      for (final entry in _worksBySecUid.entries) {
+        _worksBySecUid[entry.key] = [
+          for (final work in entry.value)
+            work.isVideo &&
+                    work.qualityChoice.level != WorkVideoQualityLevel.specific
+                ? work.copyWith(
+                    qualityChoice:
+                        rememberedQuality == BatchVideoQualityMode.lowest
+                        ? const WorkVideoQualityChoice.lowest()
+                        : const WorkVideoQualityChoice.highest(),
+                  )
+                : work,
+        ];
+      }
+    }
+
+    final defaultMode = SelectionModeStore.getHomeTopSelectAllMode();
     final defaultState = defaultMode == 2
         ? AuthorSelectionState.none
         : AuthorSelectionState.all;
 
-    _authors = widget.authors
-        .map(
-          (item) => widget.useMemoryDefault
-              ? item.copyWith(selectionState: defaultState)
-              : item,
-        )
-        .toList();
+    _authors = widget.authors.map((author) {
+      final copy = widget.useMemoryDefault
+          ? author.copyWith(selectionState: defaultState)
+          : author;
+      if (widget.useMemoryDefault) {
+        final secUid = copy.profile.secUid.trim();
+        final works = _worksOf(secUid);
+        if (works.isNotEmpty) {
+          _worksBySecUid[secUid] =
+              SaveSelectionTree.applyAuthorSelection(works, defaultState);
+        }
+      }
+      return copy;
+    }).toList();
 
+    _refreshAuthorStates();
     _qualityMode =
-        widget.initialQualityMode ??
-        DownloadSettingsStore.batchVideoQualityMode;
+        widget.initialQualityMode ?? _aggregateAll() ?? rememberedQuality;
+    _publishDebugState();
   }
 
   @override
@@ -115,92 +149,159 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
     super.dispose();
   }
 
+  List<SaveWorkItem> _worksOf(String secUid) =>
+      _worksBySecUid[secUid] ?? const [];
+
+  List<SaveWorkItem> get _allWorks => [
+    for (final author in _authors) ..._worksOf(author.profile.secUid),
+  ];
+
+  BatchVideoQualityMode? _aggregateAll() =>
+      SaveSelectionTree.aggregateQuality(_allWorks);
+
+  void _refreshAuthorStates() {
+    _authors = [
+      for (final author in _authors)
+        _worksOf(author.profile.secUid).isEmpty
+            ? author
+            : author.copyWith(
+                selectionState: SaveSelectionTree.deriveAuthorState(
+                  _worksOf(author.profile.secUid),
+                ),
+              ),
+    ];
+  }
+
   void _recordSelectionMode() {
     if (_hasRecordedSelection) return;
     _hasRecordedSelection = true;
     SelectionModeStore.updateFromHomeSelections(
-      _authors.map((e) => e.selectionState).toList(),
+      _authors.map((author) => author.selectionState).toList(),
     );
-    DownloadSettingsStore.recordBatchVideoQualitySelection(_qualityMode);
+    unawaited(
+      DownloadSettingsStore.recordBatchQualitySelection(
+        widget.memoryScope,
+        _qualityMode,
+      ),
+    );
   }
 
   bool get _hasAuthors => _authors.isNotEmpty;
 
   bool get _isAllSelected =>
       _hasAuthors &&
-      _authors.every((e) => e.selectionState == AuthorSelectionState.all);
+      _authors.every((author) => author.selectionState == AuthorSelectionState.all);
 
   int get _selectedCount => _authors
-      .where((e) => e.selectionState != AuthorSelectionState.none)
+      .where((author) => author.selectionState != AuthorSelectionState.none)
       .length;
 
-  /// 单击作者缩略图：未选/部分选 -> 全选，全选 -> 全不选
+  /// 上层控制下层：作者全选/全不选，递归设置其全部作品。
   void _toggleAuthor(int index) {
+    final author = _authors[index];
+    final secUid = author.profile.secUid.trim();
+    final next = author.selectionState == AuthorSelectionState.all
+        ? AuthorSelectionState.none
+        : AuthorSelectionState.all;
     setState(() {
-      final current = _authors[index].selectionState;
-      final next = current == AuthorSelectionState.all
-          ? AuthorSelectionState.none
-          : AuthorSelectionState.all;
-      _authors[index] = _authors[index].copyWith(selectionState: next);
+      final works = _worksOf(secUid);
+      if (works.isNotEmpty) {
+        _worksBySecUid[secUid] =
+            SaveSelectionTree.applyAuthorSelection(works, next);
+      }
+      _authors[index] = author.copyWith(selectionState: next);
+      _refreshAuthorStates();
+      _qualityMode = _aggregateAll() ?? _qualityMode;
     });
+    _publishDebugState();
   }
 
-  /// 右上角“全选”一键切换
+  /// 上层控制下层：全部作者全选/全不选，递归设置所有作品。
   void _toggleSelectAll() {
     if (!_hasAuthors) return;
     final target = _isAllSelected
         ? AuthorSelectionState.none
         : AuthorSelectionState.all;
     setState(() {
-      _authors = [
-        for (final item in _authors) item.copyWith(selectionState: target),
-      ];
+      for (var i = 0; i < _authors.length; i++) {
+        final secUid = _authors[i].profile.secUid.trim();
+        final works = _worksOf(secUid);
+        if (works.isNotEmpty) {
+          _worksBySecUid[secUid] =
+              SaveSelectionTree.applyAuthorSelection(works, target);
+        }
+        _authors[i] = _authors[i].copyWith(selectionState: target);
+      }
+      _refreshAuthorStates();
+      _qualityMode = _aggregateAll() ?? _qualityMode;
     });
+    _publishDebugState();
   }
 
-  /// 切换“最高画质 / 最低画质”
-  /// 切换规则与“全选”一致：当处于混合画质（或最低画质）时切为最高画质，最高画质切为最低画质
+  /// 上层控制下层：顶层画质切换递归应用到所有作者的全部视频作品。
   void _toggleQualityMode() {
     final next = _qualityMode == BatchVideoQualityMode.highest
         ? BatchVideoQualityMode.lowest
         : BatchVideoQualityMode.highest;
     setState(() {
+      for (final author in _authors) {
+        final secUid = author.profile.secUid.trim();
+        final works = _worksOf(secUid);
+        if (works.isEmpty) continue;
+        _worksBySecUid[secUid] =
+            SaveSelectionTree.applyQualityToWorks(works, next);
+      }
       _qualityMode = next;
     });
-    unawaited(DownloadSettingsStore.setBatchVideoQualityMode(next));
+    unawaited(
+      DownloadSettingsStore.setBatchQuality(widget.memoryScope, next),
+    );
     widget.onQualityChanged?.call(next);
+    _publishDebugState();
   }
 
-  /// 点击右下角“打开”标志，进入中层作品列表页面
   Future<void> _handleOpenAuthor(int index) async {
     final callback = widget.onOpenAuthor;
     if (callback == null || _openingIndex != null) return;
     setState(() => _openingIndex = index);
     try {
-      final updated = await callback(_authors[index], index);
+      final secUid = _authors[index].profile.secUid.trim();
+      final updated = await callback(
+        _authors[index],
+        index,
+        List<SaveWorkItem>.from(_worksOf(secUid)),
+        _qualityMode,
+      );
       if (!mounted || updated == null) return;
       setState(() {
-        _authors[index] = _authors[index].copyWith(selectionState: updated);
-        // 中层可能切换了画质偏好，返回后同步顶层标签
-        _qualityMode = DownloadSettingsStore.batchVideoQualityMode;
+        _worksBySecUid[secUid] = List<SaveWorkItem>.from(updated.works);
+        _authors[index] = _authors[index].copyWith(
+          selectionState: SaveSelectionTree.deriveAuthorState(updated.works),
+        );
+        _qualityMode = _aggregateAll() ?? updated.qualityMode;
       });
+      _publishDebugState();
     } finally {
-      if (mounted) {
-        setState(() => _openingIndex = null);
-      }
+      if (mounted) setState(() => _openingIndex = null);
     }
   }
 
   void _confirm() {
+    _refreshAuthorStates();
     _recordSelectionMode();
     final selected = _authors
-        .where((e) => e.selectionState != AuthorSelectionState.none)
+        .where((author) => author.selectionState != AuthorSelectionState.none)
         .toList();
+    _publishDebugState();
     Navigator.pop(
       context,
       MultiHomeSelectionResult(
         selectedAuthors: selected,
         qualityMode: _qualityMode,
+        worksBySecUid: {
+          for (final entry in _worksBySecUid.entries)
+            entry.key: List<SaveWorkItem>.unmodifiable(entry.value),
+        },
       ),
     );
   }
@@ -213,7 +314,6 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
         height: MediaQuery.of(context).size.height * 0.82,
         child: Column(
           children: [
-            // 顶部选择计数、画质切换与“全选”按钮栏
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
               child: Row(
@@ -243,20 +343,19 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
                 ],
               ),
             ),
-            // 作者头像三列网格
             Expanded(
               child: GridView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                ),
+                gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                    ),
                 itemCount: _authors.length,
                 itemBuilder: (context, index) => _buildAuthorTile(index),
               ),
             ),
-            // 底部保存按钮（本次仅构建 UI，返回选中结果接口）
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
               child: SizedBox(
@@ -273,6 +372,43 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
         ),
       ),
     );
+  }
+
+  void _publishDebugState() {
+    SavePageDebugStore.update('top', {
+      'qualityMode': _qualityMode.name,
+      'authors': [
+        for (var index = 0; index < _authors.length; index++)
+          _authorDebug(index),
+      ],
+    });
+  }
+
+  Map<String, dynamic> _authorDebug(int index) {
+    final author = _authors[index];
+    final works = _worksOf(author.profile.secUid.trim());
+    return {
+      'index': index,
+      'secUid': author.profile.secUid,
+      'nickname': author.profile.nickname,
+      'state': author.selectionState.name,
+      'worksCount': works.length,
+      'selectedWorks': works.where((work) => work.selectionState.isSelected).length,
+      'works': [for (final work in works) _workDebug(work)],
+    };
+  }
+
+  Map<String, dynamic> _workDebug(SaveWorkItem work) {
+    return {
+      'url': work.url,
+      'kind': work.kind.name,
+      'state': work.selectionState.name,
+      'quality': work.qualityChoice.level.name,
+      'selectedResourceCount': work.selectedResources.length,
+      'selectedResourceUrls': [
+        for (final item in work.selectedResources) item.url,
+      ],
+    };
   }
 
   Widget _buildAuthorTile(int index) {
@@ -319,7 +455,6 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
                 ),
               ),
             ),
-          // 右下角“打开”小标志（无汉字），用于进入中层页面
           Positioned(
             bottom: 4,
             right: 4,
@@ -329,7 +464,6 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
               onTap: () => _handleOpenAuthor(index),
             ),
           ),
-          // 进入中层期间展示局部加载遮罩，避免重复点击
           if (_openingIndex == index)
             Positioned.fill(
               child: Container(
@@ -366,9 +500,7 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
       container: true,
       button: true,
       selected: isAll,
-      value: isPartial
-          ? '部分选择'
-          : (isAll ? '全选' : '未选'),
+      value: isPartial ? '部分选择' : (isAll ? '全选' : '未选'),
       label: author.profile.nickname.isNotEmpty
           ? author.profile.nickname
           : '作者 ${index + 1}',

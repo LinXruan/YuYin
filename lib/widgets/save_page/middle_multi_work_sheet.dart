@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../models/common/save_memory_scope.dart';
 import '../../models/media_item.dart';
 import '../../utils/download_settings_store.dart';
+import '../../utils/save_page_debug_store.dart';
+import '../../utils/save_selection_tree.dart';
 import '../../utils/selection_mode_store.dart';
-import '../../utils/video_quality_utils.dart';
 import 'save_page_common.dart';
 
 /// 进入底层（单作品资源/画质）的回调
@@ -32,6 +34,7 @@ class MiddleMultiWorkSheet extends StatefulWidget {
     this.nested = false,
     this.useMemoryDefault = true,
     this.initialQualityMode,
+    this.memoryScope = SaveMemoryScope.multiMiddle,
     this.onOpenWork,
     this.onQualityChanged,
   });
@@ -48,8 +51,11 @@ class MiddleMultiWorkSheet extends StatefulWidget {
   /// 是否使用 [SelectionModeStore] 记忆的默认分类状态初始化
   final bool useMemoryDefault;
 
-  /// 可选初始画质模式（未指定时读取 [DownloadSettingsStore.batchVideoQualityMode]）
+  /// 可选初始画质模式（未指定时读取当前作用域记忆）
   final BatchVideoQualityMode? initialQualityMode;
+
+  /// 中层记忆作用域：homeMiddle 或 multiMiddle
+  final SaveMemoryScope memoryScope;
 
   /// 点击作品封面右下角“打开”标志时的回调
   final OnOpenWorkCallback? onOpenWork;
@@ -65,6 +71,7 @@ class MiddleMultiWorkSheet extends StatefulWidget {
     bool nested = false,
     bool useMemoryDefault = true,
     BatchVideoQualityMode? initialQualityMode,
+    SaveMemoryScope memoryScope = SaveMemoryScope.multiMiddle,
     OnOpenWorkCallback? onOpenWork,
     ValueChanged<BatchVideoQualityMode>? onQualityChanged,
   }) {
@@ -78,6 +85,7 @@ class MiddleMultiWorkSheet extends StatefulWidget {
         nested: nested,
         useMemoryDefault: useMemoryDefault,
         initialQualityMode: initialQualityMode,
+        memoryScope: memoryScope,
         onOpenWork: onOpenWork,
         onQualityChanged: onQualityChanged,
       ),
@@ -101,12 +109,17 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
     super.initState();
     _qualityMode =
         widget.initialQualityMode ??
-        DownloadSettingsStore.batchVideoQualityMode;
+        SaveSelectionTree.aggregateQuality(widget.works) ??
+        DownloadSettingsStore.getBatchQuality(widget.memoryScope);
 
     _works = widget.works.where((work) => work.kind.isSaveable).map((work) {
       if (!widget.useMemoryDefault) return work;
       final defaultState =
-          SelectionModeStore.getWorkCategoryMode(work.kind) == 2
+          SelectionModeStore.getMiddleCategoryMode(
+                work.kind,
+                widget.memoryScope,
+              ) ==
+              2
           ? WorkSelectionState.none
           : WorkSelectionState.all;
       final defaultQuality = _qualityMode == BatchVideoQualityMode.lowest
@@ -119,6 +132,7 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
     }).toList();
 
     _recomputeQualityMode();
+    _publishDebugState();
   }
 
   @override
@@ -156,10 +170,8 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
         if (work.isVideo) work.qualityChoice,
     ];
     if (choices.isEmpty) return;
-    _qualityMode = VideoQualityUtils.aggregateMode(
-      choices,
-      fallback: _qualityMode,
-    );
+    final aggregate = SaveSelectionTree.aggregateQuality(_works);
+    if (aggregate != null) _qualityMode = aggregate;
   }
 
   /// 单击作品缩略图：未选/部分选 -> 全选，全选 -> 全不选
@@ -169,8 +181,13 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
       final next = current.isAll
           ? WorkSelectionState.none
           : WorkSelectionState.all;
-      _works[index] = _works[index].copyWith(selectionState: next);
+      _works[index] = SaveSelectionTree.applyWorkSelection(
+        _works[index],
+        next,
+      );
+      _recomputeQualityMode();
     });
+    _publishDebugState();
   }
 
   /// 按分类一键切换全选/全不选
@@ -181,9 +198,14 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
         : WorkSelectionState.all;
     setState(() {
       for (final index in indices) {
-        _works[index] = _works[index].copyWith(selectionState: target);
+        _works[index] = SaveSelectionTree.applyWorkSelection(
+          _works[index],
+          target,
+        );
       }
+      _recomputeQualityMode();
     });
+    _publishDebugState();
   }
 
   /// 切换“最高/最低/混合画质”
@@ -194,18 +216,15 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
     final next = _qualityMode == BatchVideoQualityMode.highest
         ? BatchVideoQualityMode.lowest
         : BatchVideoQualityMode.highest;
-    final targetChoice = next == BatchVideoQualityMode.lowest
-        ? const WorkVideoQualityChoice.lowest()
-        : const WorkVideoQualityChoice.highest();
     setState(() {
       _qualityMode = next;
-      _works = [
-        for (final work in _works)
-          work.isVideo ? work.copyWith(qualityChoice: targetChoice) : work,
-      ];
+      _works = SaveSelectionTree.applyQualityToWorks(_works, next);
     });
-    unawaited(DownloadSettingsStore.setBatchVideoQualityMode(next));
+    unawaited(
+      DownloadSettingsStore.setBatchQuality(widget.memoryScope, next),
+    );
     widget.onQualityChanged?.call(next);
+    _publishDebugState();
   }
 
   /// 进入底层并回传资源/画质选择
@@ -218,11 +237,13 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
       if (!mounted || result == null) return;
       setState(() {
         final current = _works[index];
-        var updated = current.copyWith(
+        var updated = SaveSelectionTree.applyBottomSelection(
+          current,
+          result.selectedResources,
+          result.parsedResult,
+        ).copyWith(
           selectionState: result.state,
-          selectedResources: result.selectedResources,
           qualityChoice: result.qualityChoice ?? current.qualityChoice,
-          parsedResult: result.parsedResult,
         );
         final parsedCover = result.parsedResult?.coverUrl?.trim() ?? '';
         if (updated.coverUrl.trim().isEmpty && parsedCover.isNotEmpty) {
@@ -231,6 +252,7 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
         _works[index] = updated;
         _recomputeQualityMode();
       });
+      _publishDebugState();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.maybeOf(context)
@@ -258,6 +280,7 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
           videoTotal > 0 &&
           videoSelected == videoTotal &&
           _videoIndices.every((i) => _works[i].selectionState.isAll),
+      scope: widget.memoryScope,
     );
 
     final imageTotal = _imageIndices.length;
@@ -272,15 +295,20 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
           imageTotal > 0 &&
           imageSelected == imageTotal &&
           _imageIndices.every((i) => _works[i].selectionState.isAll),
+      scope: widget.memoryScope,
     );
 
     unawaited(
-      DownloadSettingsStore.recordBatchVideoQualitySelection(_qualityMode),
+      DownloadSettingsStore.recordBatchQualitySelection(
+        widget.memoryScope,
+        _qualityMode,
+      ),
     );
   }
 
   void _confirm() {
     _recordSelectionMode();
+    _publishDebugState();
     final selected = _works
         .where((work) => work.selectionState.isSelected)
         .toList();
@@ -395,6 +423,31 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
         ),
       ),
     );
+  }
+
+  void _publishDebugState() {
+    SavePageDebugStore.update('middle', {
+      'memoryScope': widget.memoryScope.name,
+      'qualityMode': _qualityMode.name,
+      'selectedCount': _selectedCount,
+      'totalCount': _works.length,
+      'works': [
+        for (var index = 0; index < _works.length; index++)
+          {
+            'index': index,
+            'url': _works[index].url,
+            'title': _works[index].title,
+            'kind': _works[index].kind.name,
+            'state': _works[index].selectionState.name,
+            'quality': _works[index].qualityChoice.level.name,
+            'selectedResourceCount':
+                _works[index].selectedResources.length,
+            'selectedResourceUrls': [
+              for (final item in _works[index].selectedResources) item.url,
+            ],
+          },
+      ],
+    });
   }
 
   Widget _buildWorkTile(int index) {
