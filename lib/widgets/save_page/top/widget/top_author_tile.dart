@@ -1,14 +1,12 @@
 part of '../../top_multi_home_sheet.dart';
 
-// ignore_for_file: unnecessary_this
-
-/// top author tile
-extension _SheetTopAuthorTileFlow on _MultiHomePreviewSheetState {
+/// 顶层作者格子：边框完全由派生状态决定
+extension _TopAuthorTile on _MultiHomePreviewSheetState {
   Widget _buildAuthorTile(int index) {
-    final author = _authors[index];
-    final state = author.selectionState;
-    final isPartial = state == AuthorSelectionState.partial;
-    final isAll = state == AuthorSelectionState.all;
+    final author = _matrix.authors.values.elementAt(index);
+    final state = widget.session.authorState(author.secUid);
+    final isAll = state.isAll;
+    final isPartial = state == SelectionState.partial;
 
     final Widget clippedAvatar = ClipRRect(
       borderRadius: BorderRadius.circular(9),
@@ -101,4 +99,3 @@ extension _SheetTopAuthorTileFlow on _MultiHomePreviewSheetState {
     );
   }
 }
-

@@ -85,13 +85,22 @@ extension AgentSaveHomeHandlers on AgentAutomationServer {
         home.secUid,
       );
       final config = SaveLocationStore.current;
-      final saver = WorkBatchSaver(
-        downloader: downloader,
-        sniffer: sniffer,
+      final quality = _qualityModeFrom(body['quality']?.toString());
+      final session = SelectionSession.home(
+        profiles: [home.profile],
+        worksBySecUid: {home.secUid: works},
+        defaultSelected: (_) => true,
+        quality: quality,
       );
+      final selected = await SessionWorkPreparer.prepare(
+        session,
+        works.map((work) => work.url),
+        sniffer.sniffVideoUrl,
+      );
+      session.dispose();
+      final saver = WorkBatchSaver(downloader: downloader);
       final results = await saver.saveWorks(
-        works,
-        qualityMode: _qualityModeFrom(body['quality']?.toString()),
+        selected,
         targetResolver: (type) =>
             HomeSavePath.buildTarget(config, type, authorFolder),
         onLog: logs.add,

@@ -7,24 +7,15 @@ import '../../utils/save_location_store.dart';
 import '../batch_work/i_work_batch_saver.dart';
 import '../video_downloader.dart';
 
-/// 主页作品补抓代理（缓存缺失时使用）
-abstract class IUserHomeBatchDelegate {
-  Future<List<SaveWorkItem>> extractWorks(String secUid);
-}
-
-/// 顶层多作者批量保存：按作者状态筛选作品，并写入作者分类目录
+/// 顶层多作者批量保存：按作者写入分类目录
 class UserHomeBatchSaver {
-  UserHomeBatchSaver({
-    required this.workSaver,
-    required this.delegate,
-  });
+  UserHomeBatchSaver({required this.workSaver});
 
   final IWorkBatchSaver workSaver;
-  final IUserHomeBatchDelegate delegate;
 
   Future<UserHomeBatchSaveResult> saveAuthors({
-    required List<MultiHomeAuthorItem> authors,
-    required Map<String, List<SaveWorkItem>> worksBySecUid,
+    required List<AuthorSelectionRow> authors,
+    required Map<String, List<SelectedWork>> worksBySecUid,
     required BatchVideoQualityMode qualityMode,
     CancelToken? cancelToken,
     void Function(int current, int total, String message)? onProgress,
@@ -38,43 +29,37 @@ class UserHomeBatchSaver {
       }
 
       final author = authors[index];
-      final secUid = author.profile.secUid.trim();
+      final secUid = author.secUid;
       final nickname = author.profile.nickname.trim().isNotEmpty
           ? author.profile.nickname.trim()
           : '未知作者';
-
       if (secUid.isEmpty) {
         onLog?.call('作者【$nickname】缺少 secUid，已跳过');
         continue;
       }
-      if (author.selectionState == AuthorSelectionState.none) {
+
+      final works = worksBySecUid[secUid] ?? const <SelectedWork>[];
+      if (works.isEmpty) {
+        onLog?.call('作者【$nickname】没有选中作品，已跳过');
         continue;
       }
 
-      onProgress?.call(index + 1, authors.length, '正在准备 ${index + 1}/${authors.length}');
+      onProgress?.call(
+        index + 1,
+        authors.length,
+        '正在准备 ${index + 1}/${authors.length}',
+      );
 
       try {
-        var works = worksBySecUid[secUid];
-        works ??= await delegate.extractWorks(secUid);
-
-        final selected = author.selectionState == AuthorSelectionState.all
-            ? works
-            : works.where((work) => work.selectionState.isSelected).toList();
-        if (selected.isEmpty) {
-          onLog?.call('作者【$nickname】没有选中作品，已跳过');
-          continue;
-        }
-
         final folder = AuthorFolderName.resolve(nickname, secUid);
         final config = SaveLocationStore.current;
         MediaSaveTarget resolveTarget(MediaType type) =>
             HomeSavePath.buildTarget(config, type, folder);
 
-        onLog?.call('作者【$nickname】开始保存（${selected.length} 个作品）');
+        onLog?.call('作者【$nickname】开始保存（${works.length} 个作品）');
 
         final workResults = await workSaver.saveWorks(
-          selected,
-          qualityMode: qualityMode,
+          works,
           targetResolver: resolveTarget,
           cancelToken: cancelToken,
           onProgress: (current, total, message) {
@@ -103,7 +88,11 @@ class UserHomeBatchSaver {
         );
 
         if (success) {
-          final display = HomeSavePath.buildDisplayPath(config, MediaType.video, folder);
+          final display = HomeSavePath.buildDisplayPath(
+            config,
+            MediaType.video,
+            folder,
+          );
           onLog?.call('作者【$nickname】保存完成，目录：$display');
         }
       } on DouyinDownloadCancelledException {

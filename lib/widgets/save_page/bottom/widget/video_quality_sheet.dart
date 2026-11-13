@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../models/media_item.dart';
-import '../../utils/download_settings_store.dart';
+import '../../../../models/media_item.dart';
+import '../../../../utils/download_settings_store.dart';
 
 /// 普通视频画质选择面板：展示每个档位的分辨率、码率和文件大小。
 class VideoQualitySheet extends StatelessWidget {

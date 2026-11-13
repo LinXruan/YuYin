@@ -9,7 +9,6 @@ import '../utils/login_state_store.dart';
 import '../utils/url_parser.dart';
 import 'douyin_share_api.dart';
 import 'js_script_builder.dart';
-import 'batch_work/i_work_batch_saver.dart';
 import 'multi_work/article_work_exception.dart';
 import 'multi_work/i_multi_work_extractor.dart';
 import 'multi_work/multi_work_extractor.dart';
@@ -47,8 +46,7 @@ class DouyinSniffer
         IUserHomeExtractor,
         ISingleWorkSnifferDelegate,
         IUserHomeSnifferDelegate,
-        IMultiWorkSnifferDelegate,
-        IWorkSniffDelegate {
+        IMultiWorkSnifferDelegate {
   /// 单作品解析领域提取器
   late final ISingleWorkExtractor singleWork = SingleWorkExtractor(this);
 
@@ -209,8 +207,7 @@ class DouyinSniffer
   String? get awemePageUrl => _awemePageUrl;
 
   /// 加载分享链接并等待 JS 回传，最长等待 30 秒
-  /// 批量保存代理：按作品链接补解析
-  @override
+  /// 按作品链接解析的便捷入口
   Future<SingleWorkResult> sniffWork(String url) => sniffVideoUrl(url);
   static Duration? webViewFallbackTimeoutFor(Duration elapsed) {
     final remaining = _kTaskTimeout - elapsed;

@@ -1,9 +1,7 @@
 part of '../../bottom_media_sheet.dart';
 
-// ignore_for_file: unnecessary_this
-
-/// bottom audio flow
-extension _SheetBottomAudioFlowFlow on _ImagePreviewSheetState {
+/// 底层音频试听
+extension _BottomAudioFlow on _ImagePreviewSheetState {
   void _togglePlayAudio(MediaItem item) {
     if (_currentPlayingItem?.url == item.url) {
       if (_audioService.isPlaying) {
@@ -18,8 +16,6 @@ extension _SheetBottomAudioFlowFlow on _ImagePreviewSheetState {
     }
     _refresh(() {});
   }
-
-  /// 关闭底部播放条并停止播放
 
   void _closeAudioPlayerBar() {
     _audioService.stop();

@@ -54,15 +54,20 @@ extension AgentSaveWorksHandlers on AgentAutomationServer {
           ),
         );
       }
-      final saver = WorkBatchSaver(
-        downloader: downloader,
-        sniffer: sniffer,
+      final quality = _qualityModeFrom(body['quality']?.toString());
+      final session = SelectionSession.multiWork(
+        works: extract.works,
+        defaultSelected: (_) => true,
+        quality: quality,
       );
-      final results = await saver.saveWorks(
-        extract.works,
-        qualityMode: _qualityModeFrom(body['quality']?.toString()),
-        onLog: logs.add,
+      final selected = await SessionWorkPreparer.prepare(
+        session,
+        extract.works.map((work) => work.url),
+        sniffer.sniffVideoUrl,
       );
+      session.dispose();
+      final saver = WorkBatchSaver(downloader: downloader);
+      final results = await saver.saveWorks(selected, onLog: logs.add);
       for (final result in results) {
         if (result.success) {
           await HistoryStore.markSavedWithMeta(

@@ -21,6 +21,9 @@ import '../utils/author_folder_name.dart';
 import '../utils/home_save_path.dart';
 import '../utils/url_parser.dart';
 import 'batch_work/work_batch_saver.dart';
+import 'selection/selection_debug_bridge.dart';
+import 'selection/selection_session.dart';
+import 'selection/session_work_preparer.dart';
 import 'douyin_sniffer.dart';
 import 'history/album_locator.dart';
 import 'video_downloader.dart';
@@ -64,6 +67,8 @@ part 'bridge/verify/verify_titles_handler.dart';
 part 'bridge/parse/parse_profile_handler.dart';
 
 part 'bridge/verify/verify_profile_handler.dart';
+
+part 'bridge/handler/save/selection_handler.dart';
 
 /// 专为 Agent 自动化操控设计的本地无头调试服务（仅在 Debug 模式下启用）
 class AgentAutomationServer {
@@ -166,6 +171,8 @@ class AgentAutomationServer {
         await _handleEval(request);
       } else if (path == '/api/settings/quality' && request.method == 'POST') {
         await _handleSetQualitySetting(request);
+      } else if (path.startsWith('/api/selection/')) {
+        await _handleSelection(request);
       } else if (path == '/api/save-debug' && request.method == 'GET') {
         _sendJson(request, HttpStatus.ok, {
           'snapshot': SavePageDebugStore.snapshot ?? {'layer': 'none'},

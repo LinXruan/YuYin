@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
 import 'package:yuyin/utils/download_settings_store.dart';
-import 'package:yuyin/widgets/video_quality_sheet.dart';
+import 'package:yuyin/widgets/save_page/bottom/widget/video_quality_sheet.dart';
 
 void main() {
   setUp(() {
@@ -84,4 +84,3 @@ void main() {
     expect(find.text('720x1280'), findsOneWidget);
   });
 }
-

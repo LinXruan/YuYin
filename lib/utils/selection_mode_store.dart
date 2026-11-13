@@ -67,12 +67,12 @@ class SelectionModeStore {
   static int getHomeTopSelectAllMode() => _homeTopSelectAllMode;
 
   /// 顶层作者全选 a/b 状态转移
-  static void updateFromHomeSelections(List<AuthorSelectionState> states) {
+  static void updateFromHomeSelections(List<SelectionState> states) {
     if (states.isEmpty) return;
     final int b;
-    if (states.every((state) => state == AuthorSelectionState.all)) {
+    if (states.every((state) => state == SelectionState.all)) {
       b = 1;
-    } else if (states.every((state) => state == AuthorSelectionState.none)) {
+    } else if (states.every((state) => state == SelectionState.none)) {
       b = 2;
     } else {
       b = 3;

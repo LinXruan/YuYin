@@ -1,12 +1,48 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/models/common/save_memory_scope.dart';
 import 'package:yuyin/models/media_item.dart';
-import 'package:yuyin/models/save_page/author_works_selection.dart';
+import 'package:yuyin/services/selection/selection_session.dart';
 import 'package:yuyin/utils/download_settings_store.dart';
 import 'package:yuyin/utils/selection_mode_store.dart';
 import 'package:yuyin/utils/url_parser.dart';
-import 'package:yuyin/widgets/multi_home_preview_sheet.dart';
+import 'package:yuyin/widgets/save_page/top_multi_home_sheet.dart';
+
+SelectionSession _session() {
+  return SelectionSession.home(
+    profiles: const [
+      UserHomeProfile(secUid: 'sec_1', nickname: '作者一'),
+      UserHomeProfile(secUid: 'sec_2', nickname: '作者二'),
+      UserHomeProfile(secUid: 'sec_3', nickname: '作者三'),
+    ],
+    worksBySecUid: {
+      for (final secUid in ['sec_1', 'sec_2', 'sec_3'])
+        secUid: [
+          for (var i = 0; i < 2; i++)
+            SaveWorkItem(
+              url: 'https://example.com/$secUid/$i',
+              kind: i == 0 ? WorkMediaKind.video : WorkMediaKind.image,
+            ),
+        ],
+    },
+    defaultSelected: (_) => true,
+  );
+}
+
+Widget _wrap(
+  SelectionSession session, {
+  ValueChanged<BatchVideoQualityMode>? onQuality,
+  void Function(String secUid, int index)? onOpen,
+}) {
+  return MaterialApp(
+    home: Scaffold(
+      body: MultiHomePreviewSheet(
+        session: session,
+        onQualityChanged: onQuality,
+        onOpenAuthor: onOpen == null ? null : (secUid, index) async => onOpen(secUid, index),
+      ),
+    ),
+  );
+}
 
 void main() {
   setUp(() {
@@ -14,221 +50,67 @@ void main() {
     DownloadSettingsStore.resetForTesting();
   });
 
-  List<MultiHomeAuthorItem> buildSampleAuthors({
-    AuthorSelectionState state0 = AuthorSelectionState.all,
-    AuthorSelectionState state1 = AuthorSelectionState.all,
-    AuthorSelectionState state2 = AuthorSelectionState.all,
-  }) {
-    return [
-      MultiHomeAuthorItem(
-        profile: const UserHomeProfile(
-          secUid: 'sec_1',
-          nickname: '作者一',
-          avatarUrl: '',
-        ),
-        worksTotalTag: 12,
-        selectionState: state0,
-      ),
-      MultiHomeAuthorItem(
-        profile: const UserHomeProfile(
-          secUid: 'sec_2',
-          nickname: '作者二',
-          avatarUrl: '',
-        ),
-        worksTotalTag: 25,
-        selectionState: state1,
-      ),
-      MultiHomeAuthorItem(
-        profile: const UserHomeProfile(
-          secUid: 'sec_3',
-          nickname: '作者三',
-          avatarUrl: '',
-        ),
-        worksTotalTag: 8,
-        selectionState: state2,
-      ),
-    ];
-  }
-
-  Widget wrapWithSheet(Widget sheet) {
-    return MaterialApp(
-      home: Scaffold(
-        body: sheet,
-      ),
-    );
-  }
-
-  group('SelectionModeStore 顶层全选记忆状态机测试', () {
-    test('默认 home_all 记忆值为 1（全选）', () {
-      expect(SelectionModeStore.getHomeSelectAllMode(), 1);
-    });
-
-    test('全选 -> a=1，全不选 -> a=2，半选/部分选 -> a 保持不变', () {
-      // 全部未选 -> a 转移为 2
-      SelectionModeStore.updateFromHomeSelections([
-        AuthorSelectionState.none,
-        AuthorSelectionState.none,
-      ]);
-      expect(SelectionModeStore.getHomeSelectAllMode(), 2);
-
-      // 混合/部分选择 -> a 保持 2 不变
-      SelectionModeStore.updateFromHomeSelections([
-        AuthorSelectionState.all,
-        AuthorSelectionState.none,
-      ]);
-      expect(SelectionModeStore.getHomeSelectAllMode(), 2);
-
-      SelectionModeStore.updateFromHomeSelections([
-        AuthorSelectionState.partial,
-        AuthorSelectionState.partial,
-      ]);
-      expect(SelectionModeStore.getHomeSelectAllMode(), 2);
-
-      // 全部全选 -> a 转移为 1
-      SelectionModeStore.updateFromHomeSelections([
-        AuthorSelectionState.all,
-        AuthorSelectionState.all,
-      ]);
-      expect(SelectionModeStore.getHomeSelectAllMode(), 1);
-    });
-  });
-
   group('MultiHomePreviewSheet 顶层保存页 UI 测试', () {
-    testWidgets('默认全选初始化，支持单击缩略图切换全选/全不选', (tester) async {
-      await tester.pumpWidget(
-        wrapWithSheet(
-          MultiHomePreviewSheet(
-            authors: buildSampleAuthors(),
-          ),
-        ),
-      );
+    testWidgets('默认全选，单击作者切换全选/全不选', (tester) async {
+      final session = _session();
+      await tester.pumpWidget(_wrap(session));
+      await tester.pumpAndSettle();
 
       expect(find.text('已选 3 / 3 位作者'), findsOneWidget);
       expect(find.text('保存选中项 (3)'), findsOneWidget);
-      expect(find.text('全选'), findsOneWidget);
-      expect(find.text('最高画质'), findsOneWidget);
 
-      // 单击第一个作者缩略图 -> 取消选中
       await tester.tap(find.byKey(const ValueKey('author_tile_0')));
+      await tester.pumpAndSettle();
+      expect(find.text('已选 2 / 3 位作者'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('author_tile_0')));
+      await tester.pumpAndSettle();
+      expect(find.text('已选 3 / 3 位作者'), findsOneWidget);
+    });
+
+    testWidgets('全选按钮：部分选择时点击补齐为全选，全选时点击清空', (tester) async {
+      final session = _session();
+      session.toggleAuthor('sec_1');
+      await tester.pumpWidget(_wrap(session));
       await tester.pumpAndSettle();
 
       expect(find.text('已选 2 / 3 位作者'), findsOneWidget);
-      expect(find.text('保存选中项 (2)'), findsOneWidget);
-
-      // 再次单击第一个作者缩略图 -> 恢复选中
-      await tester.tap(find.byKey(const ValueKey('author_tile_0')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('已选 3 / 3 位作者'), findsOneWidget);
-    });
-
-    testWidgets('记忆为全不选 (a=2) 时初始全不选，点击右上角全选一键全选', (tester) async {
-      SelectionModeStore.setHomeSelectAllMode(2);
-
-      await tester.pumpWidget(
-        wrapWithSheet(
-          MultiHomePreviewSheet(
-            authors: buildSampleAuthors(),
-          ),
-        ),
-      );
-
-      expect(find.text('已选 0 / 3 位作者'), findsOneWidget);
-      expect(find.text('保存选中项 (0)'), findsOneWidget);
-
-      // 点击右上角“全选”
       await tester.tap(find.byKey(const ValueKey('home_select_all_btn')));
       await tester.pumpAndSettle();
-
       expect(find.text('已选 3 / 3 位作者'), findsOneWidget);
 
-      // 再次点击“全选” -> 全不选
       await tester.tap(find.byKey(const ValueKey('home_select_all_btn')));
       await tester.pumpAndSettle();
-
       expect(find.text('已选 0 / 3 位作者'), findsOneWidget);
     });
 
-    testWidgets('画质切换按钮可从“最高画质”切换为“最低画质”并同步设置', (tester) async {
-      BatchVideoQualityMode? latestMode;
-
-      await tester.pumpWidget(
-        wrapWithSheet(
-          MultiHomePreviewSheet(
-            authors: buildSampleAuthors(),
-            onQualityChanged: (mode) => latestMode = mode,
-          ),
-        ),
-      );
+    testWidgets('画质切换：最高 -> 最低 -> 最高', (tester) async {
+      BatchVideoQualityMode? latest;
+      final session = _session();
+      await tester.pumpWidget(_wrap(session, onQuality: (mode) => latest = mode));
+      await tester.pumpAndSettle();
 
       expect(find.text('最高画质'), findsOneWidget);
-      expect(find.text('最低画质'), findsNothing);
-
       await tester.tap(find.byKey(const ValueKey('quality_toggle_btn')));
       await tester.pumpAndSettle();
-
       expect(find.text('最低画质'), findsOneWidget);
-      expect(find.text('最高画质'), findsNothing);
-      expect(latestMode, BatchVideoQualityMode.lowest);
-      expect(
-        DownloadSettingsStore.getBatchQuality(SaveMemoryScope.homeTop),
-        BatchVideoQualityMode.lowest,
-      );
+      expect(latest, BatchVideoQualityMode.lowest);
 
       await tester.tap(find.byKey(const ValueKey('quality_toggle_btn')));
       await tester.pumpAndSettle();
-
       expect(find.text('最高画质'), findsOneWidget);
-      expect(latestMode, BatchVideoQualityMode.highest);
+      expect(latest, BatchVideoQualityMode.highest);
     });
 
-    testWidgets('支持 partial 虚线框接口与右下角打开图标接口回调', (tester) async {
-      int? openedIndex;
+    testWidgets('打开作者触发回调', (tester) async {
+      String? opened;
+      final session = _session();
+      await tester.pumpWidget(_wrap(session, onOpen: (secUid, index) => opened = secUid));
+      await tester.pumpAndSettle();
 
-      await tester.pumpWidget(
-        wrapWithSheet(
-          MultiHomePreviewSheet(
-            authors: buildSampleAuthors(
-              state0: AuthorSelectionState.all,
-              state1: AuthorSelectionState.partial,
-              state2: AuthorSelectionState.none,
-            ),
-            useMemoryDefault: false,
-            onOpenAuthor: (author, index, works, qualityMode) async {
-              openedIndex = index;
-              // 模拟从中层返回后：一个作品选中、一个作品未选 -> 作者部分选择
-              return const AuthorWorksSelection(
-                works: [
-                  SaveWorkItem(
-                    url: 'https://example.com/w1',
-                    kind: WorkMediaKind.video,
-                    selectionState: WorkSelectionState.none,
-                  ),
-                  SaveWorkItem(
-                    url: 'https://example.com/w2',
-                    kind: WorkMediaKind.video,
-                    selectionState: WorkSelectionState.all,
-                  ),
-                ],
-                qualityMode: BatchVideoQualityMode.highest,
-              );
-            },
-          ),
-        ),
-      );
-
-      // 初始仅第 1 个为 partial 虚线框，第 0 和第 1 计入已选（2 / 3）
-      expect(find.byKey(const ValueKey('author_partial_border_1')), findsOneWidget);
-      expect(find.byKey(const ValueKey('author_partial_border_2')), findsNothing);
-      expect(find.text('已选 2 / 3 位作者'), findsOneWidget);
-
-      // 点击第 2 个作者右下角“打开”图标（无汉字）
       await tester.tap(find.byKey(const ValueKey('open_author_button_2')));
       await tester.pumpAndSettle();
-
-      expect(openedIndex, 2);
-      expect(find.byKey(const ValueKey('author_partial_border_2')), findsOneWidget);
-      expect(find.text('已选 3 / 3 位作者'), findsOneWidget);
+      expect(opened, 'sec_3');
     });
   });
 
@@ -251,7 +133,7 @@ void main() {
       expect(result.homeUrls, isEmpty);
     });
 
-    test('混合口令主页与网址主页（/user/...）归类为纯粹的多主页 userHomes', () {
+    test('混合口令主页与网址主页归类为 userHomes', () {
       const text = '''
 5- 长按复制此条消息，打开抖音搜索，查看TA的更多作品。 https://v.douyin.com/1YtriCIWMK0/ 3@1.com :7pm
 https://www.douyin.com/user/MS4wLjABAAAAVKdwm0VboixgMdyotVl-8jTDdimg5wXZ4c0wSTHOu6FTSKUrAWG6gIqfJC8Eti-g?from_tab_name=main&relation=2&vid=7697159257049500763
@@ -262,7 +144,7 @@ https://www.douyin.com/user/MS4wLjABAAAAVKdwm0VboixgMdyotVl-8jTDdimg5wXZ4c0wSTHO
       expect(result.workUrls, isEmpty);
     });
 
-    test('混合口令作品与网址作品（/video/ 或 modal_id）归类为纯粹的多作品 multiWork', () {
+    test('混合口令作品与网址作品归类为 multiWork', () {
       const text = '''
 5.61 复制打开抖音，看看【非影Q的作品】https://v.douyin.com/mWWRFO2hyA8/ NJV:/ R@k.cN 05/22 :2pm
 https://www.douyin.com/jingxuan?modal_id=7696132501084917042

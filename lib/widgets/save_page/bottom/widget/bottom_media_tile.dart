@@ -6,7 +6,7 @@ part of '../../bottom_media_sheet.dart';
 extension _SheetBottomMediaTileFlow on _ImagePreviewSheetState {
   Widget _buildTile(int index) {
     final item = widget.items[index];
-    final selected = _selectedIndices.contains(index);
+    final selected = _isSelected(item);
     final theme = Theme.of(context);
     final isImage = item.type == MediaType.image;
     final isAudio = item.type == MediaType.audio;

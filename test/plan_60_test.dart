@@ -1,9 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
+import 'package:yuyin/services/selection/selection_session.dart';
 import 'package:yuyin/utils/download_settings_store.dart';
 import 'package:yuyin/utils/selection_mode_store.dart';
-import 'package:yuyin/widgets/multi_home_preview_sheet.dart';
+import 'package:yuyin/widgets/save_page/top_multi_home_sheet.dart';
+
+const _tiers = SingleWorkResult(
+  items: [
+    MediaItem(url: 'v1', type: MediaType.video, bitRate: 3000000),
+    MediaItem(url: 'v2', type: MediaType.video, bitRate: 1500000),
+    MediaItem(url: 'v3', type: MediaType.video, bitRate: 700000),
+  ],
+  cookie: '',
+  isImagePost: false,
+);
+
+SelectionSession _session() {
+  final session = SelectionSession.home(
+    profiles: const [UserHomeProfile(secUid: 'sec_1', nickname: '作者一')],
+    worksBySecUid: {
+      'sec_1': const [
+        SaveWorkItem(
+          url: 'https://example.com/w1',
+          kind: WorkMediaKind.video,
+        ),
+        SaveWorkItem(
+          url: 'https://example.com/w2',
+          kind: WorkMediaKind.video,
+        ),
+      ],
+    },
+    defaultSelected: (_) => true,
+  );
+  session.ingest('https://example.com/w1', _tiers);
+  session.ingest('https://example.com/w2', _tiers);
+  return session;
+}
+
+Widget _wrap(SelectionSession session, {ValueChanged<BatchVideoQualityMode>? onQuality}) {
+  return MaterialApp(
+    home: Scaffold(
+      body: MultiHomePreviewSheet(
+        session: session,
+        onQualityChanged: onQuality,
+      ),
+    ),
+  );
+}
 
 void main() {
   setUp(() {
@@ -11,62 +55,35 @@ void main() {
     DownloadSettingsStore.resetForTesting();
   });
 
-  List<MultiHomeAuthorItem> buildAuthors() {
-    return const [
-      MultiHomeAuthorItem(
-        profile: UserHomeProfile(
-          secUid: 'sec_1',
-          nickname: '作者一',
-          avatarUrl: '',
-        ),
-        worksTotalTag: 10,
-      ),
-    ];
-  }
-
   group('PLAN_60 顶层保存页画质标签与记忆规则测试', () {
-    testWidgets('支持“混合画质”状态渲染，且点击后切为“最高画质”', (tester) async {
-      BatchVideoQualityMode? latestMode;
+    testWidgets('混合画质渲染，点击后切为最高画质', (tester) async {
+      BatchVideoQualityMode? latest;
+      final session = _session();
+      session.setTier('https://example.com/w2', 3);
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: MultiHomePreviewSheet(
-              authors: buildAuthors(),
-              initialQualityMode: BatchVideoQualityMode.mixed,
-              onQualityChanged: (mode) => latestMode = mode,
-            ),
-          ),
-        ),
-      );
+      await tester.pumpWidget(_wrap(session, onQuality: (mode) => latest = mode));
+      await tester.pumpAndSettle();
 
       expect(find.text('混合画质'), findsOneWidget);
-      expect(find.text('最高画质'), findsNothing);
-      expect(find.text('最低画质'), findsNothing);
 
-      // 混合画质点击后切为最高画质
       await tester.tap(find.byKey(const ValueKey('quality_toggle_btn')));
       await tester.pumpAndSettle();
 
       expect(find.text('最高画质'), findsOneWidget);
-      expect(latestMode, BatchVideoQualityMode.highest);
+      expect(latest, BatchVideoQualityMode.highest);
 
-      // 再次点击切为最低画质
       await tester.tap(find.byKey(const ValueKey('quality_toggle_btn')));
       await tester.pumpAndSettle();
-
       expect(find.text('最低画质'), findsOneWidget);
-      expect(latestMode, BatchVideoQualityMode.lowest);
+      expect(latest, BatchVideoQualityMode.lowest);
     });
 
-    test('recordBatchVideoQualitySelection 遵循 a/b 记忆规则（mixed 保持原记忆不变）', () async {
-      // 初始为 highest
+    test('recordBatchVideoQualitySelection 遵循 a/b 记忆规则', () async {
       expect(
         DownloadSettingsStore.batchVideoQualityMode,
         BatchVideoQualityMode.highest,
       );
 
-      // mixed (b=3) -> 保持 highest 不变
       await DownloadSettingsStore.recordBatchVideoQualitySelection(
         BatchVideoQualityMode.mixed,
       );
@@ -75,7 +92,6 @@ void main() {
         BatchVideoQualityMode.highest,
       );
 
-      // lowest (b=2) -> 更新记忆为 lowest
       await DownloadSettingsStore.recordBatchVideoQualitySelection(
         BatchVideoQualityMode.lowest,
       );
@@ -84,7 +100,6 @@ void main() {
         BatchVideoQualityMode.lowest,
       );
 
-      // mixed (b=3) -> 保持 lowest 不变
       await DownloadSettingsStore.recordBatchVideoQualitySelection(
         BatchVideoQualityMode.mixed,
       );
@@ -94,23 +109,22 @@ void main() {
       );
     });
 
-    testWidgets('“最低画质”按钮背景色不为保存页背景色（使用 tertiaryContainer）', (tester) async {
+    testWidgets('最低画质按钮背景色使用 tertiaryContainer', (tester) async {
       final theme = ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.pink),
       );
+      final session = _session();
+      session.setTier('https://example.com/w1', 3);
+      session.setTier('https://example.com/w2', 3);
 
       await tester.pumpWidget(
         MaterialApp(
           theme: theme,
-          home: Scaffold(
-            body: MultiHomePreviewSheet(
-              authors: buildAuthors(),
-              initialQualityMode: BatchVideoQualityMode.lowest,
-            ),
-          ),
+          home: Scaffold(body: MultiHomePreviewSheet(session: session)),
         ),
       );
+      await tester.pumpAndSettle();
 
       final animatedContainer = tester.widget<AnimatedContainer>(
         find.descendant(

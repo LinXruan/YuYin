@@ -1,18 +1,14 @@
 part of '../../bottom_media_sheet.dart';
 
-// ignore_for_file: unnecessary_this
-
-/// bottom selection memory
-extension _SheetBottomSelectionMemoryFlow on _ImagePreviewSheetState {
-  void _recordSelectionMode() {
-    if (_hasRecordedSelection) return;
-    _hasRecordedSelection = true;
+/// 底层记忆：记录各标签的全选倾向
+extension _BottomSelectionMemoryFlow on _ImagePreviewSheetState {
+  void _recordSelectionMemory() {
+    if (_hasRecordedMemory) return;
+    _hasRecordedMemory = true;
     SelectionModeStore.updateFromSheetItems(
       allItems: widget.items,
-      selectedIndices: _selectedIndices,
+      selectedIndices: selectedIndices.toSet(),
       scope: widget.memoryScope,
     );
   }
-
-  // --- 分类资源索引 ---
 }

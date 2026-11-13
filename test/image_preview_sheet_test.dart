@@ -6,7 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
 import 'package:yuyin/services/audio_preview_service.dart';
 import 'package:yuyin/utils/selection_mode_store.dart';
-import 'package:yuyin/widgets/image_preview_sheet.dart';
+import 'package:yuyin/models/common/save_memory_scope.dart';
+import 'package:yuyin/services/selection/selection_session.dart';
+import 'package:yuyin/widgets/save_page/bottom_media_sheet.dart';
 
 // 1x1 像素透明 PNG 二进制数据，避免测试环境下的真实网络请求
 const _transparentImageBytes = <int>[
@@ -126,6 +128,25 @@ void main() {
     Brightness brightness = Brightness.light,
     AudioPreviewService? audioService,
   }) {
+    final work = SaveWorkItem(
+      url: 'https://example.com/work',
+      kind: WorkMediaKind.image,
+    );
+    final session = SelectionSession.singleWork(
+      work: work,
+      parsed: SingleWorkResult(
+        items: items,
+        cookie: '',
+        isImagePost: true,
+      ),
+    );
+    for (final item in items) {
+      final mode = SelectionModeStore.getBottomMode(
+        item.type,
+        SaveMemoryScope.singleBottom,
+      );
+      if (mode == 2) session.toggleCell(work.url, item.url);
+    }
     return MaterialApp(
       theme: ThemeData(
         brightness: brightness,
@@ -133,6 +154,8 @@ void main() {
       ),
       home: Scaffold(
         body: ImagePreviewSheet(
+          session: session,
+          workUrl: work.url,
           items: items,
           headers: const {'User-Agent': 'Test'},
           audioService: audioService,

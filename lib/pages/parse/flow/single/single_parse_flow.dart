@@ -122,14 +122,14 @@ extension _ParseSingleParseFlowFlow on _ParsePageState {
 
       // 用户可能已切到其他 Tab，先切回解析页再弹选择面板
       widget.onRequestParseTab();
-      final selected = await _chooseItems(result);
+      final selection = await _chooseSingleWork(result, url);
       if (!mounted) return;
-      if (selected == null || selected.isEmpty) {
-        // 取消后立即停止后台捕获和网页加载，避免日志继续刷
+      if (selection == null) {
         widget.sniffer.cancelActiveTask();
         widget.logs.add('已取消下载');
         return;
       }
+      final selected = selection.items;
 
       // 命名基准：专攻作品文案（desc），若未捕获则从用户粘贴文本/口令中提取纯文案兜底
       final candidateDesc = (result.desc?.trim().isNotEmpty ?? false)
@@ -189,26 +189,51 @@ extension _ParseSingleParseFlowFlow on _ParsePageState {
     }
   }
 
-  /// 批量捕获多主页作者头像与昵称，成功后弹出顶层保存页
 
-  Future<List<MediaItem>?> _chooseItems(SniffResult result) async {
-    if (result.isImagePost) {
-      // 图文/实况图集：网格预览并勾选
-      return ImagePreviewSheet.show(
-        context,
-        items: result.items,
-        headers: _ParsePageState._mediaHeaders,
-        memoryScope: SaveMemoryScope.singleBottom,
-      );
+  /// 单作品：建立会话后直接进入底层（图文）或画质面板（视频）
+  Future<SelectedWork?> _chooseSingleWork(
+    SingleWorkResult result,
+    String url,
+  ) async {
+    final work = SaveWorkItem(
+      url: url,
+      kind: result.isImagePost ? WorkMediaKind.image : WorkMediaKind.video,
+      title: result.displayTitle,
+      coverUrl: result.coverUrl ?? '',
+    );
+    final session = SelectionSession.singleWork(
+      work: work,
+      parsed: result,
+      quality: DownloadSettingsStore.getBatchQuality(
+        SaveMemoryScope.singleBottom,
+      ),
+    );
+    try {
+      for (final item in result.items) {
+        final mode = SelectionModeStore.getBottomMode(
+          item.type,
+          SaveMemoryScope.singleBottom,
+        );
+        if (mode == 2) session.toggleCell(url, item.url);
+      }
+      if (result.isImagePost) {
+        final confirmed = await ImagePreviewSheet.show(
+          context,
+          session: session,
+          workUrl: url,
+          items: result.items,
+          headers: _ParsePageState._mediaHeaders,
+          memoryScope: SaveMemoryScope.singleBottom,
+        );
+        if (!mounted || confirmed != true) return null;
+      } else {
+        final picked = await _pickWorkTier(session, url, result);
+        if (!mounted || !picked) return null;
+      }
+      return session.buildSelectedWork(url);
+    } finally {
+      SelectionDebugBridge.detach(session);
+      session.dispose();
     }
-
-    // 普通视频：从全部清晰度档位中选择一个
-    final picked = await VideoQualitySheet.show(context, result.items);
-    if (picked == null) return null;
-    final quality = picked.resolutionLabel.isNotEmpty
-        ? picked.resolutionLabel
-        : (picked.resolution ?? picked.gearName ?? '默认画质');
-    widget.logs.add('已选择 $quality（${picked.formattedSize}）');
-    return [picked];
   }
 }

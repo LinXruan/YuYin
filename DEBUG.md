@@ -82,6 +82,9 @@
 | :--- | :--- | :--- | :--- |
 | `.\tool\agent_cmd.bat setup` | 无 | 自动探测设备并建立 `tcp:9527` 端口映射，检查服务连通性 | `[AgentBridge] [在线] 应用控制台已连接: 余音 v<version>` |
 | `.\tool\agent_cmd.bat status` | 无 | 获取应用运行状态、忙碌标记、登录态与上次解析结果 | 返回结构化 JSON 元数据 |
+| `.\tool\agent_cmd.bat display` | 无 | 查询显示模式（刷新率/帧率提示）状态 | 输出当前 display 配置 |
+| `.\tool\agent_cmd.bat quality [on|off]` | 可选 `on`/`off` | 查询或设置「仅显示最高画质」 | 返回当前开关状态 |
+| `.\tool\agent_cmd.bat mock-login [on|off]` | 可选 `on`/`off` | 模拟登录态，便于调试登录相关分支 | 返回当前登录态 |
 | `.\tool\agent_cmd.bat parse "<text>"` | 链接或口令文本 | 触发后台 WebView 捕获，返回文案、资源总数及媒体档位列表 | 终端打印格式化表格（类型、分辨率、码率等） |
 | `.\tool\agent_cmd.bat parse-works "<text>"` | 多个作品链接/口令文本 | 逐条解析作品并抓取封面，自动过滤文章作品 (PLAN_61) | 终端输出作品类型、标题、封面直链与成功/失败统计 |
 | `.\tool\agent_cmd.bat save-works "<text>"` | 多个作品链接/口令文本 | 逐条解析并批量保存到单作品路径 (PLAN_62) | 输出每个作品的成功状态、基名与媒体类型 |
@@ -90,7 +93,16 @@
 | `.\tool\agent_cmd.bat download 0,1` | 逗号分隔索引 | 仅下载指定序号项（如第 0、1 项） | 仅保存指定选中项 |
 | `.\tool\agent_cmd.bat logs [n]` | 可选数字 `n` (如 `20`) | 获取应用日志。提供 `n` 时仅展示最新 `n` 条（防止撑爆上下文） | 输出最近过程日志与保存结果 |
 | `.\tool\agent_cmd.bat clear-logs` | 无 | 清空应用内当前日志缓存 | `[AgentBridge] [成功] 日志已清空` |
-| `.\tool\agent_cmd.bat save-debug` | 无 | 读取当前保存页选择树快照 (PLAN_63) | 输出 layer、画质、作者/作品/资源的选择状态 |
+| `.\tool\agent_cmd.bat save-debug` | 无 | 读取当前保存页矩阵的调试快照 (PLAN_65) | 输出 layer、来源、作者/作品状态与画质 |
+| `.\tool\agent_cmd.bat selection-load <mock/home/multi/single> ["<text>"]` | 来源 + 文本 | 无界面加载矩阵会话；mock 生成 2 作者 × 3 作品 × 4 资源 | 返回 success 与来源 |
+| `.\tool\agent_cmd.bat save-state` | 无 | 读取当前活动会话的完整矩阵（作者、作品、资源单元、三态、档位） | 输出 JSON |
+| `.\tool\agent_cmd.bat select-author "<secUid>" [all/none]` | secUid + 目标 | 设置该作者为全选/全不选，递归写入全部资源单元 | 返回 global/quality 摘要 |
+| `.\tool\agent_cmd.bat select-work "<workUrl>" [all/none]` | 作品 URL + 目标 | 设置该作品为全选/全不选 | 同上 |
+| `.\tool\agent_cmd.bat select-cell "<workUrl>" "<资源key>" [1/0]` | 作品 URL + 资源 URL + 选中值 | 精确设置单个资源单元 | 同上 |
+| `.\tool\agent_cmd.bat select-bottom-category "<workUrl>" <image/video/audio> [1/0]` | 作品 URL + 资源类型 | 底层分类全选/全不选（video 表示实况） | 同上 |
+| `.\tool\agent_cmd.bat select-middle-category "<secUid>" <video/image> [all/none]` | 作者 secUid + 分类 | 中层分类全选/全不选 | 同上 |
+| `.\tool\agent_cmd.bat select-quality <global/author/work> "<key>" [highest/lowest]` | 作用域 + 键 + 档位 | 设置画质；author 用 secUid，work 用作品 URL，global 键传 - | 同上 |
+| `.\tool\agent_cmd.bat selection-ingest "<workUrl>"` | 作品 URL | 触发解析并把资源写入矩阵（等价于打开底层） | 返回 success |
 | `.\tool\agent_cmd.bat history [query]` | 可选搜索词 | 查看历史记录，支持关键词模糊搜索 | 终端输出历史记录表格（标题、媒体摘要、时间） |
 | `.\tool\agent_cmd.bat history-scan "<id>"` | 历史记录 id | 扫描当前保存位置下视频/图片/音频是否存在 (PLAN_62) | 输出 type、found、count、displayPath、uri、folderUri |
 | `.\tool\agent_cmd.bat clear-history` | 无 | 清空应用内所有历史记录 | `[AgentBridge] [成功] 历史记录已清空` |
@@ -118,7 +130,19 @@
 | `/api/download` | `POST` | `{"indices":"all"}` 或 `{"indices":[0,1]}` | `{"downloadedCount":2,"savedTypes":["image"],"expectedFiles":["..._1.jpg"]}` | 下载资源落盘 |
 | `/api/logs` | `GET` | 无 (支持 `?tail=20` 或 `?limit=50`) | `{"total":120,"count":20,"logs":["..."]}` | 结构化日志流 (支持尾部/限额截取) |
 | `/api/logs/clear`| `POST` | 无 | `{"success":true,"message":"Logs cleared"}` | 清空日志缓存 |
-| `/api/save-debug` | `GET` | 无 | `{"snapshot":{"layer":"top|middle|bottom","qualityMode":"...","authors":[...],"works":[...],"items":[...]}}` | 读取保存页选择树快照 (PLAN_63) |
+| `/api/save-debug` | `GET` | 无 | `{"snapshot":{"layer":"top|middle|bottom","source":"home","global":"all","authors":[...]}}` | 读取保存页矩阵调试快照 (PLAN_65) |
+| `/api/selection/state` | `GET` | 无（支持 `?cells=0`） | `{"active":true,"source":"home","global":"partial","quality":"mixed","authors":[...],"works":[...]}` | 当前活动会话的完整矩阵 |
+| `/api/selection/author` | `POST` | `{"secUid":"...","target":"all|none"}` | `{"success":true,"global":"...","quality":"..."}` | 设置作者选择 |
+| `/api/selection/work` | `POST` | `{"workUrl":"...","target":"all|none"}` | 同上 | 设置作品选择 |
+| `/api/selection/cell` | `POST` | `{"workUrl":"...","key":"<资源URL>","selected":true}` | 同上 | 设置单个资源单元 |
+| `/api/selection/bottom-category` | `POST` | `{"workUrl":"...","type":"image|video|audio","selected":false}` | 同上 | 底层分类切换 |
+| `/api/selection/middle-category` | `POST` | `{"secUid":"...","kind":"video|image","target":"all|none"}` | 同上 | 中层分类切换 |
+| `/api/selection/quality` | `POST` | `{"scope":"global|author|work","key":"...","mode":"highest|lowest"}` | 同上 | 设置画质 |
+| `/api/selection/load` | `POST` | `{"source":"mock|home|multi|single","text":"<链接>","quality":"highest|lowest"}` | `{"success":true,"source":"home","authors":2}` | 无界面加载矩阵会话 |
+| `/api/selection/ingest` | `POST` | `{"workUrl":"..."}` | `{"success":true}` | 解析作品并写入矩阵 |
+| `/api/settings/quality` | `POST` | `{"onlyHighest":true}` | `{"success":true,...}` | 设置仅显示最高画质 |
+| `/api/display` | `GET` | 无 | `{"status":"ok",...}` | 显示模式状态 |
+| `/api/login/mock` | `POST` | `{"loggedIn":true}` | `{"success":true}` | 模拟登录态 |
 | `/api/history` | `GET` | 无 (支持 `?q=关键词`) | `{"count":10,"records":[{"id":"...","title":"...","fullDesc":"..."},...]}` | 查询或模糊搜索历史记录 |
 | `/api/history/scan`| `POST` | `{"id":"home:<secUid>"}` 或作品 id | `{"id":"...","type":"userHome","displayTitle":"...","records":[{"type":"video","found":true,"count":2,"uri":"...","folderUri":"...","displayPath":"..."}]}` | 扫描历史记录在当前保存位置的可用性 (PLAN_62) |
 | `/api/history/open`| `POST` | `{"id":"...","type":"video|image|audio"}` | `{"opened":true,"type":"video","uri":"...","folderUri":"..."}` | 优先跳转文件管理器文件夹，失败打开文件 (PLAN_62) |
@@ -156,14 +180,19 @@ adb shell monkey -p com.debug.yuyin -c android.intent.category.LAUNCHER 1
 :: 4. 发起捕获解析
 .\tool\agent_cmd.bat parse "<待测链接或分享口令>"
 
-:: 5. 执行资源下载测试
+:: 5. 查看保存矩阵并按需改写选择
+.\tool\agent_cmd.bat save-state
+.\tool\agent_cmd.bat select-author "MS4wLjABAAAA..." none
+.\tool\agent_cmd.bat select-quality author "MS4wLjABAAAA..." lowest
+
+:: 6. 执行资源下载测试
 .\tool\agent_cmd.bat download all
 
-:: 6. 查看并核验相册目录文件落盘情况
+:: 7. 查看并核验相册目录文件落盘情况
 adb shell ls -la /sdcard/Pictures/YuYin/
 adb shell ls -la /sdcard/Movies/YuYin/
 
-:: 7. 获取应用内过程日志（推荐加上条数如 20，避免日志过长）
+:: 8. 获取应用内过程日志（推荐加上条数如 20，避免日志过长）
 .\tool\agent_cmd.bat logs 20
 ```
 

@@ -1,47 +1,33 @@
 part of '../../middle_multi_work_sheet.dart';
 
-// ignore_for_file: unnecessary_this
+/// 中层记忆：只记录分类的全选倾向，不参与本次选择
+extension _MiddleSelectionMemoryFlow on _MiddleMultiWorkSheetState {
+  void _recordSelectionMemory() {
+    if (_hasRecordedMemory) return;
+    _hasRecordedMemory = true;
 
-/// middle selection memory
-extension _SheetMiddleSelectionMemoryFlow on _MiddleMultiWorkSheetState {
-  void _recordSelectionMode() {
-    if (_hasRecordedSelection) return;
-    _hasRecordedSelection = true;
+    for (final kind in [WorkMediaKind.video, WorkMediaKind.image]) {
+      final rows = _rows.where((row) => row.work.kind == kind).toList();
+      if (rows.isEmpty) continue;
+      final selected = rows
+          .where((row) => widget.session.workState(row.url).isSelected)
+          .length;
+      SelectionModeStore.updateFromWorkCategorySelection(
+        kind: kind,
+        total: rows.length,
+        selected: selected,
+        allSelected: selected == rows.length &&
+            rows.every((row) => widget.session.workState(row.url).isAll),
+        scope: widget.memoryScope,
+      );
+    }
 
-    final videoTotal = _videoIndices.length;
-    final videoSelected = _videoIndices
-        .where((i) => _works[i].selectionState.isSelected)
-        .length;
-    SelectionModeStore.updateFromWorkCategorySelection(
-      kind: WorkMediaKind.video,
-      total: videoTotal,
-      selected: videoSelected,
-      allSelected:
-          videoTotal > 0 &&
-          videoSelected == videoTotal &&
-          _videoIndices.every((i) => _works[i].selectionState.isAll),
-      scope: widget.memoryScope,
-    );
-
-    final imageTotal = _imageIndices.length;
-    final imageSelected = _imageIndices
-        .where((i) => _works[i].selectionState.isSelected)
-        .length;
-    SelectionModeStore.updateFromWorkCategorySelection(
-      kind: WorkMediaKind.image,
-      total: imageTotal,
-      selected: imageSelected,
-      allSelected:
-          imageTotal > 0 &&
-          imageSelected == imageTotal &&
-          _imageIndices.every((i) => _works[i].selectionState.isAll),
-      scope: widget.memoryScope,
-    );
-
+    final quality =
+        widget.session.qualityOfRows(_rows) ?? BatchVideoQualityMode.highest;
     unawaited(
       DownloadSettingsStore.recordBatchQualitySelection(
         widget.memoryScope,
-        _qualityMode,
+        quality,
       ),
     );
   }

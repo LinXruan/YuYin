@@ -2,25 +2,18 @@ import 'package:dio/dio.dart';
 
 import '../../models/media_item.dart';
 import '../../utils/file_name_formatter.dart';
-import '../../utils/save_selection_tree.dart';
-import '../../utils/video_quality_utils.dart';
 import '../video_downloader.dart';
 import 'i_work_batch_saver.dart';
 
-/// 批量作品保存：按作品逐个解析、选择资源并落盘
+/// 批量作品保存：逐个作品落盘，选择内容由调用方决定
 class WorkBatchSaver implements IWorkBatchSaver {
-  WorkBatchSaver({
-    required this.downloader,
-    required this.sniffer,
-  });
+  WorkBatchSaver({required this.downloader});
 
   final IWorkDownloadDelegate downloader;
-  final IWorkSniffDelegate sniffer;
 
   @override
   Future<List<WorkSaveResult>> saveWorks(
-    List<SaveWorkItem> works, {
-    BatchVideoQualityMode qualityMode = BatchVideoQualityMode.highest,
+    List<SelectedWork> works, {
     MediaSaveTargetResolver? targetResolver,
     CancelToken? cancelToken,
     void Function(int current, int total, String message)? onProgress,
@@ -36,39 +29,27 @@ class WorkBatchSaver implements IWorkBatchSaver {
       final work = works[index];
       final current = index + 1;
 
-      if (work.kind == WorkMediaKind.article) {
-        onLog?.call('已跳过文章作品');
-        continue;
-      }
-
       onProgress?.call(current, total, '正在准备 $current/$total');
 
       try {
-        var parsed = work.parsedResult;
-        parsed ??= await sniffer.sniffWork(work.url);
-        if (parsed.items.isEmpty) {
-          onLog?.call('作品未捕获到可下载资源，已跳过');
+        if (work.items.isEmpty) {
+          onLog?.call('作品没有选中资源，已跳过');
           results.add(
-            WorkSaveResult(url: work.url, success: false, error: '无可用资源'),
+            WorkSaveResult(
+              url: work.work.url,
+              success: false,
+              error: '无选中资源',
+            ),
           );
           continue;
         }
 
-        final items = _selectItems(work, parsed, qualityMode);
-        if (items.isEmpty) {
-          onLog?.call('作品没有符合条件的资源，已跳过');
-          results.add(
-            WorkSaveResult(url: work.url, success: false, error: '无选中资源'),
-          );
-          continue;
-        }
-
-        final baseName = _resolveBaseName(work, parsed);
-        onLog?.call('正在保存：$baseName（${items.length} 个资源）');
+        final baseName = _resolveBaseName(work);
+        onLog?.call('正在保存：$baseName（${work.items.length} 个资源）');
 
         final savedTypes = await downloader.downloadItems(
-          items,
-          cookie: parsed.cookie,
+          work.items,
+          cookie: work.parsed.cookie,
           baseTitle: baseName,
           cancelToken: cancelToken,
           targetResolver: targetResolver,
@@ -83,7 +64,7 @@ class WorkBatchSaver implements IWorkBatchSaver {
 
         results.add(
           WorkSaveResult(
-            url: work.url,
+            url: work.work.url,
             success: savedTypes.isNotEmpty,
             savedTypes: savedTypes,
             savedBaseName: baseName,
@@ -94,7 +75,11 @@ class WorkBatchSaver implements IWorkBatchSaver {
       } catch (e) {
         onLog?.call('作品保存失败：$e');
         results.add(
-          WorkSaveResult(url: work.url, success: false, error: e.toString()),
+          WorkSaveResult(
+            url: work.work.url,
+            success: false,
+            error: e.toString(),
+          ),
         );
       }
     }
@@ -102,49 +87,17 @@ class WorkBatchSaver implements IWorkBatchSaver {
     return results;
   }
 
-  /// 根据用户在底层的显式选择、作品类型与画质模式决定要保存的资源
-  List<MediaItem> _selectItems(
-    SaveWorkItem work,
-    SingleWorkResult parsed,
-    BatchVideoQualityMode qualityMode,
-  ) {
-    if (work.isVideo) {
-      final explicit = work.selectedResources
-          .where((item) => item.type == MediaType.video)
-          .toList();
-      if (explicit.isNotEmpty) return explicit;
-
-      final choice = SaveSelectionTree.resolveWorkQuality(work, qualityMode);
-      final picked = VideoQualityUtils.resolveChoice(choice, parsed.videoItems);
-      return picked == null ? const [] : [picked];
+  String _resolveBaseName(SelectedWork work) {
+    final desc = work.parsed.desc?.trim();
+    if (desc != null && desc.isNotEmpty) return _safeBaseName(desc);
+    final title = work.parsed.title?.trim();
+    if (title != null && title.isNotEmpty) return _safeBaseName(title);
+    if (work.work.title.trim().isNotEmpty) {
+      return _safeBaseName(work.work.title);
     }
-
-    if (work.selectedResources.isNotEmpty) {
-      return work.selectedResources;
-    }
-
-    // 图文/实况：未显式选择时保存全部资源（图片、实况视频、音频）
-    return parsed.items;
+    return _safeBaseName(work.work.url);
   }
 
-  /// 文件名基名：文案优先，其次标题，最后链接
-  String _resolveBaseName(SaveWorkItem work, SingleWorkResult parsed) {
-    final desc = parsed.desc?.trim();
-    if (desc != null && desc.isNotEmpty) {
-      return _safeBaseName(desc);
-    }
-    final title = parsed.title?.trim();
-    if (title != null && title.isNotEmpty) {
-      return _safeBaseName(title);
-    }
-    if (work.title.trim().isNotEmpty) {
-      return _safeBaseName(work.title);
-    }
-    return _safeBaseName(work.url);
-  }
-
-  /// 与 VideoDownloader 内部最终的 sanitize 结果保持一致，避免尾部 ... 被移除后前缀失配
-  String _safeBaseName(String raw) {
-    return FileNameFormatter.sanitize(FileNameFormatter.buildBaseName(raw));
-  }
+  String _safeBaseName(String raw) =>
+      FileNameFormatter.sanitize(FileNameFormatter.buildBaseName(raw));
 }

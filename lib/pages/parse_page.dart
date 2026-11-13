@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 
 import '../models/common/save_memory_scope.dart';
 import '../models/media_item.dart';
-import '../models/save_page/author_works_selection.dart';
 import '../services/batch_work/work_batch_saver.dart';
 import '../services/douyin_sniffer.dart';
 import '../services/multi_work/article_work_exception.dart';
@@ -20,12 +19,16 @@ import '../utils/network_detector.dart';
 import '../utils/save_location_store.dart';
 import '../utils/url_parser.dart';
 import '../utils/video_quality_utils.dart';
-import '../widgets/image_preview_sheet.dart';
-import '../widgets/multi_home_preview_sheet.dart';
 import '../models/history_item.dart';
 import '../utils/history_store.dart';
+import '../services/selection/selection_debug_bridge.dart';
+import '../services/selection/selection_session.dart';
+import '../services/selection/session_work_preparer.dart';
+import '../utils/selection_mode_store.dart';
+import '../widgets/save_page/bottom_media_sheet.dart';
 import '../widgets/save_page/middle_multi_work_sheet.dart';
-import '../widgets/video_quality_sheet.dart';
+import '../widgets/save_page/top_multi_home_sheet.dart';
+import '../widgets/save_page/bottom/widget/video_quality_sheet.dart';
 
 part 'parse/flow/common/parse_input_flow.dart';
 
@@ -38,7 +41,7 @@ part 'parse/flow/multi/multi_parse_flow.dart';
 part 'parse/flow/common/parse_progress_flow.dart';
 part 'parse/widget/status/status_card.dart';
 part 'parse/widget/banner/login_prompt_banner.dart';
-part 'parse/support/home_works_delegate.dart';
+part 'parse/flow/common/save_page_flow.dart';
 
 /// 解析页：粘贴链接 -> 捕获 -> 选择画质/图片 -> 下载
 class ParsePage extends StatefulWidget {
@@ -82,9 +85,6 @@ class _ParsePageState extends State<ParsePage>
   bool _isParsing = false;
   bool _cancelLogged = false;
 
-  /// 作者主页作品列表缓存（key: secUid），用于重复进入中层时恢复选择
-  final Map<String, List<SaveWorkItem>> _authorWorksCache = {};
-
   /// 加载封面/头像所需的统一请求头
   static const Map<String, String> _mediaHeaders = {
     'User-Agent': DouyinSniffer.desktopUserAgent,
@@ -92,10 +92,8 @@ class _ParsePageState extends State<ParsePage>
   };
 
   /// 批量作品保存器（下载器与嗅探器均实现对应代理）
-  WorkBatchSaver get _workBatchSaver => WorkBatchSaver(
-        downloader: widget.downloader,
-        sniffer: widget.sniffer,
-      );
+  WorkBatchSaver get _workBatchSaver =>
+      WorkBatchSaver(downloader: widget.downloader);
 
   @override
   bool get wantKeepAlive => true;

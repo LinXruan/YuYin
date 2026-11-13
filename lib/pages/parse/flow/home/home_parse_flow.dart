@@ -1,13 +1,12 @@
 part of '../../../parse_page.dart';
 
-/// home parse flow
-extension _ParseHomeParseFlowFlow on _ParsePageState {
+/// 主页解析：作者 -> 顶层保存页
+extension _ParseHomeParseFlow on _ParsePageState {
   Future<void> _parseUserHomes(List<String> homeUrls) async {
-    bool isLogged = widget.loggedIn.value;
+    var isLogged = widget.loggedIn.value;
     if (!isLogged) {
       try {
-        isLogged =
-            await LoginStateStore.isLoggedIn() &&
+        isLogged = await LoginStateStore.isLoggedIn() &&
             await LoginStateStore.checkWebViewCookieSession();
         if (isLogged) widget.loggedIn.value = true;
       } catch (_) {}
@@ -21,13 +20,14 @@ extension _ParseHomeParseFlowFlow on _ParsePageState {
       return;
     }
 
-    final authors = <MultiHomeAuthorItem>[];
+    final profiles = <UserHomeProfile>[];
+    final worksBySecUid = <String, List<SaveWorkItem>>{};
     final seenHomeKeys = <String>{};
-    // 明确 /user/ 网址优先于口令短链，避免同一主页重复抓取
     final orderedHomeUrls = <String>[
       ...homeUrls.where(UrlParser.isUserHomeUrl),
       ...homeUrls.where((url) => !UrlParser.isUserHomeUrl(url)),
     ];
+
     try {
       for (var i = 0; i < orderedHomeUrls.length; i++) {
         if (!mounted || !_isParsing) return;
@@ -36,10 +36,8 @@ extension _ParseHomeParseFlowFlow on _ParsePageState {
           '正在捕获主页作品 (${i + 1}/${orderedHomeUrls.length})...',
         );
         try {
-          // 一次性抓取作者资料 + 全部作品链接/封面，顶层页打开后进入中层无需再等待
-          final homeResult = await widget.sniffer.userHome.extractAllWorks(
-            homeUrl,
-          );
+          final homeResult =
+              await widget.sniffer.userHome.extractAllWorks(homeUrl);
           if (!mounted || !_isParsing) return;
 
           final secUid = homeResult.secUid.trim();
@@ -61,7 +59,7 @@ extension _ParseHomeParseFlowFlow on _ParsePageState {
             );
             continue;
           }
-          _authorWorksCache[secUid] = works;
+          worksBySecUid[secUid] = works;
           HistoryStore.addRecord(
             HistoryItem(
               id: 'home:$secUid',
@@ -76,12 +74,7 @@ extension _ParseHomeParseFlowFlow on _ParsePageState {
               authorSecUid: secUid,
             ),
           );
-          authors.add(
-            MultiHomeAuthorItem(
-              profile: homeResult.profile,
-              worksTotalTag: homeResult.worksTotalTag,
-            ),
-          );
+          profiles.add(homeResult.profile);
           final articleText = homeResult.filteredArticleCount > 0
               ? '，已过滤 ${homeResult.filteredArticleCount} 条文章'
               : '';
@@ -99,54 +92,87 @@ extension _ParseHomeParseFlowFlow on _ParsePageState {
       _isParsing = false;
       if (mounted) _refresh(() {});
 
-      if (authors.isEmpty) {
+      if (profiles.isEmpty) {
         widget.logs.add('未捕获到有效作者信息，请检查主页链接或登录状态');
         return;
       }
+      if (!mounted) return;
 
-      if (!mounted) return;
-      widget.logs.add('[主页] 成功捕获 ${authors.length} 位作者信息，正在打开顶层保存页');
+      widget.logs.add('[主页] 成功捕获 ${profiles.length} 位作者信息，正在打开顶层保存页');
       widget.onRequestParseTab();
-      final selection = await MultiHomePreviewSheet.show(
-        context,
-        authors: authors,
-        headers: _ParsePageState._mediaHeaders,
-        initialWorksBySecUid: _authorWorksCache,
-        memoryScope: SaveMemoryScope.homeTop,
-        onOpenAuthor: _openAuthorWorks,
+
+      final session = SelectionSession.home(
+        profiles: profiles,
+        worksBySecUid: worksBySecUid,
+        defaultSelected: (kind) =>
+            SelectionModeStore.getHomeTopSelectAllMode() != 2 &&
+            SelectionModeStore.getMiddleCategoryMode(
+              kind,
+              SaveMemoryScope.homeMiddle,
+            ) !=
+                2,
+        quality: DownloadSettingsStore.getBatchQuality(
+          SaveMemoryScope.homeTop,
+        ),
       );
-      if (!mounted) return;
-      if (selection == null) {
+      SelectionDebugBridge.attach(session);
+
+      final confirmed = await MultiHomePreviewSheet.show(
+        context,
+        session: session,
+        headers: _ParsePageState._mediaHeaders,
+        onOpenAuthor: (secUid, index) => _openAuthorWorks(session, secUid),
+      );
+      if (!mounted) {
+        SelectionDebugBridge.detach(session);
+        session.dispose();
+        return;
+      }
+      if (confirmed != true) {
+        SelectionDebugBridge.detach(session);
+        session.dispose();
         widget.logs.add('已取消多主页保存');
         return;
       }
 
-      final selectedAuthors = selection.selectedAuthors;
+      final selectedAuthors = session.matrix.authors.values
+          .where((author) => session.authorState(author.secUid).isSelected)
+          .toList();
       if (selectedAuthors.isEmpty) {
+        SelectionDebugBridge.detach(session);
+        session.dispose();
         widget.logs.add('未选择任何作者');
         return;
       }
 
-      final homeSaver = UserHomeBatchSaver(
-        workSaver: _workBatchSaver,
-        delegate: _HomeWorksDelegate(_extractWorksForBatch),
-      );
+      final prepared = await _prepareByAuthor(session, selectedAuthors);
+      if (!mounted) {
+        SelectionDebugBridge.detach(session);
+        session.dispose();
+        return;
+      }
+
+      final qualityMode =
+          session.globalQuality ?? BatchVideoQualityMode.highest;
+      final homeSaver = UserHomeBatchSaver(workSaver: _workBatchSaver);
       widget.busy.value = true;
       _downloadCancelToken = CancelToken();
       widget.logs.add(
-        '开始保存 ${selectedAuthors.length} 位作者（${_qualityLabel(selection.qualityMode)}）...',
+        '开始保存 ${selectedAuthors.length} 位作者（${_qualityLabel(qualityMode)}）...',
       );
 
       final result = await homeSaver.saveAuthors(
         authors: selectedAuthors,
-        worksBySecUid: selection.worksBySecUid,
-        qualityMode: selection.qualityMode,
+        worksBySecUid: prepared,
+        qualityMode: qualityMode,
         cancelToken: _downloadCancelToken,
         onProgress: _updateBatchSaveProgress,
         onLog: (message) {
           if (mounted) widget.logs.add(message);
         },
       );
+      SelectionDebugBridge.detach(session);
+      session.dispose();
       if (!mounted) return;
 
       for (final author in result.authors) {
@@ -171,79 +197,29 @@ extension _ParseHomeParseFlowFlow on _ParsePageState {
     }
   }
 
-  /// 粘贴多个作品链接：逐条捕获封面后打开中层保存页
-
-  Future<AuthorWorksSelection?> _openAuthorWorks(
-    MultiHomeAuthorItem author,
-    int index,
-    List<SaveWorkItem> topWorks,
-    BatchVideoQualityMode topQuality,
-  ) async {
-    final secUid = author.profile.secUid.trim();
-    if (secUid.isEmpty) {
-      widget.logs.add('作者 secUid 缺失，无法捕获作品列表');
-      return null;
-    }
-
-    var works = topWorks;
-    if (works.isEmpty) {
-      works = _authorWorksCache[secUid] ?? const [];
-    }
-    if (works.isEmpty) {
-      final nickname = author.profile.nickname.isNotEmpty
-          ? author.profile.nickname
-          : '未知作者';
-      widget.logs.add('正在捕获作者【$nickname】的作品列表...');
-      try {
-        final homeResult = await widget.sniffer.userHome.extractAllWorks(
-          'https://www.douyin.com/user/$secUid',
-        );
-        if (!mounted) return null;
-        works = _buildHomeWorks(homeResult);
-        _authorWorksCache[secUid] = works;
-        final articleText = homeResult.filteredArticleCount > 0
-            ? '（已过滤 ${homeResult.filteredArticleCount} 条文章）'
-            : '';
-        widget.logs.add(
-          '作者【$nickname】作品列表捕获完成：${works.length} 条可保存作品$articleText',
-        );
-      } catch (e) {
-        if (mounted) {
-          widget.logs.add('捕获作者作品列表失败：${_friendlyError(e)}');
-        }
-        return null;
-      }
-    }
-
-    if (works.isEmpty) {
-      widget.logs.add('该作者暂无可保存的视频/图文作品');
-      return null;
-    }
-
-    if (!mounted) return null;
-    final selection = await MiddleMultiWorkSheet.show(
+  /// 打开某个作者的中层
+  Future<void> _openAuthorWorks(SelectionSession session, String secUid) async {
+    final rows = session.rowsOf(secUid);
+    if (!mounted || rows.isEmpty) return;
+    final confirmed = await MiddleMultiWorkSheet.show(
       context,
-      works: works,
+      session: session,
+      rows: rows,
       headers: _ParsePageState._mediaHeaders,
       nested: true,
-      // 顶层已经应用过记忆与用户操作，禁止中层再用记忆覆盖
-      useMemoryDefault: false,
-      initialQualityMode: topQuality,
       memoryScope: SaveMemoryScope.homeMiddle,
-      onOpenWork: (work, index) =>
-          _openWorkDetail(work, index, SaveMemoryScope.homeBottom),
+      onOpenWork: (workUrl, index) =>
+          _openWorkDetail(session, workUrl, SaveMemoryScope.homeBottom),
     );
-    if (!mounted || selection == null) return null;
-
-    _authorWorksCache[secUid] = selection.allWorks;
-    return AuthorWorksSelection(
-      works: selection.allWorks,
-      qualityMode: selection.qualityMode,
-    );
+    if (!mounted) return;
+    if (confirmed == true) {
+      widget.logs.add(
+        '作者作品已更新：${session.selectedCountOf(rows)}/${rows.length}',
+      );
+    }
   }
 
-  /// 将主页捕获结果转换为中层作品条目（过滤文章并区分视频/图文）
-
+  /// 主页捕获结果 -> 作品条目
   List<SaveWorkItem> _buildHomeWorks(UserHomeResult result) {
     final works = <SaveWorkItem>[];
     for (final url in result.workUrls) {
@@ -261,14 +237,5 @@ extension _ParseHomeParseFlowFlow on _ParsePageState {
       );
     }
     return works;
-  }
-
-  /// 顶层保存时补抓某个作者的作品列表
-
-  Future<List<SaveWorkItem>> _extractWorksForBatch(String secUid) async {
-    final homeResult = await widget.sniffer.userHome.extractAllWorks(
-      'https://www.douyin.com/user/$secUid',
-    );
-    return _buildHomeWorks(homeResult);
   }
 }

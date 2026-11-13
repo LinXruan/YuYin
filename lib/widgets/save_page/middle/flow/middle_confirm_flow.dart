@@ -1,22 +1,10 @@
 part of '../../middle_multi_work_sheet.dart';
 
-// ignore_for_file: unnecessary_this
-
-/// middle confirm flow
-extension _SheetMiddleConfirmFlowFlow on _MiddleMultiWorkSheetState {
+/// 中层确认：选择已在矩阵中，直接返回
+extension _MiddleConfirmFlow on _MiddleMultiWorkSheetState {
   void _confirm() {
-    _recordSelectionMode();
+    _recordSelectionMemory();
     _publishDebugState();
-    final selected = _works
-        .where((work) => work.selectionState.isSelected)
-        .toList();
-    Navigator.pop(
-      context,
-      MultiWorkSelectionResult(
-        selectedWorks: selected,
-        qualityMode: _qualityMode,
-        allWorks: List.unmodifiable(_works),
-      ),
-    );
+    Navigator.pop(context, true);
   }
 }

@@ -10,6 +10,14 @@
 
     [string]$Arg1 = "",
 
+    [Parameter(Position = 2)]
+
+    [string]$Arg2 = "",
+
+    [Parameter(Position = 3)]
+
+    [string]$Arg3 = "",
+
 
 
     [string]$Serial = "",
@@ -491,6 +499,90 @@ switch ($Action.ToLower()) {
 
 
 
+    "selection-load" {
+
+        $payload = @{ source = $Arg1; text = $Arg2 } | ConvertTo-Json
+
+        Invoke-RestMethod -Uri "$baseUrl/api/selection/load" -Method Post -ContentType "application/json" -Body $payload | ConvertTo-Json -Depth 6
+
+    }
+
+    "save-state" {
+
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/selection/state" -Method Get
+
+        $resp | ConvertTo-Json -Depth 12
+
+    }
+
+    "select-author" {
+
+        $target = if ($Arg2) { $Arg2 } else { "all" }
+
+        $payload = @{ secUid = $Arg1; target = $target } | ConvertTo-Json
+
+        Invoke-RestMethod -Uri "$baseUrl/api/selection/author" -Method Post -ContentType "application/json" -Body $payload | ConvertTo-Json -Depth 6
+
+    }
+
+    "select-work" {
+
+        $target = if ($Arg2) { $Arg2 } else { "all" }
+
+        $payload = @{ workUrl = $Arg1; target = $target } | ConvertTo-Json
+
+        Invoke-RestMethod -Uri "$baseUrl/api/selection/work" -Method Post -ContentType "application/json" -Body $payload | ConvertTo-Json -Depth 6
+
+    }
+
+    "select-cell" {
+
+        $selected = if ($Arg3) { $Arg3 } else { "1" }
+
+        $payload = @{ workUrl = $Arg1; key = $Arg2; selected = $selected } | ConvertTo-Json
+
+        Invoke-RestMethod -Uri "$baseUrl/api/selection/cell" -Method Post -ContentType "application/json" -Body $payload | ConvertTo-Json -Depth 6
+
+    }
+
+    "select-bottom-category" {
+
+        $selected = if ($Arg3) { $Arg3 } else { "0" }
+
+        $payload = @{ workUrl = $Arg1; type = $Arg2; selected = $selected } | ConvertTo-Json
+
+        Invoke-RestMethod -Uri "$baseUrl/api/selection/bottom-category" -Method Post -ContentType "application/json" -Body $payload | ConvertTo-Json -Depth 6
+
+    }
+
+    "select-middle-category" {
+
+        $target = if ($Arg3) { $Arg3 } else { "all" }
+
+        $payload = @{ secUid = $Arg1; kind = $Arg2; target = $target } | ConvertTo-Json
+
+        Invoke-RestMethod -Uri "$baseUrl/api/selection/middle-category" -Method Post -ContentType "application/json" -Body $payload | ConvertTo-Json -Depth 6
+
+    }
+
+    "select-quality" {
+
+        $mode = if ($Arg3) { $Arg3 } else { "highest" }
+
+        $payload = @{ scope = $Arg1; key = $Arg2; mode = $mode } | ConvertTo-Json
+
+        Invoke-RestMethod -Uri "$baseUrl/api/selection/quality" -Method Post -ContentType "application/json" -Body $payload | ConvertTo-Json -Depth 6
+
+    }
+
+    "selection-ingest" {
+
+        $payload = @{ workUrl = $Arg1 } | ConvertTo-Json
+
+        Invoke-RestMethod -Uri "$baseUrl/api/selection/ingest" -Method Post -ContentType "application/json" -Body $payload | ConvertTo-Json -Depth 6
+
+    }
+
     default {
 
         Write-Host "未知指令: $Action"
@@ -500,4 +592,3 @@ switch ($Action.ToLower()) {
     }
 
 }
-

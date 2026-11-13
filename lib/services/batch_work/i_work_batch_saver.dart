@@ -14,16 +14,10 @@ abstract class IWorkDownloadDelegate {
   });
 }
 
-/// 单作品解析代理：parsedResult 缺失时补解析
-abstract class IWorkSniffDelegate {
-  Future<SingleWorkResult> sniffWork(String url);
-}
-
-/// 批量作品保存契约
+/// 批量作品保存契约：资源与画质已由选择矩阵解算完成
 abstract class IWorkBatchSaver {
   Future<List<WorkSaveResult>> saveWorks(
-    List<SaveWorkItem> works, {
-    BatchVideoQualityMode qualityMode = BatchVideoQualityMode.highest,
+    List<SelectedWork> works, {
     MediaSaveTargetResolver? targetResolver,
     CancelToken? cancelToken,
     void Function(int current, int total, String message)? onProgress,
