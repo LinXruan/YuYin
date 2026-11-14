@@ -55,7 +55,7 @@ extension AgentSaveWorksHandlers on AgentAutomationServer {
         );
       }
       final quality = _qualityModeFrom(body['quality']?.toString());
-      final session = SelectionSession.multiWork(
+      final session = SaveSelectionSession.multiWork(
         works: extract.works,
         defaultSelected: (_) => true,
         quality: quality,

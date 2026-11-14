@@ -52,7 +52,7 @@ extension _ParseMultiParseFlow on _ParsePageState {
       if (mounted) _refresh(() {});
       widget.onRequestParseTab();
 
-      final session = SelectionSession.multiWork(
+      final session = SaveSelectionSession.multiWork(
         works: extractResult.works,
         defaultSelected: (kind) =>
             SelectionModeStore.getMiddleCategoryMode(
@@ -69,7 +69,7 @@ extension _ParseMultiParseFlow on _ParsePageState {
       final confirmed = await MiddleMultiWorkSheet.show(
         context,
         session: session,
-        rows: session.allRows.toList(),
+        workUrls: session.allWorkUrls,
         headers: _ParsePageState._mediaHeaders,
         nested: false,
         memoryScope: SaveMemoryScope.multiMiddle,
@@ -88,9 +88,8 @@ extension _ParseMultiParseFlow on _ParsePageState {
         return;
       }
 
-      final urls = session.allRows
-          .where((row) => session.workState(row.url).isSelected)
-          .map((row) => row.url)
+      final urls = session.allWorkUrls
+          .where((url) => session.workState(url).isSelected)
           .toList();
       if (urls.isEmpty) {
         SelectionDebugBridge.detach(session);

@@ -6,8 +6,8 @@ import '../../models/common/batch_video_quality.dart';
 import '../../models/common/save_memory_scope.dart';
 import '../../models/save_page/selection/quality_indicator.dart';
 import '../../models/save_page/selection/selection_state.dart';
-import '../../models/save_page/selection/selection_matrix.dart';
-import '../../services/selection/selection_session.dart';
+import '../../services/selection/debug/selection_snapshot.dart';
+import '../../services/selection/save_selection_session.dart';
 import '../../utils/download_settings_store.dart';
 import '../../utils/save_page_debug_store.dart';
 import '../../utils/selection_mode_store.dart';
@@ -38,7 +38,7 @@ class MultiHomePreviewSheet extends StatefulWidget {
     this.onQualityChanged,
   });
 
-  final SelectionSession session;
+  final SaveSelectionSession session;
 
   final Map<String, String> headers;
 
@@ -49,7 +49,7 @@ class MultiHomePreviewSheet extends StatefulWidget {
   /// 返回 true 表示确认保存；null/false 表示取消
   static Future<bool?> show(
     BuildContext context, {
-    required SelectionSession session,
+    required SaveSelectionSession session,
     Map<String, String> headers = const {},
     OnOpenAuthorCallback? onOpenAuthor,
     ValueChanged<BatchVideoQualityMode>? onQualityChanged,
@@ -77,8 +77,6 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
   /// 正在打开中层的作者索引（仅局部加载态）
   int? _openingIndex;
 
-  SelectionMatrix get _matrix => widget.session.matrix;
-
   @override
   void dispose() {
     _recordSelectionMemory();
@@ -95,7 +93,7 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
       listenable: widget.session,
       builder: (context, _) {
         final session = widget.session;
-        final authors = _matrix.authors.values.toList();
+        final authors = session.authors;
         final quality = session.globalQuality;
         return SafeArea(
           child: SizedBox(

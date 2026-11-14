@@ -7,7 +7,7 @@ extension _TopSheetActionFlow on _MultiHomePreviewSheetState {
     if (callback == null || _openingIndex != null) return;
     _refresh(() => _openingIndex = index);
     try {
-      final secUid = _matrix.authors.values.elementAt(index).secUid;
+      final secUid = widget.session.authors[index].secUid;
       await callback(secUid, index);
     } finally {
       if (mounted) _refresh(() => _openingIndex = null);
@@ -24,10 +24,8 @@ extension _TopSheetActionFlow on _MultiHomePreviewSheetState {
   void _recordSelectionMemory() {
     if (_hasRecordedMemory) return;
     _hasRecordedMemory = true;
-    final states = [
-      for (final author in _matrix.authors.values)
-        widget.session.authorState(author.secUid),
-    ];
-    SelectionModeStore.updateFromHomeSelections(states);
+    SelectionModeStore.updateFromHomeSelections(
+      widget.session.authors.map((author) => author.selection).toList(),
+    );
   }
 }

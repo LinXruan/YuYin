@@ -3,8 +3,8 @@ part of '../../top_multi_home_sheet.dart';
 /// 顶层作者格子：边框完全由派生状态决定
 extension _TopAuthorTile on _MultiHomePreviewSheetState {
   Widget _buildAuthorTile(int index) {
-    final author = _matrix.authors.values.elementAt(index);
-    final state = widget.session.authorState(author.secUid);
+    final author = widget.session.authors[index];
+    final state = author.selection;
     final isAll = state.isAll;
     final isPartial = state == SelectionState.partial;
 

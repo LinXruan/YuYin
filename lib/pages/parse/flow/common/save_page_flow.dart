@@ -3,11 +3,11 @@ part of '../../../parse_page.dart';
 /// 保存页共用流程：打开底层、补解析、按作者解算
 extension _ParseSavePageFlow on _ParsePageState {
   Future<void> _openWorkDetail(
-    SelectionSession session,
+    SaveSelectionSession session,
     String workUrl,
     SaveMemoryScope bottomScope,
   ) async {
-    final row = session.rowOf(workUrl);
+    final row = session.workOf(workUrl);
     if (row == null) return;
 
     if (!row.parsed) {
@@ -29,13 +29,13 @@ extension _ParseSavePageFlow on _ParsePageState {
     }
     if (!mounted) return;
 
-    final parsed = session.rowOf(workUrl)?.work.parsedResult;
+    final parsed = session.workOf(workUrl)?.work.parsedResult;
     if (parsed == null || parsed.items.isEmpty) {
       widget.logs.add('该作品未捕获到可下载资源');
       return;
     }
-    if (row.isVideo) {
-      await _pickWorkTier(session, workUrl, parsed);
+    if (row.behavesAsVideo) {
+      await _pickWorkTier(session, workUrl);
       return;
     }
 
@@ -49,24 +49,22 @@ extension _ParseSavePageFlow on _ParsePageState {
       memoryScope: bottomScope,
     );
     if (!mounted) return;
-    final selected = session.rowOf(workUrl)?.selectedItems.length ?? 0;
+    final selected = session.selectedResourceCount(workUrl);
     widget.logs.add('已选择 $selected/${parsed.items.length} 个资源');
   }
 
   Future<bool> _pickWorkTier(
-    SelectionSession session,
+    SaveSelectionSession session,
     String workUrl,
-    SingleWorkResult parsed,
   ) async {
-    final tiers = VideoQualityUtils.displayTiers(parsed.videoItems);
+    final row = session.workOf(workUrl);
+    if (row == null || !row.behavesAsVideo) return false;
+    final tiers = VideoQualityUtils.displayTiers(row.tiers);
     if (tiers.isEmpty) return false;
-    final row = session.rowOf(workUrl);
-    if (row == null) return false;
 
-    final value = row.videoValue;
+    final current = row.selectedTier;
     var initialItem = tiers.first;
-    if (value > 0 && value <= parsed.videoItems.length) {
-      final current = parsed.videoItems[value - 1];
+    if (current != null) {
       initialItem = tiers.firstWhere(
         (tier) => tier.url == current.url,
         orElse: () => tiers.first,
@@ -80,10 +78,7 @@ extension _ParseSavePageFlow on _ParsePageState {
     );
     if (!mounted || picked == null) return false;
 
-    final index = parsed.videoItems.indexWhere(
-      (tier) => tier.url == picked.url,
-    );
-    session.setTier(workUrl, index >= 0 ? index + 1 : 1);
+    session.setTier(workUrl, picked.url);
     final qualityText = picked.resolutionLabel.isNotEmpty
         ? picked.resolutionLabel
         : (picked.resolution ?? picked.gearName ?? '默认画质');
@@ -93,15 +88,12 @@ extension _ParseSavePageFlow on _ParsePageState {
 
   /// 按作者补解析并解算为可落盘对象
   Future<Map<String, List<SelectedWork>>> _prepareByAuthor(
-    SelectionSession session,
-    Iterable<AuthorSelectionRow> authors,
+    SaveSelectionSession session,
+    Iterable<AuthorSelectionView> authors,
   ) async {
     final result = <String, List<SelectedWork>>{};
     for (final author in authors) {
-      final urls = session.matrix
-          .rowsOf(author.secUid)
-          .map((row) => row.url)
-          .toList();
+      final urls = session.workUrlsOf(author.secUid);
       result[author.secUid] = await SessionWorkPreparer.prepare(
         session,
         urls,

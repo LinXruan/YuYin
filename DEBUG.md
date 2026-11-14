@@ -93,16 +93,18 @@
 | `.\tool\agent_cmd.bat download 0,1` | 逗号分隔索引 | 仅下载指定序号项（如第 0、1 项） | 仅保存指定选中项 |
 | `.\tool\agent_cmd.bat logs [n]` | 可选数字 `n` (如 `20`) | 获取应用日志。提供 `n` 时仅展示最新 `n` 条（防止撑爆上下文） | 输出最近过程日志与保存结果 |
 | `.\tool\agent_cmd.bat clear-logs` | 无 | 清空应用内当前日志缓存 | `[AgentBridge] [成功] 日志已清空` |
-| `.\tool\agent_cmd.bat save-debug` | 无 | 读取当前保存页矩阵的调试快照 (PLAN_65) | 输出 layer、来源、作者/作品状态与画质 |
-| `.\tool\agent_cmd.bat selection-load <mock/home/multi/single> ["<text>"]` | 来源 + 文本 | 无界面加载矩阵会话；mock 生成 2 作者 × 3 作品 × 4 资源 | 返回 success 与来源 |
-| `.\tool\agent_cmd.bat save-state` | 无 | 读取当前活动会话的完整矩阵（作者、作品、资源单元、三态、档位） | 输出 JSON |
+| `.\tool\agent_cmd.bat save-debug` | 无 | 读取当前保存页分层会话的调试快照 (PLAN_67) | 输出 layer、来源、作者/作品状态与画质 |
+| `.\tool\agent_cmd.bat selection-load <mock/home/multi/single> ["<text>"]` | 来源 + 文本 | 无界面加载分层会话；mock 生成 2 作者 × 3 作品 × 4 资源 | 返回 success 与来源 |
+| `.\tool\agent_cmd.bat save-state` | 无 | 读取当前活动会话的完整分层状态（作者、作品、资源、三态、档位） | 输出 JSON |
+| `.\tool\agent_cmd.bat selection-verify` | 无 | 全量重算并校验父层缓存与子层是否一致 (PLAN_67) | 输出 `consistent` 与 `violations` |
+| `.\tool\agent_cmd.bat select-tier "<workUrl>" "<tierKey>"` | 作品 URL + 档位 URL | 设置视频具体档位，不改变选中状态 | 返回 global/quality 摘要 |
 | `.\tool\agent_cmd.bat select-author "<secUid>" [all/none]` | secUid + 目标 | 设置该作者为全选/全不选，递归写入全部资源单元 | 返回 global/quality 摘要 |
 | `.\tool\agent_cmd.bat select-work "<workUrl>" [all/none]` | 作品 URL + 目标 | 设置该作品为全选/全不选 | 同上 |
 | `.\tool\agent_cmd.bat select-cell "<workUrl>" "<资源key>" [1/0]` | 作品 URL + 资源 URL + 选中值 | 精确设置单个资源单元 | 同上 |
 | `.\tool\agent_cmd.bat select-bottom-category "<workUrl>" <image/video/audio> [1/0]` | 作品 URL + 资源类型 | 底层分类全选/全不选（video 表示实况） | 同上 |
 | `.\tool\agent_cmd.bat select-middle-category "<secUid>" <video/image> [all/none]` | 作者 secUid + 分类 | 中层分类全选/全不选 | 同上 |
-| `.\tool\agent_cmd.bat select-quality <global/author/work> "<key>" [highest/lowest]` | 作用域 + 键 + 档位 | 设置画质；author 用 secUid，work 用作品 URL，global 键传 - | 同上 |
-| `.\tool\agent_cmd.bat selection-ingest "<workUrl>"` | 作品 URL | 触发解析并把资源写入矩阵（等价于打开底层） | 返回 success |
+| `.\tool\agent_cmd.bat select-quality <global/author/work> "<key>" [highest/lowest]` | 作用域 + 键 + 档位 | 设置画质；author 用 secUid，work 用作品 URL，global 键传 _ | 同上 |
+| `.\tool\agent_cmd.bat selection-ingest "<workUrl>"` | 作品 URL | 触发解析并物化资源/档位（等价于打开底层） | 返回 success |
 | `.\tool\agent_cmd.bat history [query]` | 可选搜索词 | 查看历史记录，支持关键词模糊搜索 | 终端输出历史记录表格（标题、媒体摘要、时间） |
 | `.\tool\agent_cmd.bat history-scan "<id>"` | 历史记录 id | 扫描当前保存位置下视频/图片/音频是否存在 (PLAN_62) | 输出 type、found、count、displayPath、uri、folderUri |
 | `.\tool\agent_cmd.bat clear-history` | 无 | 清空应用内所有历史记录 | `[AgentBridge] [成功] 历史记录已清空` |
@@ -130,16 +132,18 @@
 | `/api/download` | `POST` | `{"indices":"all"}` 或 `{"indices":[0,1]}` | `{"downloadedCount":2,"savedTypes":["image"],"expectedFiles":["..._1.jpg"]}` | 下载资源落盘 |
 | `/api/logs` | `GET` | 无 (支持 `?tail=20` 或 `?limit=50`) | `{"total":120,"count":20,"logs":["..."]}` | 结构化日志流 (支持尾部/限额截取) |
 | `/api/logs/clear`| `POST` | 无 | `{"success":true,"message":"Logs cleared"}` | 清空日志缓存 |
-| `/api/save-debug` | `GET` | 无 | `{"snapshot":{"layer":"top|middle|bottom","source":"home","global":"all","authors":[...]}}` | 读取保存页矩阵调试快照 (PLAN_65) |
-| `/api/selection/state` | `GET` | 无（支持 `?cells=0`） | `{"active":true,"source":"home","global":"partial","quality":"mixed","authors":[...],"works":[...]}` | 当前活动会话的完整矩阵 |
+| `/api/save-debug` | `GET` | 无 | `{"snapshot":{"layer":"top|middle|bottom","source":"home","global":"all","authors":[...]}}` | 读取保存页分层调试快照 (PLAN_67) |
+| `/api/selection/state` | `GET` | 无（支持 `?cells=0`） | `{"active":true,"source":"home","global":"partial","quality":"mixed","authors":[...],"works":[...]}` | 当前活动会话的完整分层状态 |
+| `/api/selection/verify` | `GET` | 无 | `{"active":true,"consistent":true,"violations":[]}` | 全量重算校验父层缓存与子层一致 (PLAN_67) |
 | `/api/selection/author` | `POST` | `{"secUid":"...","target":"all|none"}` | `{"success":true,"global":"...","quality":"..."}` | 设置作者选择 |
 | `/api/selection/work` | `POST` | `{"workUrl":"...","target":"all|none"}` | 同上 | 设置作品选择 |
 | `/api/selection/cell` | `POST` | `{"workUrl":"...","key":"<资源URL>","selected":true}` | 同上 | 设置单个资源单元 |
 | `/api/selection/bottom-category` | `POST` | `{"workUrl":"...","type":"image|video|audio","selected":false}` | 同上 | 底层分类切换 |
 | `/api/selection/middle-category` | `POST` | `{"secUid":"...","kind":"video|image","target":"all|none"}` | 同上 | 中层分类切换 |
-| `/api/selection/quality` | `POST` | `{"scope":"global|author|work","key":"...","mode":"highest|lowest"}` | 同上 | 设置画质 |
-| `/api/selection/load` | `POST` | `{"source":"mock|home|multi|single","text":"<链接>","quality":"highest|lowest","video":true}` | `{"success":true,"source":"home","authors":2}` | 无界面加载矩阵会话；mock 加 `video:true` 生成 3 档视频作品 |
-| `/api/selection/ingest` | `POST` | `{"workUrl":"..."}` | `{"success":true}` | 解析作品并写入矩阵 |
+| `/api/selection/quality` | `POST` | `{"scope":"global|author|work","key":"...","mode":"highest|lowest"}` | 同上 | 设置画质；只统计已选视频，写入范围内全部视频偏好 |
+| `/api/selection/tier` | `POST` | `{"workUrl":"...","tierKey":"<档位URL>"}` | `{"success":true,...}` | 设置视频具体档位，不改变选中 (PLAN_67) |
+| `/api/selection/load` | `POST` | `{"source":"mock|home|multi|single","text":"<链接>","quality":"highest|lowest","video":true}` | `{"success":true,"source":"home","authors":2}` | 无界面加载分层会话；mock 加 `video:true` 生成 3 档视频作品 |
+| `/api/selection/ingest` | `POST` | `{"workUrl":"..."}` | `{"success":true}` | 解析作品并物化资源/档位 |
 | `/api/settings/quality` | `POST` | `{"onlyHighest":true}` | `{"success":true,...}` | 设置仅显示最高画质 |
 | `/api/display` | `GET` | 无 | `{"status":"ok",...}` | 显示模式状态 |
 | `/api/login/mock` | `POST` | `{"loggedIn":true}` | `{"success":true}` | 模拟登录态 |
@@ -180,7 +184,7 @@ adb shell monkey -p com.debug.yuyin -c android.intent.category.LAUNCHER 1
 :: 4. 发起捕获解析
 .\tool\agent_cmd.bat parse "<待测链接或分享口令>"
 
-:: 5. 查看保存矩阵并按需改写选择
+:: 5. 查看保存分层状态并按需改写选择
 .\tool\agent_cmd.bat save-state
 .\tool\agent_cmd.bat select-author "MS4wLjABAAAA..." none
 .\tool\agent_cmd.bat select-quality author "MS4wLjABAAAA..." lowest
@@ -227,9 +231,13 @@ adb logcat -d | grep -E "flutter|JS-Sniffer|AgentBridge"
   adb pull /sdcard/window.xml
   ```
 - *注：调试页中的 `SelectableText` 不会暴露在 uiautomator dump 中，读取日志统一使用 `agent_cmd.bat logs` 或共享剪贴板。*
-### 2.3 保存页画质四态（PLAN_65/66）
+### 2.3 保存页分层约束传播（PLAN_67）
 
+- 三层固定为 `Author -> Work -> Resource`；multi/single 使用隐藏虚拟作者 `__synthetic__`。
+- 选择轴 `author.selection <-> work.selection <-> resource.selected`；画质轴 `author.quality <-> videoWork.quality`。
 - `/api/selection/state` 的 `quality` / `qualityIndicator` 取值：`none`（无视频）、`highest`、`mixed`、`lowest`。
-- 画质只统计**已选中**的视频作品；未选视频不参与聚合。
+- 画质只统计**已选中**的视频作品；未选视频不参与聚合，但作者/中层画质命令会写入其偏好。
 - `none` 时画质按钮灰色不可点，`/api/selection/quality` 返回 `success:false`。
+- 底层视频选档使用 `/api/selection/tier`，只改具体档位，**绝不改变 selected**。
 - 任何画质操作都不会改变作者/作品/资源的选中数量。
+- `/api/selection/verify` 返回 `consistent:true` 表示父层缓存与全量重算一致；不一致时 `violations` 列出节点。

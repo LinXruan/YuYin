@@ -5,7 +5,7 @@ extension _MiddleDebugSnapshot on _MiddleMultiWorkSheetState {
   void _publishDebugState() {
     SavePageDebugStore.update(
       'middle',
-      widget.session.snapshotMiddle(_rows),
+      SelectionSnapshot.middle(widget.session, widget.workUrls),
     );
   }
 }

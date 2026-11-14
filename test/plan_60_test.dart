@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
-import 'package:yuyin/services/selection/selection_session.dart';
+import 'package:yuyin/services/selection/save_selection_session.dart';
 import 'package:yuyin/utils/download_settings_store.dart';
 import 'package:yuyin/utils/selection_mode_store.dart';
 import 'package:yuyin/widgets/save_page/top_multi_home_sheet.dart';
@@ -16,8 +16,8 @@ const _tiers = SingleWorkResult(
   isImagePost: false,
 );
 
-SelectionSession _session() {
-  final session = SelectionSession.home(
+SaveSelectionSession _session() {
+  final session = SaveSelectionSession.home(
     profiles: const [UserHomeProfile(secUid: 'sec_1', nickname: '作者一')],
     worksBySecUid: {
       'sec_1': const [
@@ -38,7 +38,7 @@ SelectionSession _session() {
   return session;
 }
 
-Widget _wrap(SelectionSession session, {ValueChanged<BatchVideoQualityMode>? onQuality}) {
+Widget _wrap(SaveSelectionSession session, {ValueChanged<BatchVideoQualityMode>? onQuality}) {
   return MaterialApp(
     home: Scaffold(
       body: MultiHomePreviewSheet(
@@ -59,7 +59,7 @@ void main() {
     testWidgets('混合画质渲染，点击后切为最高画质', (tester) async {
       BatchVideoQualityMode? latest;
       final session = _session();
-      session.setTier('https://example.com/w2', 3);
+      session.setTier('https://example.com/w2', 'v3');
 
       await tester.pumpWidget(_wrap(session, onQuality: (mode) => latest = mode));
       await tester.pumpAndSettle();
@@ -115,8 +115,8 @@ void main() {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.pink),
       );
       final session = _session();
-      session.setTier('https://example.com/w1', 3);
-      session.setTier('https://example.com/w2', 3);
+      session.setTier('https://example.com/w1', 'v3');
+      session.setTier('https://example.com/w2', 'v3');
 
       await tester.pumpWidget(
         MaterialApp(

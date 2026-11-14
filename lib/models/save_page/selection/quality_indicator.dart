@@ -1,6 +1,6 @@
 import '../../common/batch_video_quality.dart';
 
-/// 画质标签四态：「无视频」是独立状态，不与 mixed 混用
+/// 画质显示四态：「无视频」是独立状态，不与 mixed 混用
 enum QualityIndicator {
   /// 已选资源中没有任何视频：按钮灰色且不可点击
   none,
@@ -12,10 +12,26 @@ enum QualityIndicator {
   lowest,
 }
 
+/// 画质命令的边界方向；与显示态 mixed/none 区分
+enum QualityEdge { highest, lowest }
+
 extension QualityIndicatorX on QualityIndicator {
   bool get isEnabled => this != QualityIndicator.none;
 
-  /// 落盘时使用的批量模式；无视频时为空
+  String get label {
+    switch (this) {
+      case QualityIndicator.none:
+        return '无视频';
+      case QualityIndicator.highest:
+        return '最高画质';
+      case QualityIndicator.mixed:
+        return '混合画质';
+      case QualityIndicator.lowest:
+        return '最低画质';
+    }
+  }
+
+  /// 落盘/日志使用的批量模式；无视频时为空
   BatchVideoQualityMode? get mode {
     switch (this) {
       case QualityIndicator.highest:
@@ -29,9 +45,16 @@ extension QualityIndicatorX on QualityIndicator {
     }
   }
 
-  /// 点击后的下一态：最高 ↔ 最低；混合与无视频点击→最高
-  QualityIndicator get next =>
-      this == QualityIndicator.lowest
-          ? QualityIndicator.highest
-          : QualityIndicator.lowest;
+  /// 点击画质按钮后的目标边界：最高 -> 最低；最低/混合 -> 最高
+  QualityEdge? get nextEdge {
+    switch (this) {
+      case QualityIndicator.highest:
+        return QualityEdge.lowest;
+      case QualityIndicator.lowest:
+      case QualityIndicator.mixed:
+        return QualityEdge.highest;
+      case QualityIndicator.none:
+        return null;
+    }
+  }
 }

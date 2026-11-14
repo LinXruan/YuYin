@@ -101,7 +101,7 @@ extension _ParseHomeParseFlow on _ParsePageState {
       widget.logs.add('[主页] 成功捕获 ${profiles.length} 位作者信息，正在打开顶层保存页');
       widget.onRequestParseTab();
 
-      final session = SelectionSession.home(
+      final session = SaveSelectionSession.home(
         profiles: profiles,
         worksBySecUid: worksBySecUid,
         defaultSelected: (kind) =>
@@ -135,8 +135,8 @@ extension _ParseHomeParseFlow on _ParsePageState {
         return;
       }
 
-      final selectedAuthors = session.matrix.authors.values
-          .where((author) => session.authorState(author.secUid).isSelected)
+      final selectedAuthors = session.authors
+          .where((author) => author.selection.isSelected)
           .toList();
       if (selectedAuthors.isEmpty) {
         SelectionDebugBridge.detach(session);
@@ -162,7 +162,7 @@ extension _ParseHomeParseFlow on _ParsePageState {
       );
 
       final result = await homeSaver.saveAuthors(
-        authors: selectedAuthors,
+        authors: selectedAuthors.map((author) => author.profile).toList(),
         worksBySecUid: prepared,
         qualityMode: qualityMode,
         cancelToken: _downloadCancelToken,
@@ -198,13 +198,16 @@ extension _ParseHomeParseFlow on _ParsePageState {
   }
 
   /// 打开某个作者的中层
-  Future<void> _openAuthorWorks(SelectionSession session, String secUid) async {
+  Future<void> _openAuthorWorks(
+    SaveSelectionSession session,
+    String secUid,
+  ) async {
     final rows = session.rowsOf(secUid);
     if (!mounted || rows.isEmpty) return;
     final confirmed = await MiddleMultiWorkSheet.show(
       context,
       session: session,
-      rows: rows,
+      workUrls: session.workUrlsOf(secUid),
       headers: _ParsePageState._mediaHeaders,
       nested: true,
       memoryScope: SaveMemoryScope.homeMiddle,

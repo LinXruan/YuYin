@@ -515,6 +515,22 @@ switch ($Action.ToLower()) {
 
     }
 
+    "selection-verify" {
+
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/selection/verify" -Method Get
+
+        $resp | ConvertTo-Json -Depth 6
+
+    }
+
+    "select-tier" {
+
+        $payload = @{ workUrl = $Arg1; tierKey = $Arg2 } | ConvertTo-Json
+
+        Invoke-RestMethod -Uri "$baseUrl/api/selection/tier" -Method Post -ContentType "application/json" -Body $payload | ConvertTo-Json -Depth 6
+
+    }
+
     "select-author" {
 
         $target = if ($Arg2) { $Arg2 } else { "all" }
@@ -587,7 +603,7 @@ switch ($Action.ToLower()) {
 
         Write-Host "未知指令: $Action"
 
-        Write-Host "支持的指令: setup, status, display, quality [on|off], mock-login [on|off], parse, parse-profile, download, logs, clear-logs, history [query], clear-history, thumbnails, clear-thumbnails, preload-thumbnails, verify-covers, verify-titles, verify-profile, cancel, eval"
+        Write-Host "支持的指令: setup, status, display, quality [on|off], mock-login [on|off], parse, parse-profile, download, logs, clear-logs, history [query], clear-history, thumbnails, clear-thumbnails, preload-thumbnails, verify-covers, verify-titles, verify-profile, selection-load, save-state, selection-verify, select-author, select-work, select-cell, select-bottom-category, select-middle-category, select-quality, select-tier, selection-ingest, cancel, eval"
 
     }
 

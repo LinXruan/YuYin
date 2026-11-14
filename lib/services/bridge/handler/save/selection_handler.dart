@@ -19,6 +19,19 @@ extension AgentSelectionHandlers on AgentAutomationServer {
       return;
     }
 
+    if (path == '/api/selection/verify') {
+      if (request.method != 'GET') {
+        _sendJson(request, HttpStatus.methodNotAllowed, {'error': '仅支持 GET'});
+        return;
+      }
+      _sendJson(
+        request,
+        HttpStatus.ok,
+        SelectionDebugBridge.verify(),
+      );
+      return;
+    }
+
     if (request.method != 'POST') {
       _sendJson(request, HttpStatus.methodNotAllowed, {'error': '仅支持 POST'});
       return;
@@ -93,7 +106,7 @@ extension AgentSelectionHandlers on AgentAutomationServer {
               ),
           ],
       };
-      final session = SelectionSession.home(
+      final session = SaveSelectionSession.home(
         profiles: profiles,
         worksBySecUid: works,
         defaultSelected: defaultSelected,
@@ -177,7 +190,7 @@ extension AgentSelectionHandlers on AgentAutomationServer {
       if (profiles.isEmpty) {
         return {'success': false, 'error': '未捕获到有效作者'};
       }
-      final session = SelectionSession.home(
+      final session = SaveSelectionSession.home(
         profiles: profiles,
         worksBySecUid: works,
         defaultSelected: defaultSelected,
@@ -192,7 +205,7 @@ extension AgentSelectionHandlers on AgentAutomationServer {
       if (extract.works.isEmpty) {
         return {'success': false, 'error': '未捕获到作品'};
       }
-      final session = SelectionSession.multiWork(
+      final session = SaveSelectionSession.multiWork(
         works: extract.works,
         defaultSelected: defaultSelected,
         quality: quality,
@@ -207,7 +220,7 @@ extension AgentSelectionHandlers on AgentAutomationServer {
 
     final url = batch.workUrls.isNotEmpty ? batch.workUrls.first : text.trim();
     final parsed = await sniffer.sniffVideoUrl(url);
-    final session = SelectionSession.singleWork(
+    final session = SaveSelectionSession.singleWork(
       work: SaveWorkItem(
         url: url,
         kind: parsed.isImagePost ? WorkMediaKind.image : WorkMediaKind.video,

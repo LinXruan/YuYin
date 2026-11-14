@@ -201,7 +201,7 @@ extension _ParseSingleParseFlowFlow on _ParsePageState {
       title: result.displayTitle,
       coverUrl: result.coverUrl ?? '',
     );
-    final session = SelectionSession.singleWork(
+    final session = SaveSelectionSession.singleWork(
       work: work,
       parsed: result,
       quality: DownloadSettingsStore.getBatchQuality(
@@ -214,7 +214,7 @@ extension _ParseSingleParseFlowFlow on _ParsePageState {
           item.type,
           SaveMemoryScope.singleBottom,
         );
-        if (mode == 2) session.toggleCell(url, item.url);
+        if (mode == 2) session.setResource(url, item.url, false);
       }
       if (result.isImagePost) {
         final confirmed = await ImagePreviewSheet.show(
@@ -227,7 +227,7 @@ extension _ParseSingleParseFlowFlow on _ParsePageState {
         );
         if (!mounted || confirmed != true) return null;
       } else {
-        final picked = await _pickWorkTier(session, url, result);
+        final picked = await _pickWorkTier(session, url);
         if (!mounted || !picked) return null;
       }
       return session.buildSelectedWork(url);

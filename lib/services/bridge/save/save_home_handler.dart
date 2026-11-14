@@ -86,7 +86,7 @@ extension AgentSaveHomeHandlers on AgentAutomationServer {
       );
       final config = SaveLocationStore.current;
       final quality = _qualityModeFrom(body['quality']?.toString());
-      final session = SelectionSession.home(
+      final session = SaveSelectionSession.home(
         profiles: [home.profile],
         worksBySecUid: {home.secUid: works},
         defaultSelected: (_) => true,

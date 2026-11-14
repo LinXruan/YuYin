@@ -22,7 +22,7 @@ extension _MiddleSelectionMemoryFlow on _MiddleMultiWorkSheetState {
       );
     }
 
-    final quality = widget.session.qualityModeForRows(_rows);
+    final quality = widget.session.qualityModeOf(_rows);
     if (quality == null) return;
     unawaited(
       DownloadSettingsStore.recordBatchQualitySelection(

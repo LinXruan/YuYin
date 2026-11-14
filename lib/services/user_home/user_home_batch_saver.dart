@@ -14,7 +14,7 @@ class UserHomeBatchSaver {
   final IWorkBatchSaver workSaver;
 
   Future<UserHomeBatchSaveResult> saveAuthors({
-    required List<AuthorSelectionRow> authors,
+    required List<UserHomeProfile> authors,
     required Map<String, List<SelectedWork>> worksBySecUid,
     required BatchVideoQualityMode qualityMode,
     CancelToken? cancelToken,
@@ -30,8 +30,8 @@ class UserHomeBatchSaver {
 
       final author = authors[index];
       final secUid = author.secUid;
-      final nickname = author.profile.nickname.trim().isNotEmpty
-          ? author.profile.nickname.trim()
+      final nickname = author.nickname.trim().isNotEmpty
+          ? author.nickname.trim()
           : '未知作者';
       if (secUid.isEmpty) {
         onLog?.call('作者【$nickname】缺少 secUid，已跳过');

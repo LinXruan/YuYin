@@ -5,7 +5,7 @@ extension _BottomDebugSnapshot on _ImagePreviewSheetState {
   void _publishDebugState() {
     SavePageDebugStore.update(
       'bottom',
-      widget.session.snapshotBottom(widget.workUrl),
+      SelectionSnapshot.bottom(widget.session, widget.workUrl),
     );
   }
 }

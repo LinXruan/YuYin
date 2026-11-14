@@ -108,14 +108,8 @@ void main() {
       final saver = UserHomeBatchSaver(workSaver: workSaver);
 
       final authors = [
-        AuthorSelectionRow(
-          profile: const UserHomeProfile(secUid: 'a1', nickname: '作者一'),
-          workUrls: const ['w1'],
-        ),
-        AuthorSelectionRow(
-          profile: const UserHomeProfile(secUid: 'a2', nickname: '作者二'),
-          workUrls: const [],
-        ),
+        const UserHomeProfile(secUid: 'a1', nickname: '作者一'),
+        const UserHomeProfile(secUid: 'a2', nickname: '作者二'),
       ];
       final works = {
         'a1': [

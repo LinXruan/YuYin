@@ -6,9 +6,10 @@ import '../../models/common/batch_video_quality.dart';
 import '../../models/common/save_memory_scope.dart';
 import '../../models/save_page/selection/quality_indicator.dart';
 import '../../models/save_page/selection/selection_state.dart';
-import '../../models/save_page/selection/work_selection_row.dart';
+import '../../models/save_page/selection/work_selection_view.dart';
 import '../../models/save_page/work_kind.dart';
-import '../../services/selection/selection_session.dart';
+import '../../services/selection/debug/selection_snapshot.dart';
+import '../../services/selection/save_selection_session.dart';
 import '../../utils/download_settings_store.dart';
 import '../../utils/save_page_debug_store.dart';
 import '../../utils/selection_mode_store.dart';
@@ -35,7 +36,7 @@ class MiddleMultiWorkSheet extends StatefulWidget {
   const MiddleMultiWorkSheet({
     super.key,
     required this.session,
-    required this.rows,
+    required this.workUrls,
     this.headers = const {},
     this.nested = false,
     this.memoryScope = SaveMemoryScope.multiMiddle,
@@ -43,10 +44,10 @@ class MiddleMultiWorkSheet extends StatefulWidget {
     this.onQualityChanged,
   });
 
-  final SelectionSession session;
+  final SaveSelectionSession session;
 
-  /// 当前层展示的作品范围（主页来源为该作者的作品）
-  final List<WorkSelectionRow> rows;
+  /// 当前层展示的作品 URL 范围（主页来源为该作者的作品）
+  final List<String> workUrls;
 
   final Map<String, String> headers;
 
@@ -62,8 +63,8 @@ class MiddleMultiWorkSheet extends StatefulWidget {
   /// 返回 true 表示确认（nested 时为返回上层）
   static Future<bool?> show(
     BuildContext context, {
-    required SelectionSession session,
-    required List<WorkSelectionRow> rows,
+    required SaveSelectionSession session,
+    required List<String> workUrls,
     Map<String, String> headers = const {},
     bool nested = false,
     SaveMemoryScope memoryScope = SaveMemoryScope.multiMiddle,
@@ -76,7 +77,7 @@ class MiddleMultiWorkSheet extends StatefulWidget {
       showDragHandle: true,
       builder: (_) => MiddleMultiWorkSheet(
         session: session,
-        rows: rows,
+        workUrls: workUrls,
         headers: headers,
         nested: nested,
         memoryScope: memoryScope,
@@ -94,7 +95,14 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
   bool _hasRecordedMemory = false;
   int? _openingIndex;
 
-  List<WorkSelectionRow> get _rows => widget.rows;
+  List<WorkSelectionView> get _rows {
+    final result = <WorkSelectionView>[];
+    for (final url in widget.workUrls) {
+      final work = widget.session.workOf(url);
+      if (work != null) result.add(work);
+    }
+    return result;
+  }
 
   @override
   void dispose() {
@@ -112,12 +120,13 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
       listenable: widget.session,
       builder: (context, _) {
         final session = widget.session;
-        final videoRows = _rows.where((row) => row.isVideo).toList();
+        final videoRows =
+            _rows.where((row) => row.behavesAsVideo).toList();
         final imageRows = _rows
             .where((row) => row.work.kind == WorkMediaKind.image)
             .toList();
         final selected = session.selectedCountOf(_rows);
-        final quality = session.qualityOfRows(_rows);
+        final quality = session.qualityOf(_rows);
         return SafeArea(
           child: SizedBox(
             height: MediaQuery.of(context).size.height * 0.82,
@@ -216,7 +225,6 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
     );
   }
 
-  bool _isAllSelected(List<WorkSelectionRow> rows) =>
-      rows.isNotEmpty &&
-      rows.every((row) => widget.session.workState(row.url).isAll);
+  bool _isAllSelected(List<WorkSelectionView> rows) =>
+      rows.isNotEmpty && rows.every((row) => row.selection.isAll);
 }

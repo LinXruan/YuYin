@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 import '../../models/common/save_memory_scope.dart';
 import '../../models/media_item.dart';
 import '../../services/audio_preview_service.dart';
-import '../../services/selection/selection_session.dart';
+import '../../services/selection/debug/selection_snapshot.dart';
+import '../../services/selection/save_selection_session.dart';
 import '../../utils/save_page_debug_store.dart';
 import '../../utils/selection_mode_store.dart';
 import 'bottom_media_widgets.dart';
 import 'save_page_common.dart';
+
+part 'bottom/flow/bottom_state_flow.dart';
 
 part 'bottom/flow/bottom_media_selection_flow.dart';
 
@@ -38,7 +41,7 @@ class ImagePreviewSheet extends StatefulWidget {
     this.memoryScope = SaveMemoryScope.singleBottom,
   });
 
-  final SelectionSession session;
+  final SaveSelectionSession session;
 
   final String workUrl;
 
@@ -55,7 +58,7 @@ class ImagePreviewSheet extends StatefulWidget {
 
   static Future<bool?> show(
     BuildContext context, {
-    required SelectionSession session,
+    required SaveSelectionSession session,
     required String workUrl,
     required List<MediaItem> items,
     required Map<String, String> headers,
@@ -91,7 +94,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
   bool _showAudioPlayerBar = false;
   MediaItem? _currentPlayingItem;
 
-  WorkSelectionRow? get _row => widget.session.rowOf(widget.workUrl);
+  WorkSelectionView? get _row => widget.session.workOf(widget.workUrl);
 
   @override
   void initState() {
@@ -125,10 +128,8 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
     return ListenableBuilder(
       listenable: widget.session,
       builder: (context, _) {
-        final row = _row;
-        final selectedCount = row == null
-            ? 0
-            : row.allCells.where((cell) => cell.isSelected).length;
+        final selectedCount =
+            widget.session.selectedResourceCount(widget.workUrl);
         final hasImages = _hasType(MediaType.image);
         final hasLive = _hasType(MediaType.video);
         final hasAudio = _hasType(MediaType.audio);
@@ -227,29 +228,4 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
       },
     );
   }
-
-  bool _hasType(MediaType type) =>
-      widget.items.any((item) => item.type == type);
-
-  bool _isAllSelected(MediaType type) {
-    final row = _row;
-    if (row == null) return false;
-    final cells = row.cellsOf(type);
-    return cells.isNotEmpty && cells.every((cell) => cell.isSelected);
-  }
-
-  bool _isSelected(MediaItem item) {
-    final row = _row;
-    if (row == null) return false;
-    for (final cell in row.allCells) {
-      if (cell.key == item.url) return cell.isSelected;
-    }
-    return false;
-  }
-
-  /// 当前已选资源在 items 中的索引（写记忆用）
-  List<int> get selectedIndices => [
-    for (var i = 0; i < widget.items.length; i++)
-      if (_isSelected(widget.items[i])) i,
-  ];
 }

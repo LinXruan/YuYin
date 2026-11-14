@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
-import 'package:yuyin/services/selection/selection_session.dart';
+import 'package:yuyin/services/selection/save_selection_session.dart';
 import 'package:yuyin/utils/download_settings_store.dart';
 import 'package:yuyin/utils/selection_mode_store.dart';
 import 'package:yuyin/utils/url_parser.dart';
 import 'package:yuyin/widgets/save_page/top_multi_home_sheet.dart';
 
-SelectionSession _session() {
-  return SelectionSession.home(
+SaveSelectionSession _session() {
+  return SaveSelectionSession.home(
     profiles: const [
       UserHomeProfile(secUid: 'sec_1', nickname: '作者一'),
       UserHomeProfile(secUid: 'sec_2', nickname: '作者二'),
@@ -29,7 +29,7 @@ SelectionSession _session() {
 }
 
 Widget _wrap(
-  SelectionSession session, {
+  SaveSelectionSession session, {
   ValueChanged<BatchVideoQualityMode>? onQuality,
   void Function(String secUid, int index)? onOpen,
 }) {

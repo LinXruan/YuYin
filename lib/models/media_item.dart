@@ -1,4 +1,4 @@
-// 聚合导出按领域拆分后的数据模型，确保向后兼容
+// 聚合导出按领域拆分后的数据模型
 export 'common/batch_video_quality.dart';
 export 'common/media_save_target.dart';
 export 'common/save_location_target.dart';
@@ -10,12 +10,11 @@ export 'save_page/save_work_item.dart';
 export 'save_page/work_kind.dart';
 export 'save_page/selection/selection_state.dart';
 export 'save_page/selection/selection_source.dart';
-export 'save_page/selection/selection_cell.dart';
-export 'save_page/selection/selection_group.dart';
 export 'save_page/selection/quality_indicator.dart';
-export 'save_page/selection/work_selection_row.dart';
-export 'save_page/selection/author_selection_row.dart';
-export 'save_page/selection/selection_matrix.dart';
+export 'save_page/selection/quality_preference.dart';
+export 'save_page/selection/resource_selection_view.dart';
+export 'save_page/selection/work_selection_view.dart';
+export 'save_page/selection/author_selection_view.dart';
 export 'save_page/selection/selected_work.dart';
 export 'save_page/work_save_result.dart';
 export 'save_page/work_video_quality_choice.dart';
