@@ -1,6 +1,6 @@
 import '../../../models/single_work/media_download_item.dart';
-import '../../../utils/download_settings_store.dart';
-import '../../../utils/video_quality_utils.dart';
+import '../../../utils/settings/download_settings_store.dart';
+import '../../../utils/settings/video_quality_utils.dart';
 import '../save_selection_session.dart';
 
 /// 画质选项只读快照：用于确认过滤后的可见列表是否包含当前档位/全量最低档

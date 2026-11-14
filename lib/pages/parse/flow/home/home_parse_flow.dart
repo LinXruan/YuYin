@@ -1,4 +1,4 @@
-part of '../../../parse_page.dart';
+part of '../../page/parse_page.dart';
 
 /// 主页解析：作者 -> 顶层保存页
 extension _ParseHomeParseFlow on _ParsePageState {

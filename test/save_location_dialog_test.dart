@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/utils/save_location_store.dart';
-import 'package:yuyin/widgets/save_location_dialog.dart';
+import 'package:yuyin/utils/savelocation/save_location_store.dart';
+import 'package:yuyin/widgets/savelocation/save_location_dialog.dart';
 
 void main() {
   setUp(() {

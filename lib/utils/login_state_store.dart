@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../services/login_detector_script.dart';
+import '../services/script/login/login_detector_script.dart';
 
 /// 登录状态本地持久化：保存登录标记及简要用户公开信息（昵称、头像链接）。
 ///

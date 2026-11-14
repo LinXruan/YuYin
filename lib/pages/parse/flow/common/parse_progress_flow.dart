@@ -1,4 +1,4 @@
-part of '../../../parse_page.dart';
+part of '../../page/parse_page.dart';
 
 /// parse progress flow
 extension _ParseParseProgressFlowFlow on _ParsePageState {

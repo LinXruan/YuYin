@@ -2,10 +2,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/services/app_installer.dart';
-import 'package:yuyin/services/update_checker.dart';
-import 'package:yuyin/utils/app_update_store.dart';
-import 'package:yuyin/widgets/update_dialog.dart';
+import 'package:yuyin/services/update/app_installer.dart';
+import 'package:yuyin/services/update/client/update_checker.dart';
+import 'package:yuyin/utils/update/app_update_store.dart';
+import 'package:yuyin/widgets/update/dialog/update_dialog.dart';
 
 void main() {
   group('PLAN_47 UpdateDialog 与 AppUpdateStore 测试', () {

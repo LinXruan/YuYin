@@ -4,9 +4,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
-import 'package:yuyin/services/agent_automation_server.dart';
-import 'package:yuyin/services/js_script_builder.dart';
-import 'package:yuyin/utils/log_controller.dart';
+import 'package:yuyin/services/bridge/server/agent_automation_server.dart';
+import 'package:yuyin/services/script/douyin/douyin_sniff_script.dart';
+import 'package:yuyin/utils/debug/log_controller.dart';
 
 void main() {
   group('PLAN_54: 主页作品封面图捕获算法与模型测试', () {

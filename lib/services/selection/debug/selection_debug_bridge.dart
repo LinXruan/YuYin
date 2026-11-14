@@ -1,14 +1,11 @@
 import 'package:flutter/foundation.dart';
 
-import '../../../models/common/work_type.dart';
-import '../../../models/save_page/selection/quality_indicator.dart';
-import '../../../models/save_page/selection/selection_state.dart';
-import '../../../models/save_page/work_kind.dart';
 import '../../../models/single_work/single_work_result.dart';
 import '../save_selection_session.dart';
 import '../selection_invariants.dart';
 import 'quality_options_snapshot.dart';
 import 'selection_snapshot.dart';
+import 'command_flow.dart';
 
 /// 保存页分层会话的调试桥：让 Agent 通过 HTTP 直接读写当前会话
 ///
@@ -68,25 +65,25 @@ class SelectionDebugBridge {
     switch (action) {
       case 'author':
         final secUid = body['secUid']?.toString() ?? '';
-        session.setAuthor(secUid, _targetOf(body['target']));
+        session.setAuthor(secUid, SelectionDebugCommandFlow.targetOf(body['target']));
         break;
       case 'work':
         final url = body['workUrl']?.toString() ?? '';
-        session.setWork(url, _targetOf(body['target']));
+        session.setWork(url, SelectionDebugCommandFlow.targetOf(body['target']));
         break;
       case 'cell':
         final url = body['workUrl']?.toString() ?? '';
         final key = body['key']?.toString() ?? '';
-        session.setResource(url, key, _boolOf(body['selected'], true));
+        session.setResource(url, key, SelectionDebugCommandFlow.boolOf(body['selected'], true));
         break;
       case 'bottom-category':
-        _bottomCategory(session, body);
+        SelectionDebugCommandFlow.bottomCategory(session, body);
         break;
       case 'middle-category':
-        _middleCategory(session, body);
+        SelectionDebugCommandFlow.middleCategory(session, body);
         break;
       case 'quality':
-        if (!_quality(session, body)) {
+        if (!SelectionDebugCommandFlow.quality(session, body)) {
           return {
             'success': false,
             'error': '当前范围没有已选视频，画质按钮不可用',
@@ -105,7 +102,7 @@ class SelectionDebugBridge {
         }
         break;
       case 'filter':
-        if (!_filter(session, body)) {
+        if (!SelectionDebugCommandFlow.filter(session, body)) {
           return {'success': false, 'error': '筛选参数无效'};
         }
         break;
@@ -138,136 +135,5 @@ class SelectionDebugBridge {
     final session = _session;
     if (session == null) return false;
     return session.ensureParsed(workUrl, parser);
-  }
-
-  static void _bottomCategory(
-    SaveSelectionSession session,
-    Map<String, dynamic> body,
-  ) {
-    final type = _mediaTypeOf(body['type']?.toString());
-    if (type == null) return;
-    session.setResourceCategory(
-      body['workUrl']?.toString() ?? '',
-      type,
-      _boolOf(body['selected'], true),
-    );
-  }
-
-  static void _middleCategory(
-    SaveSelectionSession session,
-    Map<String, dynamic> body,
-  ) {
-    final kind = body['kind']?.toString() == 'image'
-        ? WorkMediaKind.image
-        : WorkMediaKind.video;
-    session.setAuthorKind(
-      body['secUid']?.toString() ?? '',
-      kind,
-      _targetOf(body['target']),
-    );
-  }
-
-  static bool _quality(
-    SaveSelectionSession session,
-    Map<String, dynamic> body,
-  ) {
-    final edge = body['mode']?.toString() == 'lowest'
-        ? QualityEdge.lowest
-        : QualityEdge.highest;
-    final scope = body['scope']?.toString() ?? 'terminal';
-    final key = body['key']?.toString() ?? '';
-    switch (scope) {
-      case 'author':
-        return session.setAuthorQuality(key, edge);
-      case 'work':
-        return session.setWorkQuality(key, edge);
-      default:
-        return session.setTerminalQuality(edge);
-    }
-  }
-
-  static bool _filter(
-    SaveSelectionSession session,
-    Map<String, dynamic> body,
-  ) {
-    final scope = body['scope']?.toString() ?? 'terminal';
-    if (scope != 'terminal' && scope != 'author') return false;
-    final target = body['target']?.toString() ?? 'all';
-    if (target != 'all' && target != 'none') return false;
-    final selected = target == 'all';
-    final key = body['key']?.toString() ?? '';
-    final authorScope = scope == 'author';
-
-    switch (body['dimension']?.toString()) {
-      case 'picture':
-        if (authorScope) {
-          session.setAuthorResource(key, MediaType.image, selected);
-        } else {
-          session.setTerminalResource(MediaType.image, selected);
-        }
-        return true;
-      case 'live':
-        if (authorScope) {
-          session.setAuthorResource(key, MediaType.video, selected);
-        } else {
-          session.setTerminalResource(MediaType.video, selected);
-        }
-        return true;
-      case 'music':
-        if (authorScope) {
-          session.setAuthorResource(key, MediaType.audio, selected);
-        } else {
-          session.setTerminalResource(MediaType.audio, selected);
-        }
-        return true;
-      case 'note':
-        final kind = WorkMediaKind.image;
-        if (authorScope) {
-          session.setAuthorKind(key, kind, _selectionOf(selected));
-        } else {
-          session.setTerminalKind(kind, _selectionOf(selected));
-        }
-        return true;
-      case 'video':
-        final kind = WorkMediaKind.video;
-        if (authorScope) {
-          session.setAuthorKind(key, kind, _selectionOf(selected));
-        } else {
-          session.setTerminalKind(kind, _selectionOf(selected));
-        }
-        return true;
-      default:
-        return false;
-    }
-  }
-
-  static SelectionState _selectionOf(bool selected) =>
-      selected ? SelectionState.all : SelectionState.none;
-
-  static SelectionState _targetOf(Object? raw) {
-    return raw?.toString() == 'none'
-        ? SelectionState.none
-        : SelectionState.all;
-  }
-
-  static bool _boolOf(Object? raw, bool fallback) {
-    if (raw is bool) return raw;
-    final text = raw?.toString();
-    if (text == '1' || text == 'true') return true;
-    if (text == '0' || text == 'false') return false;
-    return fallback;
-  }
-
-  static MediaType? _mediaTypeOf(String? raw) {
-    switch (raw) {
-      case 'image':
-        return MediaType.image;
-      case 'video':
-        return MediaType.video;
-      case 'audio':
-        return MediaType.audio;
-      default:
-        return null;
-    }
   }
 }

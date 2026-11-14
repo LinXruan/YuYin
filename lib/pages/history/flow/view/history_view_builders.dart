@@ -1,4 +1,4 @@
-part of '../../../history_page.dart';
+part of '../../page/history_page.dart';
 
 /// history view bui
 extension _HistoryHistoryViewBuiFlow on _HistoryPageState {

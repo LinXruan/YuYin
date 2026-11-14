@@ -1,4 +1,4 @@
-import '../../utils/parse_utils.dart';
+import '../../utils/url/parse_utils.dart';
 import '../common/work_type.dart';
 
 /// 单个媒体资源（普通视频档位、静态图片、实况图视频或音频）

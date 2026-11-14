@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/pages/download_settings_page.dart';
-import 'package:yuyin/utils/download_settings_store.dart';
-import 'package:yuyin/utils/save_location_store.dart';
+import 'package:yuyin/pages/settings/download_settings_page.dart';
+import 'package:yuyin/utils/settings/download_settings_store.dart';
+import 'package:yuyin/utils/savelocation/save_location_store.dart';
 
 void main() {
   setUp(() async {

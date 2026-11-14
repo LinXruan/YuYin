@@ -1,4 +1,4 @@
-part of '../../../history_page.dart';
+part of '../../page/history_page.dart';
 
 class _HistoryFilterButton extends StatelessWidget {
   const _HistoryFilterButton({

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/services/update_checker.dart';
-import 'package:yuyin/widgets/update_dialog.dart';
+import 'package:yuyin/services/update/client/update_checker.dart';
+import 'package:yuyin/widgets/update/dialog/update_dialog.dart';
 
 void main() {
   testWidgets('UpdateDialog 正确渲染 Markdown 组件且不暴露 ### 源码符号', (tester) async {

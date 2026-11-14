@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../services/douyin_sniffer.dart';
-import '../services/login_detector_script.dart';
+import '../services/sniffer/facade/douyin_sniffer.dart';
+import '../services/script/login/login_detector_script.dart';
 import '../utils/login_state_store.dart';
 
 /// 抖音网页登录页：支持全自动识别登录与登出状态感知

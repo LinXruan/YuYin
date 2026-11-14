@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
-import 'package:yuyin/services/douyin_share_api.dart';
+import 'package:yuyin/services/share/client/douyin_share_api.dart';
 
 void main() {
   group('DouyinShareApi.extractRouterDataJson', () {

@@ -1,4 +1,4 @@
-part of '../../douyin_sniffer.dart';
+part of '../facade/douyin_sniffer.dart';
 
 /// webview fallback flow
 extension SnifferWebviewFallbackFlowFlow on DouyinSniffer {

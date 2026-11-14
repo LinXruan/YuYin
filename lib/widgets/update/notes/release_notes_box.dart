@@ -1,4 +1,4 @@
-part of '../../update_dialog.dart';
+part of '../dialog/update_dialog.dart';
 
 class _ReleaseNotesBox extends StatefulWidget {
   const _ReleaseNotesBox({required this.notes});

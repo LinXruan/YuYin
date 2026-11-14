@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
-import 'package:yuyin/services/audio_preview_service.dart';
+import 'package:yuyin/services/media/audio_preview_service.dart';
 
 import 'image_preview_sheet_harness.dart';
 

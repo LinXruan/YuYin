@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
-import 'package:yuyin/utils/download_settings_store.dart';
+import 'package:yuyin/utils/settings/download_settings_store.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

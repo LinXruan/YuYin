@@ -1,4 +1,4 @@
-part of '../../agent_automation_server.dart';
+part of '../server/agent_automation_server.dart';
 
 /// eval 端点处理。
 extension AgentEvalHandlers on AgentAutomationServer {

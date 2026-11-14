@@ -8,7 +8,7 @@ import '../../models/save_page/selection/quality_indicator.dart';
 import '../../models/save_page/work_kind.dart';
 import '../../services/selection/debug/selection_snapshot.dart';
 import '../../services/selection/save_selection_session.dart';
-import '../../utils/save_page_debug_store.dart';
+import '../../utils/debug/save_page_debug_store.dart';
 import 'filter/filter_controls.dart';
 import 'filter/filter_strip.dart';
 import 'save_page_common.dart';

@@ -1,4 +1,4 @@
-part of '../../../history_page.dart';
+part of '../../page/history_page.dart';
 
 /// history search
 extension _HistoryHistorySearchFlow on _HistoryPageState {

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
 import 'package:yuyin/services/selection/save_selection_session.dart';
-import 'package:yuyin/utils/terminal_memory_store.dart';
+import 'package:yuyin/utils/memory/terminal_memory_store.dart';
 
 SingleWorkResult _note(
   String work, {

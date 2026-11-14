@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/pages/parse_page.dart';
-import 'package:yuyin/utils/log_controller.dart';
+import 'package:yuyin/pages/parse/page/parse_page.dart';
+import 'package:yuyin/utils/debug/log_controller.dart';
 
 void main() {
   group('StatusCard.resolveStatusText 智能文本解析测试', () {

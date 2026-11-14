@@ -1,5 +1,5 @@
 // 分享页 URL 清洗与分辨率文案。
-import '../../../utils/parse_utils.dart';
+import '../../../utils/url/parse_utils.dart';
 class ShareUrlUtils {
   /// 清洗 URL：实体解码、协议补全、去水印、过滤非法协议
   static String cleanUrl(Object? raw) {

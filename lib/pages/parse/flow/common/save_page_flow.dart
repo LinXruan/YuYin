@@ -1,4 +1,4 @@
-part of '../../../parse_page.dart';
+part of '../../page/parse_page.dart';
 
 /// 保存页共用流程：打开底层、补解析、按作者解算
 extension _ParseSavePageFlow on _ParsePageState {

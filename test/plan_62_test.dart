@@ -4,7 +4,7 @@ import 'package:yuyin/models/media_item.dart';
 import 'package:yuyin/services/batch_work/i_work_batch_saver.dart';
 import 'package:yuyin/services/batch_work/work_batch_saver.dart';
 import 'package:yuyin/services/user_home/user_home_batch_saver.dart';
-import 'package:yuyin/services/video_downloader.dart';
+import 'package:yuyin/services/media/video_downloader.dart';
 
 class _FakeDownloader implements IWorkDownloadDelegate {
   _FakeDownloader();

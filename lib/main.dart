@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'pages/app_shell.dart';
-import 'utils/app_update_store.dart';
-import 'utils/download_settings_store.dart';
-import 'utils/history_store.dart';
-import 'utils/save_location_store.dart';
-import 'utils/terminal_memory_store.dart';
-import 'utils/theme_store.dart';
+import 'pages/shell/page/app_shell.dart';
+import 'utils/update/app_update_store.dart';
+import 'utils/settings/download_settings_store.dart';
+import 'utils/history/history_store.dart';
+import 'utils/savelocation/save_location_store.dart';
+import 'utils/memory/terminal_memory_store.dart';
+import 'utils/settings/theme_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

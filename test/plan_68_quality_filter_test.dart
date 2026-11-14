@@ -2,8 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
 import 'package:yuyin/services/selection/debug/quality_options_snapshot.dart';
 import 'package:yuyin/services/selection/save_selection_session.dart';
-import 'package:yuyin/utils/download_settings_store.dart';
-import 'package:yuyin/utils/video_quality_utils.dart';
+import 'package:yuyin/utils/settings/download_settings_store.dart';
+import 'package:yuyin/utils/settings/video_quality_utils.dart';
 
 const _realTiers = [
   (id: '1080_722838', w: 1728, h: 1080, bitRate: 722838),

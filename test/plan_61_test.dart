@@ -3,9 +3,9 @@ import 'package:yuyin/models/media_item.dart';
 import 'package:yuyin/services/multi_work/article_work_exception.dart';
 import 'package:yuyin/services/multi_work/i_multi_work_extractor.dart';
 import 'package:yuyin/services/multi_work/multi_work_extractor.dart';
-import 'package:yuyin/utils/download_settings_store.dart';
+import 'package:yuyin/utils/settings/download_settings_store.dart';
 import 'package:yuyin/utils/url_parser.dart';
-import 'package:yuyin/utils/video_quality_utils.dart';
+import 'package:yuyin/utils/settings/video_quality_utils.dart';
 
 /// 多作品抓取代理 Fake：按 URL 返回预置结果
 class _FakeMultiWorkDelegate implements IMultiWorkSnifferDelegate {

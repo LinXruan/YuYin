@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
 import 'package:yuyin/services/selection/save_selection_session.dart';
-import 'package:yuyin/utils/download_settings_store.dart';
-import 'package:yuyin/utils/video_quality_utils.dart';
+import 'package:yuyin/utils/settings/download_settings_store.dart';
+import 'package:yuyin/utils/settings/video_quality_utils.dart';
 import 'package:yuyin/widgets/save_page/bottom/widget/video_tier_picker_sheet.dart';
 import 'package:yuyin/widgets/save_page/middle_multi_work_sheet.dart';
 

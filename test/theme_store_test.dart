@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/utils/theme_store.dart';
+import 'package:yuyin/utils/settings/theme_store.dart';
 
 void main() {
   group('ThemeStore 单元测试', () {

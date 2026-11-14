@@ -1,4 +1,4 @@
-part of '../../../history_page.dart';
+part of '../../page/history_page.dart';
 
 /// history action
 extension _HistoryHistoryActionFlow on _HistoryPageState {

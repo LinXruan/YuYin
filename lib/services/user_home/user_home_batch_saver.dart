@@ -1,11 +1,11 @@
 import 'package:dio/dio.dart';
 
 import '../../models/media_item.dart';
-import '../../utils/author_folder_name.dart';
-import '../../utils/home_save_path.dart';
-import '../../utils/save_location_store.dart';
+import '../../utils/save/author_folder_name.dart';
+import '../../utils/save/home_save_path.dart';
+import '../../utils/savelocation/save_location_store.dart';
 import '../batch_work/i_work_batch_saver.dart';
-import '../video_downloader.dart';
+import '../media/video_downloader.dart';
 
 /// 顶层多作者批量保存：按作者写入分类目录
 class UserHomeBatchSaver {

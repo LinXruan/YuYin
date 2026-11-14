@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/history_item.dart';
-import 'package:yuyin/utils/history_store.dart';
+import 'package:yuyin/utils/history/history_store.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../models/media_item.dart';
-import '../../services/audio_preview_service.dart';
+import '../../services/media/audio_preview_service.dart';
 import '../../services/selection/debug/selection_snapshot.dart';
 import '../../services/selection/save_selection_session.dart';
-import '../../utils/save_page_debug_store.dart';
-import 'bottom_media_widgets.dart';
+import '../../utils/debug/save_page_debug_store.dart';
+import 'bottom/widget/media_audio_player_bar.dart';
+import 'bottom/widget/media_audio_tile.dart';
+import 'bottom/widget/media_live_video_tile.dart';
 import 'filter/filter_controls.dart';
 
 part 'bottom/flow/bottom_state_flow.dart';

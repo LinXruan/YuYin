@@ -1,4 +1,4 @@
-part of '../../app_shell.dart';
+part of '../page/app_shell.dart';
 
 // ignore_for_file: unnecessary_this
 

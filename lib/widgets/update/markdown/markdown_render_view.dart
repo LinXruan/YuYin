@@ -1,4 +1,4 @@
-part of '../../update_dialog.dart';
+part of '../dialog/update_dialog.dart';
 
 class _MarkdownRenderView extends StatelessWidget {
   const _MarkdownRenderView({required this.markdown});

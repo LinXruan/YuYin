@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/utils/app_update_store.dart';
-import 'package:yuyin/utils/download_settings_store.dart';
-import 'package:yuyin/utils/history_thumbnail_cache.dart';
+import 'package:yuyin/utils/update/app_update_store.dart';
+import 'package:yuyin/utils/settings/download_settings_store.dart';
+import 'package:yuyin/utils/thumbnail/history_thumbnail_cache.dart';
 
 void main() {
   group('PLAN_48 单元测试', () {

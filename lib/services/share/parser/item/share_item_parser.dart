@@ -1,6 +1,6 @@
 // 单作品条目与视频档位解析。
 import '../../../../models/media_item.dart';
-import '../../../../utils/parse_utils.dart';
+import '../../../../utils/url/parse_utils.dart';
 import '../../model/share_models.dart';
 import '../media/share_media_picker.dart';
 import '../share_json_utils.dart';

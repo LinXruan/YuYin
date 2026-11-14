@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/services/login_detector_script.dart';
+import 'package:yuyin/services/script/login/login_detector_script.dart';
 import 'package:yuyin/utils/login_state_store.dart';
 
 void main() {

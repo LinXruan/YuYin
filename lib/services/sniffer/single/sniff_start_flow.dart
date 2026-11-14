@@ -1,4 +1,4 @@
-part of '../../douyin_sniffer.dart';
+part of '../facade/douyin_sniffer.dart';
 
 /// sniff start flow
 extension SnifferSniffStartFlowFlow on DouyinSniffer {

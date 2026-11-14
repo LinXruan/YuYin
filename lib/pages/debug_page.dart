@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../services/douyin_sniffer.dart';
-import '../utils/log_controller.dart';
+import '../services/sniffer/facade/douyin_sniffer.dart';
+import '../utils/debug/log_controller.dart';
 import '../widgets/log_panel.dart';
 
 /// 调试页：运行日志、清空日志、复制日志

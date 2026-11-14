@@ -5,11 +5,11 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/history_item.dart';
-import 'package:yuyin/pages/history_page.dart';
-import 'package:yuyin/services/agent_automation_server.dart';
-import 'package:yuyin/utils/history_store.dart';
-import 'package:yuyin/utils/history_thumbnail_cache.dart';
-import 'package:yuyin/utils/log_controller.dart';
+import 'package:yuyin/pages/history/page/history_page.dart';
+import 'package:yuyin/services/bridge/server/agent_automation_server.dart';
+import 'package:yuyin/utils/history/history_store.dart';
+import 'package:yuyin/utils/thumbnail/history_thumbnail_cache.dart';
+import 'package:yuyin/utils/debug/log_controller.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

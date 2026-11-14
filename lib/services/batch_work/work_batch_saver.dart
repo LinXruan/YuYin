@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 
 import '../../models/media_item.dart';
-import '../../utils/file_name_formatter.dart';
-import '../video_downloader.dart';
+import '../../utils/save/file_name_formatter.dart';
+import '../media/video_downloader.dart';
 import 'i_work_batch_saver.dart';
 
 /// 批量作品保存：逐个作品落盘，选择内容由调用方决定

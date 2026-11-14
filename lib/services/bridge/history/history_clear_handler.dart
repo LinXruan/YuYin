@@ -1,4 +1,4 @@
-part of '../../agent_automation_server.dart';
+part of '../server/agent_automation_server.dart';
 
 /// history clear 端点处理。
 extension AgentHistoryClearHandlers on AgentAutomationServer {

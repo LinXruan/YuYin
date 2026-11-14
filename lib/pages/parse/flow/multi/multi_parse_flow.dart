@@ -1,4 +1,4 @@
-part of '../../../parse_page.dart';
+part of '../../page/parse_page.dart';
 
 /// 多作品解析：作品 -> 中层保存页
 extension _ParseMultiParseFlow on _ParsePageState {

@@ -21,8 +21,8 @@ import '../../models/save_page/work_video_quality_choice.dart';
 import '../../models/single_work/media_download_item.dart';
 import '../../models/single_work/single_work_result.dart';
 import '../../models/user_home/user_home_profile.dart';
-import '../../utils/terminal_memory_store.dart';
-import '../../utils/video_quality_utils.dart';
+import '../../utils/memory/terminal_memory_store.dart';
+import '../../utils/settings/video_quality_utils.dart';
 import 'selection_aggregator.dart';
 
 part 'internal/terminal_node.dart';
@@ -52,6 +52,8 @@ part 'flow/save_resolver_flow.dart';
 /// 保存页四层聚合会话：Terminal -> Author -> Work -> Resource
 ///
 /// 任意层命令只向下写自己的子树，随后自下而上重算聚合；UI 只读 view。
+part 'session/session_query.dart';
+
 class SaveSelectionSession extends ChangeNotifier {
   SaveSelectionSession._({
     required this.source,
@@ -165,42 +167,6 @@ class SaveSelectionSession extends ChangeNotifier {
   List<AuthorSelectionView> get authors => _terminal.authors;
 
   List<WorkSelectionView> get allWorks => _allWorkViews;
-
-  List<String> get allWorkUrls => [for (final work in _allWorks) work.url];
-
-  List<String> workUrlsOf(String secUid) {
-    final author = _authorBySecUid[secUid];
-    if (author == null) return const <String>[];
-    return [for (final work in author.nodes) work.url];
-  }
-
-  List<WorkSelectionView> rowsOf(String secUid) {
-    final author = _authorBySecUid[secUid];
-    return author == null ? const <WorkSelectionView>[] : author.works;
-  }
-
-  AuthorSelectionView? authorOf(String secUid) => _authorBySecUid[secUid];
-
-  WorkSelectionView? workOf(String workUrl) => _workByUrl[workUrl];
-
-  int get authorCount => _terminal.authorCount;
-
-  int get selectedAuthorCount => _terminal.selectedAuthorCount;
-
-  AggregateState authorState(String secUid) =>
-      _authorBySecUid[secUid]?.selection ?? AggregateState.empty;
-
-  SelectionState workState(String workUrl) =>
-      _workByUrl[workUrl]?.selection ?? SelectionState.none;
-
-  QualityIndicator authorQuality(String secUid) =>
-      _authorBySecUid[secUid]?.quality ?? QualityIndicator.none;
-
-  int selectedCountOf(Iterable<WorkSelectionView> rows) =>
-      rows.where((row) => row.selection.isSelected).length;
-
-  int selectedResourceCount(String workUrl) =>
-      _workByUrl[workUrl]?.selectedResourceCount ?? 0;
 
   // ---------- 生命周期 ----------
 

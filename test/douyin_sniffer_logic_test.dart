@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
-import 'package:yuyin/services/douyin_sniffer.dart';
+import 'package:yuyin/services/sniffer/facade/douyin_sniffer.dart';
 
 void main() {
   group('parseChannelItems', () {

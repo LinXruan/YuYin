@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/services/update_checker.dart';
+import 'package:yuyin/services/update/client/update_checker.dart';
 
 void main() {
   group('UpdateChecker 语义化版本比对测试', () {

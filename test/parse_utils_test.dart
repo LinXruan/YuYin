@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/utils/parse_utils.dart';
+import 'package:yuyin/utils/url/parse_utils.dart';
 
 void main() {
   group('positiveInt', () {

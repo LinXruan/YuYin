@@ -5,10 +5,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/app_info.dart';
 import 'package:yuyin/models/history_item.dart';
-import 'package:yuyin/services/agent_automation_server.dart';
-import 'package:yuyin/utils/download_settings_store.dart';
-import 'package:yuyin/utils/history_store.dart';
-import 'package:yuyin/utils/log_controller.dart';
+import 'package:yuyin/services/bridge/server/agent_automation_server.dart';
+import 'package:yuyin/utils/settings/download_settings_store.dart';
+import 'package:yuyin/utils/history/history_store.dart';
+import 'package:yuyin/utils/debug/log_controller.dart';
 
 void main() {
   group('AgentAutomationServer 接口测试', () {

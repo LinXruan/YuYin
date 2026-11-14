@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
-import 'package:yuyin/utils/save_location_store.dart';
+import 'package:yuyin/utils/savelocation/save_location_store.dart';
 
 void main() {
   group('SaveLocationConfig 实体与序列化测试', () {

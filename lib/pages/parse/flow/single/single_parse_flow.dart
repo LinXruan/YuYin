@@ -1,4 +1,4 @@
-part of '../../../parse_page.dart';
+part of '../../page/parse_page.dart';
 
 /// single parse flow
 extension _ParseSingleParseFlowFlow on _ParsePageState {
