@@ -41,6 +41,7 @@ final class EdgeQualityPreference extends QualityPreference {
     required bool selected,
   }) {
     if (!selected || sortedTiers.isEmpty) return QualityIndicator.none;
+    if (sortedTiers.length == 1) return QualityIndicator.highest;
     return edge == QualityEdge.highest
         ? QualityIndicator.highest
         : QualityIndicator.lowest;

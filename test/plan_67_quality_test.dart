@@ -119,6 +119,7 @@ void main() {
         defaultSelected: (_) => true,
       );
       session.ingest('w1', _video('w1', tiers: 1));
+      session.setQuality(session.allWorks, QualityEdge.lowest);
 
       expect(session.workOf('w1')!.tierCount, 1);
       expect(session.workOf('w1')!.quality, QualityIndicator.highest);

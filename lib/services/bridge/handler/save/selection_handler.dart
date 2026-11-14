@@ -32,6 +32,20 @@ extension AgentSelectionHandlers on AgentAutomationServer {
       return;
     }
 
+    if (path == '/api/selection/quality-options') {
+      if (request.method != 'GET') {
+        _sendJson(request, HttpStatus.methodNotAllowed, {'error': '仅支持 GET'});
+        return;
+      }
+      final workUrl = request.uri.queryParameters['workUrl'] ?? '';
+      _sendJson(
+        request,
+        HttpStatus.ok,
+        SelectionDebugBridge.qualityOptions(workUrl),
+      );
+      return;
+    }
+
     if (request.method != 'POST') {
       _sendJson(request, HttpStatus.methodNotAllowed, {'error': '仅支持 POST'});
       return;
@@ -123,16 +137,19 @@ extension AgentSelectionHandlers on AgentAutomationServer {
                         url: 'mock://a${i}_w${w}_high',
                         type: MediaType.video,
                         bitRate: 3000000,
+                        resolution: '1080x1920',
                       ),
                       MediaItem(
                         url: 'mock://a${i}_w${w}_mid',
                         type: MediaType.video,
                         bitRate: 1500000,
+                        resolution: '720x1280',
                       ),
                       MediaItem(
                         url: 'mock://a${i}_w${w}_low',
                         type: MediaType.video,
                         bitRate: 700000,
+                        resolution: '720x1280',
                       ),
                     ],
                     cookie: '',

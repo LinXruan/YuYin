@@ -8,6 +8,7 @@ import '../../../models/save_page/work_kind.dart';
 import '../../../models/single_work/single_work_result.dart';
 import '../save_selection_session.dart';
 import '../selection_invariants.dart';
+import 'quality_options_snapshot.dart';
 import 'selection_snapshot.dart';
 
 /// 保存页分层会话的调试桥：让 Agent 通过 HTTP 直接读写当前会话
@@ -36,6 +37,14 @@ class SelectionDebugBridge {
       return {'active': false, 'message': '当前没有活动的保存页会话'};
     }
     return SelectionSnapshot.state(session, withCells: withCells);
+  }
+
+  static Map<String, dynamic> qualityOptions(String workUrl) {
+    final session = _session;
+    if (session == null) {
+      return {'active': false, 'message': '当前没有活动的保存页会话'};
+    }
+    return QualityOptionsSnapshot.of(session, workUrl);
   }
 
   static Map<String, dynamic> verify() {

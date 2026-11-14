@@ -515,6 +515,16 @@ switch ($Action.ToLower()) {
 
     }
 
+    "quality-options" {
+
+        $encoded = [uri]::EscapeDataString($Arg1)
+
+        $resp = Invoke-RestMethod -Uri "$baseUrl/api/selection/quality-options?workUrl=$encoded" -Method Get
+
+        $resp | ConvertTo-Json -Depth 8
+
+    }
+
     "selection-verify" {
 
         $resp = Invoke-RestMethod -Uri "$baseUrl/api/selection/verify" -Method Get
@@ -603,7 +613,7 @@ switch ($Action.ToLower()) {
 
         Write-Host "未知指令: $Action"
 
-        Write-Host "支持的指令: setup, status, display, quality [on|off], mock-login [on|off], parse, parse-profile, download, logs, clear-logs, history [query], clear-history, thumbnails, clear-thumbnails, preload-thumbnails, verify-covers, verify-titles, verify-profile, selection-load, save-state, selection-verify, select-author, select-work, select-cell, select-bottom-category, select-middle-category, select-quality, select-tier, selection-ingest, cancel, eval"
+        Write-Host "支持的指令: setup, status, display, quality [on|off], mock-login [on|off], parse, parse-profile, download, logs, clear-logs, history [query], clear-history, thumbnails, clear-thumbnails, preload-thumbnails, verify-covers, verify-titles, verify-profile, selection-load, save-state, quality-options, selection-verify, select-author, select-work, select-cell, select-bottom-category, select-middle-category, select-quality, select-tier, selection-ingest, cancel, eval"
 
     }
 

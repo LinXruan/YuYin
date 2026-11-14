@@ -241,6 +241,12 @@ class DownloadSettingsStore {
       }
     }
 
+    // 额外保留全量规范排序的最后一档，保证「最低画质」始终可选且可回填
+    final lowest = sorted.last;
+    if (!result.any((item) => item.url == lowest.url)) {
+      result.add(lowest);
+    }
+
     return result;
   }
 

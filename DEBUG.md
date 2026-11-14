@@ -98,6 +98,7 @@
 | `.\tool\agent_cmd.bat save-state` | 无 | 读取当前活动会话的完整分层状态（作者、作品、资源、三态、档位） | 输出 JSON |
 | `.\tool\agent_cmd.bat selection-verify` | 无 | 全量重算并校验父层缓存与子层是否一致 (PLAN_67) | 输出 `consistent` 与 `violations` |
 | `.\tool\agent_cmd.bat select-tier "<workUrl>" "<tierKey>"` | 作品 URL + 档位 URL | 设置视频具体档位，不改变选中状态 | 返回 global/quality 摘要 |
+| `.\tool\agent_cmd.bat quality-options "<workUrl>"` | 作品 URL | 输出全量档位、过滤后可见档位与当前选中 (PLAN_68) | 输出 full/display/selectedTier |
 | `.\tool\agent_cmd.bat select-author "<secUid>" [all/none]` | secUid + 目标 | 设置该作者为全选/全不选，递归写入全部资源单元 | 返回 global/quality 摘要 |
 | `.\tool\agent_cmd.bat select-work "<workUrl>" [all/none]` | 作品 URL + 目标 | 设置该作品为全选/全不选 | 同上 |
 | `.\tool\agent_cmd.bat select-cell "<workUrl>" "<资源key>" [1/0]` | 作品 URL + 资源 URL + 选中值 | 精确设置单个资源单元 | 同上 |
@@ -135,6 +136,7 @@
 | `/api/save-debug` | `GET` | 无 | `{"snapshot":{"layer":"top|middle|bottom","source":"home","global":"all","authors":[...]}}` | 读取保存页分层调试快照 (PLAN_67) |
 | `/api/selection/state` | `GET` | 无（支持 `?cells=0`） | `{"active":true,"source":"home","global":"partial","quality":"mixed","authors":[...],"works":[...]}` | 当前活动会话的完整分层状态 |
 | `/api/selection/verify` | `GET` | 无 | `{"active":true,"consistent":true,"violations":[]}` | 全量重算校验父层缓存与子层一致 (PLAN_67) |
+| `/api/selection/quality-options` | `GET` | `?workUrl=<url>` | `{"success":true,"full":[...],"display":[...],"selectedTier":"...","quality":"lowest"}` | 检查画质过滤是否保留当前档位与全量最低档 (PLAN_68) |
 | `/api/selection/author` | `POST` | `{"secUid":"...","target":"all|none"}` | `{"success":true,"global":"...","quality":"..."}` | 设置作者选择 |
 | `/api/selection/work` | `POST` | `{"workUrl":"...","target":"all|none"}` | 同上 | 设置作品选择 |
 | `/api/selection/cell` | `POST` | `{"workUrl":"...","key":"<资源URL>","selected":true}` | 同上 | 设置单个资源单元 |
@@ -239,5 +241,6 @@ adb logcat -d | grep -E "flutter|JS-Sniffer|AgentBridge"
 - 画质只统计**已选中**的视频作品；未选视频不参与聚合，但作者/中层画质命令会写入其偏好。
 - `none` 时画质按钮灰色不可点，`/api/selection/quality` 返回 `success:false`。
 - 底层视频选档使用 `/api/selection/tier`，只改具体档位，**绝不改变 selected**。
+- 画质页开启「仅显示最高画质」时，每个分辨率保留最优档位，并额外保留全量规范排序最后一档；`/api/selection/quality-options` 可直接核对 `display` 是否包含 `full` 最后一项。
 - 任何画质操作都不会改变作者/作品/资源的选中数量。
 - `/api/selection/verify` 返回 `consistent:true` 表示父层缓存与全量重算一致；不一致时 `violations` 列出节点。
