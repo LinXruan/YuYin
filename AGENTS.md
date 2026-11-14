@@ -9,10 +9,10 @@
 ## 1. 项目概况
 
 - **应用**：余音（YuYin），Android 端抖音无水印视频 / 图集 / 实况图下载工具。
-- **包名 / 版本**：debug 版 `com.debug.yuyin`，release 版 `com.release.yuyin`；版本 `1.5.5+182`（以 `pubspec.yaml` 和 `lib/app_info.dart` 为准）。
+- **包名 / 版本**：debug 版 `com.debug.yuyin`，release 版 `com.release.yuyin`；版本 `1.5.5+183`（以 `pubspec.yaml` 和 `lib/app_info.dart` 为准）。
 - **技术栈**：Flutter 3.47.6 / Dart 3.13.5，Material 3，仅 Android（忽略 Web / Windows）。
 - **依赖**：`webview_flutter`、`dio`、`path_provider`、`gal`；不引入第三方状态管理。
-- **现状**：解析、登录、画质/图集选择、下载、调试日志、关于页、历史记录与全文模糊搜索均已完成；主页批量抓取、三层保存页（作者 / 作品 / 资源）与批量下载执行链路已完成；历史记录支持主页/多作品、复制链接与保存位置定位。PLAN_64（1.5.5+178）已完成全库文件级重构与深度分层。PLAN_65（1.5.5+179）完成三层选择联动。PLAN_66（1.5.5+180）新增「无视频」禁用态。PLAN_67（1.5.5+181）彻底删除四维矩阵，重建 Author → Work → Resource 分层约束传播：选择轴与画质轴分离、禁止回传、父层可写但只允许 `SaveSelectionSession` 写入；multi/single 使用隐藏虚拟作者；视频以 `selected + QualityPreference` 存储，底层选档绝不改变选中。PLAN_68（1.5.5+182）修复画质过滤丢失全量最低档：每个分辨率保留最优档位后额外保留规范最后一档，单档位显示 highest；新增 `quality-options` 调试端点。
+- **现状**：解析、登录、画质/图集选择、下载、调试日志、关于页、历史记录与全文模糊搜索均已完成；主页批量抓取、三层保存页（作者 / 作品 / 资源）与批量下载执行链路已完成；历史记录支持主页/多作品、复制链接与保存位置定位。PLAN_64（1.5.5+178）已完成全库文件级重构与深度分层。PLAN_65（1.5.5+179）完成三层选择联动。PLAN_66（1.5.5+180）新增「无视频」禁用态。PLAN_67（1.5.5+181）彻底删除四维矩阵，重建 Author → Work → Resource 分层约束传播：选择轴与画质轴分离、禁止回传、父层可写但只允许 `SaveSelectionSession` 写入；multi/single 使用隐藏虚拟作者；视频以 `selected + QualityPreference` 存储，底层选档绝不改变选中。PLAN_68（1.5.5+182）修复画质过滤丢失全量最低档：每个分辨率保留最优档位后额外保留规范最后一档，单档位显示 highest；新增 `quality-options` 调试端点。PLAN_69（1.5.5+183）修复套壳链路小 bug：预载解析结果在会话构造时立即物化（多作品进入底层不再二次嗅探）、work/顶层加载态在下一层压栈当帧清除、视频档位面板改为会话驱动点选即写，单作品视频底部按钮恢复为「保存选中项」。
 
 ## 2. 常用命令
 

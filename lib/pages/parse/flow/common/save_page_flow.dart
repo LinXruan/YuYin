@@ -2,6 +2,7 @@ part of '../../../parse_page.dart';
 
 /// 保存页共用流程：打开底层、补解析、按作者解算
 extension _ParseSavePageFlow on _ParsePageState {
+  /// 进入 resource 层：只等待解析准备，子页面压栈后立即返回
   Future<void> _openWorkDetail(
     SaveSelectionSession session,
     String workUrl,
@@ -35,25 +36,64 @@ extension _ParseSavePageFlow on _ParsePageState {
       return;
     }
     if (row.behavesAsVideo) {
-      await _pickWorkTier(session, workUrl);
+      _presentWorkTier(session, workUrl);
       return;
     }
-
-    await ImagePreviewSheet.show(
-      context,
-      session: session,
-      workUrl: workUrl,
-      items: parsed.items,
-      headers: _ParsePageState._mediaHeaders,
-      nested: true,
-      memoryScope: bottomScope,
-    );
-    if (!mounted) return;
-    final selected = session.selectedResourceCount(workUrl);
-    widget.logs.add('已选择 $selected/${parsed.items.length} 个资源');
+    _presentWorkMedia(session, workUrl, parsed.items, bottomScope);
   }
 
-  Future<bool> _pickWorkTier(
+  /// 主页/多作品：视频档位面板压栈后立即返回，work 层加载态当帧清除
+  void _presentWorkTier(SaveSelectionSession session, String workUrl) {
+    final row = session.workOf(workUrl);
+    if (row == null || !row.behavesAsVideo) return;
+    final tiers = VideoQualityUtils.displayTiers(row.tiers);
+    if (tiers.isEmpty) return;
+
+    unawaited(
+      VideoTierPickerSheet.show(
+        context,
+        session: session,
+        workUrl: workUrl,
+        tiers: tiers,
+        actionLabel: '返回',
+        actionIcon: Icons.arrow_back_rounded,
+      ).then((_) {
+        if (!mounted) return;
+        final tier = session.workOf(workUrl)?.selectedTier;
+        if (tier == null) return;
+        widget.logs.add(
+          '当前画质：${_tierLabel(tier)}（${tier.formattedSize}）',
+        );
+      }),
+    );
+  }
+
+  /// 图文作品：资源网格压栈后立即返回，work 层加载态当帧清除
+  void _presentWorkMedia(
+    SaveSelectionSession session,
+    String workUrl,
+    List<MediaItem> items,
+    SaveMemoryScope bottomScope,
+  ) {
+    unawaited(
+      ImagePreviewSheet.show(
+        context,
+        session: session,
+        workUrl: workUrl,
+        items: items,
+        headers: _ParsePageState._mediaHeaders,
+        nested: true,
+        memoryScope: bottomScope,
+      ).then((_) {
+        if (!mounted) return;
+        final selected = session.selectedResourceCount(workUrl);
+        widget.logs.add('已选择 $selected/${items.length} 个资源');
+      }),
+    );
+  }
+
+  /// 单作品视频：底部按钮即确认，返回 true 表示用户完成选择
+  Future<bool> _pickSingleTier(
     SaveSelectionSession session,
     String workUrl,
   ) async {
@@ -62,28 +102,28 @@ extension _ParseSavePageFlow on _ParsePageState {
     final tiers = VideoQualityUtils.displayTiers(row.tiers);
     if (tiers.isEmpty) return false;
 
-    final current = row.selectedTier;
-    var initialItem = tiers.first;
-    if (current != null) {
-      initialItem = tiers.firstWhere(
-        (tier) => tier.url == current.url,
-        orElse: () => tiers.first,
+    final confirmed = await VideoTierPickerSheet.show(
+      context,
+      session: session,
+      workUrl: workUrl,
+      tiers: tiers,
+      actionLabel: '保存选中项 (1)',
+      actionIcon: Icons.save_alt,
+    );
+    if (!mounted || confirmed != true) return false;
+
+    final tier = session.workOf(workUrl)?.selectedTier;
+    if (tier != null) {
+      widget.logs.add(
+        '已选择 ${_tierLabel(tier)}（${tier.formattedSize}）',
       );
     }
-
-    final picked = await VideoQualitySheet.showSelect(
-      context,
-      tiers,
-      initialItem: initialItem,
-    );
-    if (!mounted || picked == null) return false;
-
-    session.setTier(workUrl, picked.url);
-    final qualityText = picked.resolutionLabel.isNotEmpty
-        ? picked.resolutionLabel
-        : (picked.resolution ?? picked.gearName ?? '默认画质');
-    widget.logs.add('已选择 $qualityText（${picked.formattedSize}）');
     return true;
+  }
+
+  String _tierLabel(MediaItem tier) {
+    if (tier.resolutionLabel.isNotEmpty) return tier.resolutionLabel;
+    return tier.resolution ?? tier.gearName ?? '默认画质';
   }
 
   /// 按作者补解析并解算为可落盘对象

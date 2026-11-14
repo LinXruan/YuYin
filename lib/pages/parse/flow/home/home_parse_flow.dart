@@ -197,29 +197,29 @@ extension _ParseHomeParseFlow on _ParsePageState {
     }
   }
 
-  /// 打开某个作者的中层
-  Future<void> _openAuthorWorks(
-    SaveSelectionSession session,
-    String secUid,
-  ) async {
+  /// 打开某个作者的中层；面板压栈后立即返回，顶层加载态当帧清除
+  void _openAuthorWorks(SaveSelectionSession session, String secUid) {
     final rows = session.rowsOf(secUid);
     if (!mounted || rows.isEmpty) return;
-    final confirmed = await MiddleMultiWorkSheet.show(
-      context,
-      session: session,
-      workUrls: session.workUrlsOf(secUid),
-      headers: _ParsePageState._mediaHeaders,
-      nested: true,
-      memoryScope: SaveMemoryScope.homeMiddle,
-      onOpenWork: (workUrl, index) =>
-          _openWorkDetail(session, workUrl, SaveMemoryScope.homeBottom),
+    unawaited(
+      MiddleMultiWorkSheet.show(
+        context,
+        session: session,
+        workUrls: session.workUrlsOf(secUid),
+        headers: _ParsePageState._mediaHeaders,
+        nested: true,
+        memoryScope: SaveMemoryScope.homeMiddle,
+        onOpenWork: (workUrl, index) =>
+            _openWorkDetail(session, workUrl, SaveMemoryScope.homeBottom),
+      ).then((confirmed) {
+        if (!mounted) return;
+        if (confirmed == true) {
+          widget.logs.add(
+            '作者作品已更新：${session.selectedCountOf(rows)}/${rows.length}',
+          );
+        }
+      }),
     );
-    if (!mounted) return;
-    if (confirmed == true) {
-      widget.logs.add(
-        '作者作品已更新：${session.selectedCountOf(rows)}/${rows.length}',
-      );
-    }
   }
 
   /// 主页捕获结果 -> 作品条目

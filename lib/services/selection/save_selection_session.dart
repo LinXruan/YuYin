@@ -125,20 +125,22 @@ class SaveSelectionSession extends ChangeNotifier {
     bool selected = true,
     BatchVideoQualityMode quality = BatchVideoQualityMode.highest,
   }) {
-    final session = SaveSelectionSession._(
+    return SaveSelectionSession._(
       source: SelectionSource.singleWork,
       authors: [
         _authorNode(
           _syntheticProfile,
           [
-            _createWork(work, defaultSelected: selected, edge: _edgeOf(quality)),
+            _createWork(
+              work.copyWith(parsedResult: parsed),
+              defaultSelected: selected,
+              edge: _edgeOf(quality),
+            ),
           ],
           synthetic: true,
         ),
       ],
     );
-    session.ingest(work.url, parsed);
-    return session;
   }
 
   static const String syntheticSecUid = '__synthetic__';
@@ -260,20 +262,35 @@ class SaveSelectionSession extends ChangeNotifier {
     required bool defaultSelected,
     required QualityEdge edge,
   }) {
+    final _WorkNode node;
     if (work.isVideo) {
-      return _VideoWorkNode(
+      node = _VideoWorkNode(
         work: work,
         defaultSelected: defaultSelected,
         selected: defaultSelected,
         qualityPreference: EdgeQualityPreference(edge),
       );
+    } else {
+      node = _MediaWorkNode(
+        work: work,
+        defaultSelected: defaultSelected,
+        selectionState:
+            defaultSelected ? SelectionState.all : SelectionState.none,
+      );
     }
-    return _MediaWorkNode(
-      work: work,
-      defaultSelected: defaultSelected,
-      selectionState:
-          defaultSelected ? SelectionState.all : SelectionState.none,
+    _materializePreloaded(node);
+    return node;
+  }
+
+  /// 多作品/单作品来源的预载解析结果在构造时立即物化，避免二次嗅探
+  static void _materializePreloaded(_WorkNode node) {
+    final parsed = node.work.parsedResult;
+    if (parsed == null) return;
+    final cover = node.work.coverUrl.trim();
+    node.work = node.work.copyWith(
+      coverUrl: cover.isEmpty ? (parsed.coverUrl ?? '') : cover,
     );
+    node.ingest(parsed);
   }
 
   static _AuthorNode _authorNode(

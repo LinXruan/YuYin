@@ -227,7 +227,7 @@ extension _ParseSingleParseFlowFlow on _ParsePageState {
         );
         if (!mounted || confirmed != true) return null;
       } else {
-        final picked = await _pickWorkTier(session, url);
+        final picked = await _pickSingleTier(session, url);
         if (!mounted || !picked) return null;
       }
       return session.buildSelectedWork(url);
