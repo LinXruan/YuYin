@@ -38,7 +38,8 @@ class SelectionDebugBridge {
       'active': true,
       'source': matrix.source.name,
       'global': session.globalState.name,
-      'quality': session.globalQuality?.name ?? 'none',
+      'quality': session.globalQuality.name,
+      'qualityIndicator': session.globalQuality.name,
       'authorCount': session.authorCount,
       'selectedAuthorCount': session.selectedAuthorCount,
       'authors': [
@@ -48,7 +49,7 @@ class SelectionDebugBridge {
             'nickname': author.profile.nickname,
             'state': session.authorState(author.secUid).name,
             'quality':
-                session.qualityOfRows(session.rowsOf(author.secUid))?.name,
+                session.qualityOfRows(session.rowsOf(author.secUid)).name,
             'totalWorks': author.workUrls.length,
             'selectedWorks':
                 session.selectedCountOf(session.rowsOf(author.secUid)),
@@ -92,7 +93,14 @@ class SelectionDebugBridge {
         _middleCategory(session, body);
         break;
       case 'quality':
-        _quality(session, body);
+        final applied = _quality(session, body);
+        if (!applied) {
+          return {
+            'success': false,
+            'error': '当前没有已选视频，画质按钮不可用',
+            'quality': session.globalQuality.name,
+          };
+        }
         break;
       default:
         return {'success': false, 'error': '未知操作: $action'};
@@ -101,7 +109,7 @@ class SelectionDebugBridge {
     return {
       'success': true,
       'global': session.globalState.name,
-      'quality': session.globalQuality?.name ?? 'none',
+      'quality': session.globalQuality.name,
       'selectedAuthorCount': session.selectedAuthorCount,
     };
   }
@@ -128,18 +136,17 @@ class SelectionDebugBridge {
       'state': session.workState(row.url).name,
       'tier': row.isVideo ? _tierOf(row) : null,
       'tierCount': row.tierCount,
-      'totalCells': row.cells.length,
-      'selectedCells': row.cells.where((cell) => cell.isSelected).length,
+      'totalCells': row.allCells.length,
+      'selectedCells': row.allCells.where((cell) => cell.isSelected).length,
       if (withCells)
         'cells': [
-          for (final cell in row.cells)
+          for (final cell in row.allCells)
             {'key': cell.key, 'type': cell.type.name, 'value': cell.value},
         ],
     };
   }
 
-  static int _tierOf(WorkSelectionRow row) =>
-      row.cells.isEmpty ? 0 : row.cells.first.value;
+  static int _tierOf(WorkSelectionRow row) => row.videoValue;
 
   static SelectionState _targetOf(Object? raw) {
     return raw?.toString() == 'none'
@@ -182,7 +189,7 @@ class SelectionDebugBridge {
     );
   }
 
-  static void _quality(SelectionSession session, Map<String, dynamic> body) {
+  static bool _quality(SelectionSession session, Map<String, dynamic> body) {
     final mode = body['mode']?.toString() == 'lowest'
         ? BatchVideoQualityMode.lowest
         : BatchVideoQualityMode.highest;
@@ -190,14 +197,12 @@ class SelectionDebugBridge {
     final key = body['key']?.toString() ?? '';
     switch (scope) {
       case 'author':
-        session.setRowsQuality(session.rowsOf(key), mode);
-        break;
+        return session.setRowsQuality(session.rowsOf(key), mode);
       case 'work':
         final row = session.rowOf(key);
-        if (row != null) session.setRowsQuality([row], mode);
-        break;
+        return row != null && session.setRowsQuality([row], mode);
       default:
-        session.setRowsQuality(session.allRows, mode);
+        return session.setRowsQuality(session.allRows, mode);
     }
   }
 

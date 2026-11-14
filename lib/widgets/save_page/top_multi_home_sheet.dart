@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/common/batch_video_quality.dart';
 import '../../models/common/save_memory_scope.dart';
+import '../../models/save_page/selection/quality_indicator.dart';
 import '../../models/save_page/selection/selection_state.dart';
 import '../../models/save_page/selection/selection_matrix.dart';
 import '../../services/selection/selection_session.dart';
@@ -95,7 +96,7 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
       builder: (context, _) {
         final session = widget.session;
         final authors = _matrix.authors.values.toList();
-        final quality = session.globalQuality ?? BatchVideoQualityMode.highest;
+        final quality = session.globalQuality;
         return SafeArea(
           child: SizedBox(
             height: MediaQuery.of(context).size.height * 0.82,
@@ -116,8 +117,8 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
                       const SizedBox(width: 8),
                       SaveQualityToggleChip(
                         key: const ValueKey('quality_toggle_btn'),
-                        mode: quality,
-                        onTap: _toggleQuality,
+                        indicator: quality,
+                        onTap: quality.isEnabled ? _toggleQuality : null,
                       ),
                       const SizedBox(width: 6),
                       SaveCategoryFilterButton(

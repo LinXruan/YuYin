@@ -11,6 +11,8 @@ export 'save_page/work_kind.dart';
 export 'save_page/selection/selection_state.dart';
 export 'save_page/selection/selection_source.dart';
 export 'save_page/selection/selection_cell.dart';
+export 'save_page/selection/selection_group.dart';
+export 'save_page/selection/quality_indicator.dart';
 export 'save_page/selection/work_selection_row.dart';
 export 'save_page/selection/author_selection_row.dart';
 export 'save_page/selection/selection_matrix.dart';

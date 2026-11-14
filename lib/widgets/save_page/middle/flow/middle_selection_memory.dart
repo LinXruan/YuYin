@@ -22,8 +22,8 @@ extension _MiddleSelectionMemoryFlow on _MiddleMultiWorkSheetState {
       );
     }
 
-    final quality =
-        widget.session.qualityOfRows(_rows) ?? BatchVideoQualityMode.highest;
+    final quality = widget.session.qualityModeForRows(_rows);
+    if (quality == null) return;
     unawaited(
       DownloadSettingsStore.recordBatchQualitySelection(
         widget.memoryScope,

@@ -117,7 +117,7 @@ extension _ParseMultiParseFlow on _ParsePageState {
       }
 
       final qualityMode =
-          session.globalQuality ?? BatchVideoQualityMode.highest;
+          session.globalQualityMode ?? BatchVideoQualityMode.highest;
       widget.busy.value = true;
       _downloadCancelToken = CancelToken();
       widget.logs.add(

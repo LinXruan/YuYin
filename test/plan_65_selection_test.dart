@@ -85,7 +85,7 @@ void main() {
       session.toggleAuthor('a1');
       expect(session.authorState('a1'), SelectionState.none);
       expect(session.workState('w1_2'), SelectionState.none);
-      expect(session.rowOf('w1_2')!.cells.every((c) => c.value == 0), isTrue);
+      expect(session.rowOf('w1_2')!.allCells.every((c) => c.value == 0), isTrue);
     });
 
     test('顶层重新全选 -> 资源恢复全选', () {
@@ -125,15 +125,15 @@ void main() {
     test('默认最高 -> 实线；切最低 -> 无框；再切回最高', () {
       final session = _homeSession();
       session.ingest('w1_1', _videoPost());
-      expect(session.qualityOfRows(session.allRows), BatchVideoQualityMode.highest);
+      expect(session.qualityOfRows(session.allRows), QualityIndicator.highest);
 
       session.toggleQuality(session.allRows);
-      expect(session.qualityOfRows(session.allRows), BatchVideoQualityMode.lowest);
-      expect(session.rowOf('w1_1')!.cells.first.value, 3);
+      expect(session.qualityOfRows(session.allRows), QualityIndicator.lowest);
+      expect(session.rowOf('w1_1')!.allCells.first.value, 3);
 
       session.toggleQuality(session.allRows);
-      expect(session.qualityOfRows(session.allRows), BatchVideoQualityMode.highest);
-      expect(session.rowOf('w1_1')!.cells.first.value, 1);
+      expect(session.qualityOfRows(session.allRows), QualityIndicator.highest);
+      expect(session.rowOf('w1_1')!.allCells.first.value, 1);
     });
 
     test('一个最高一个最低 -> 混合；混合点击 -> 最高', () {
@@ -141,17 +141,18 @@ void main() {
       session.ingest('w1_1', _videoPost());
       session.ingest('w1_3', _videoPost());
       session.setTier('w1_3', 3);
-      expect(session.qualityOfRows(session.allRows), BatchVideoQualityMode.mixed);
+      expect(session.qualityOfRows(session.allRows), QualityIndicator.mixed);
 
       session.toggleQuality(session.allRows);
-      expect(session.qualityOfRows(session.allRows), BatchVideoQualityMode.highest);
+      expect(session.qualityOfRows(session.allRows), QualityIndicator.highest);
     });
 
-    test('视频取消勾选后画质变为混合', () {
+    test('视频取消勾选后不参与画质，变为无视频', () {
       final session = _homeSession();
       session.ingest('w1_1', _videoPost());
       session.toggleWork('w1_1');
-      expect(session.qualityOfRows(session.allRows), BatchVideoQualityMode.mixed);
+      session.toggleWork('w1_3');
+      expect(session.qualityOfRows(session.allRows), QualityIndicator.none);
     });
   });
 
@@ -185,7 +186,7 @@ void main() {
       session.toggleCell('w1_2', 'audio1');
       session.ingest('w1_2', _imagePost());
       expect(
-        session.rowOf('w1_2')!.cells.firstWhere((c) => c.key == 'audio1').value,
+        session.rowOf('w1_2')!.allCells.firstWhere((c) => c.key == 'audio1').value,
         0,
       );
     });

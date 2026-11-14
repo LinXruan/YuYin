@@ -2,7 +2,7 @@ import 'dart:ui' show PathMetric;
 
 import 'package:flutter/material.dart';
 
-import '../../models/media_item.dart';
+import '../../models/save_page/selection/quality_indicator.dart';
 
 /// 保存页分类筛选胶囊按钮（图片/实况/音频、视频/图文、全选）
 ///
@@ -82,24 +82,25 @@ class SaveCategoryFilterButton extends StatelessWidget {
   }
 }
 
-/// 保存页画质切换按钮（最高/最低/混合画质）
+/// 保存页画质切换按钮：最高 / 混合 / 最低 / 无视频
 ///
-/// 采用圆角矩形 + 图标样式，与右侧“全选”胶囊按钮明确区分。
+/// 「无视频」为独立灰态：不可点击，也不参与任何画质判断。
 class SaveQualityToggleChip extends StatelessWidget {
   const SaveQualityToggleChip({
     super.key,
-    required this.mode,
-    required this.onTap,
+    required this.indicator,
+    this.onTap,
   });
 
-  final BatchVideoQualityMode mode;
-  final VoidCallback onTap;
+  final QualityIndicator indicator;
+
+  /// 为 null 时按钮禁用（无已选视频）
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isHighest = mode == BatchVideoQualityMode.highest;
-    final isLowest = mode == BatchVideoQualityMode.lowest;
+    final enabled = onTap != null;
 
     final Color backgroundColor;
     final Color foregroundColor;
@@ -107,50 +108,64 @@ class SaveQualityToggleChip extends StatelessWidget {
     final IconData iconData;
     final String label;
 
-    if (isHighest) {
+    if (indicator == QualityIndicator.highest) {
       backgroundColor = theme.colorScheme.secondaryContainer;
       foregroundColor = theme.colorScheme.onSecondaryContainer;
       borderColor = theme.colorScheme.secondary.withValues(alpha: 0.5);
       iconData = Icons.hd_outlined;
       label = '最高画质';
-    } else if (isLowest) {
+    } else if (indicator == QualityIndicator.lowest) {
       backgroundColor = theme.colorScheme.tertiaryContainer;
       foregroundColor = theme.colorScheme.onTertiaryContainer;
       borderColor = theme.colorScheme.tertiary.withValues(alpha: 0.5);
       iconData = Icons.sd_outlined;
       label = '最低画质';
-    } else {
+    } else if (indicator == QualityIndicator.mixed) {
       backgroundColor = theme.colorScheme.primaryContainer;
       foregroundColor = theme.colorScheme.onPrimaryContainer;
       borderColor = theme.colorScheme.primary.withValues(alpha: 0.5);
       iconData = Icons.tune_rounded;
       label = '混合画质';
+    } else {
+      backgroundColor = theme.colorScheme.surfaceContainerHighest;
+      foregroundColor = theme.colorScheme.onSurfaceVariant.withValues(
+        alpha: 0.6,
+      );
+      borderColor = theme.colorScheme.outlineVariant;
+      iconData = Icons.videocam_off_outlined;
+      label = '无视频';
     }
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: borderColor, width: 1.0),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(iconData, size: 15, color: foregroundColor),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: theme.textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: foregroundColor,
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: '画质状态',
+      value: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: borderColor, width: 1.0),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(iconData, size: 15, color: foregroundColor),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: foregroundColor,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -1,10 +1,10 @@
-import '../../models/common/batch_video_quality.dart';
+import '../../models/save_page/selection/quality_indicator.dart';
 import '../../models/save_page/selection/selection_matrix.dart';
 import '../../models/save_page/selection/selection_source.dart';
 import '../../models/save_page/selection/selection_state.dart';
 import '../../models/save_page/selection/work_selection_row.dart';
 
-/// 选择状态派生：只读，永远现算，不缓存
+/// 选择状态与画质派生：只读，永远现算
 class SelectionDeriver {
   SelectionDeriver._();
 
@@ -12,9 +12,10 @@ class SelectionDeriver {
     if (!row.parsed) {
       return row.defaultSelected ? SelectionState.all : SelectionState.none;
     }
-    if (row.cells.isEmpty) return SelectionState.none;
-    if (row.cells.every((cell) => cell.value > 0)) return SelectionState.all;
-    if (row.cells.every((cell) => cell.value <= 0)) return SelectionState.none;
+    final cells = row.allCells.toList();
+    if (cells.isEmpty) return SelectionState.none;
+    if (cells.every((cell) => cell.value > 0)) return SelectionState.all;
+    if (cells.every((cell) => cell.value <= 0)) return SelectionState.none;
     return SelectionState.partial;
   }
 
@@ -41,22 +42,22 @@ class SelectionDeriver {
     return rowsState(matrix.allRows);
   }
 
-  /// 画质聚合：全最高 -> highest；全最低 -> lowest；其余（含未选）-> mixed
-  static BatchVideoQualityMode? qualityOf(Iterable<WorkSelectionRow> rows) {
-    final videos = rows.where((row) => row.isVideo).toList();
-    if (videos.isEmpty) return null;
-    final allHighest = videos.every((row) {
-      if (!row.parsed) return row.defaultSelected && !row.preferLowest;
-      return row.cells.isNotEmpty && row.cells.first.value == 1;
-    });
-    if (allHighest) return BatchVideoQualityMode.highest;
-    final allLowest = videos.every((row) {
-      if (!row.parsed) return row.defaultSelected && row.preferLowest;
-      if (row.cells.isEmpty) return false;
-      final value = row.cells.first.value;
-      return value > 0 && row.tierCount > 0 && value >= row.tierCount;
-    });
-    if (allLowest) return BatchVideoQualityMode.lowest;
-    return BatchVideoQualityMode.mixed;
+  /// 画质只看已选中的视频作品：
+  /// - 未选中的视频不参与聚合；
+  /// - 一个已选视频都没有 -> none（无视频）。
+  static QualityIndicator qualityOf(Iterable<WorkSelectionRow> rows) {
+    final levels = rows
+        .where((row) => row.isVideo)
+        .map((row) => row.qualityLevel)
+        .where((level) => level != QualityIndicator.none)
+        .toList();
+    if (levels.isEmpty) return QualityIndicator.none;
+    if (levels.every((level) => level == QualityIndicator.highest)) {
+      return QualityIndicator.highest;
+    }
+    if (levels.every((level) => level == QualityIndicator.lowest)) {
+      return QualityIndicator.lowest;
+    }
+    return QualityIndicator.mixed;
   }
 }

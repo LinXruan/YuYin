@@ -77,6 +77,7 @@ extension AgentSelectionHandlers on AgentAutomationServer {
       final authors = (body['authors'] as num?)?.toInt() ?? 2;
       final worksPerAuthor = (body['works'] as num?)?.toInt() ?? 3;
       final resources = (body['resources'] as num?)?.toInt() ?? 4;
+      final videoWorks = body['video'] == true;
       final profiles = [
         for (var i = 1; i <= authors; i++)
           UserHomeProfile(secUid: 'mock_a$i', nickname: '模拟作者$i'),
@@ -87,7 +88,7 @@ extension AgentSelectionHandlers on AgentAutomationServer {
             for (var w = 1; w <= worksPerAuthor; w++)
               SaveWorkItem(
                 url: 'mock://a${i}_w$w',
-                kind: WorkMediaKind.image,
+                kind: videoWorks ? WorkMediaKind.video : WorkMediaKind.image,
                 title: '作品$i-$w',
               ),
           ],
@@ -102,17 +103,39 @@ extension AgentSelectionHandlers on AgentAutomationServer {
         for (var w = 1; w <= worksPerAuthor; w++) {
           session.ingest(
             'mock://a${i}_w$w',
-            SingleWorkResult(
-              items: [
-                for (var r = 1; r <= resources; r++)
-                  MediaItem(
-                    url: 'mock://a${i}_w${w}_r$r',
-                    type: MediaType.image,
+            videoWorks
+                ? SingleWorkResult(
+                    items: [
+                      MediaItem(
+                        url: 'mock://a${i}_w${w}_high',
+                        type: MediaType.video,
+                        bitRate: 3000000,
+                      ),
+                      MediaItem(
+                        url: 'mock://a${i}_w${w}_mid',
+                        type: MediaType.video,
+                        bitRate: 1500000,
+                      ),
+                      MediaItem(
+                        url: 'mock://a${i}_w${w}_low',
+                        type: MediaType.video,
+                        bitRate: 700000,
+                      ),
+                    ],
+                    cookie: '',
+                    isImagePost: false,
+                  )
+                : SingleWorkResult(
+                    items: [
+                      for (var r = 1; r <= resources; r++)
+                        MediaItem(
+                          url: 'mock://a${i}_w${w}_r$r',
+                          type: MediaType.image,
+                        ),
+                    ],
+                    cookie: '',
+                    isImagePost: true,
                   ),
-              ],
-              cookie: '',
-              isImagePost: true,
-            ),
           );
         }
       }

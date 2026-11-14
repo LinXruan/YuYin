@@ -138,7 +138,7 @@
 | `/api/selection/bottom-category` | `POST` | `{"workUrl":"...","type":"image|video|audio","selected":false}` | 同上 | 底层分类切换 |
 | `/api/selection/middle-category` | `POST` | `{"secUid":"...","kind":"video|image","target":"all|none"}` | 同上 | 中层分类切换 |
 | `/api/selection/quality` | `POST` | `{"scope":"global|author|work","key":"...","mode":"highest|lowest"}` | 同上 | 设置画质 |
-| `/api/selection/load` | `POST` | `{"source":"mock|home|multi|single","text":"<链接>","quality":"highest|lowest"}` | `{"success":true,"source":"home","authors":2}` | 无界面加载矩阵会话 |
+| `/api/selection/load` | `POST` | `{"source":"mock|home|multi|single","text":"<链接>","quality":"highest|lowest","video":true}` | `{"success":true,"source":"home","authors":2}` | 无界面加载矩阵会话；mock 加 `video:true` 生成 3 档视频作品 |
 | `/api/selection/ingest` | `POST` | `{"workUrl":"..."}` | `{"success":true}` | 解析作品并写入矩阵 |
 | `/api/settings/quality` | `POST` | `{"onlyHighest":true}` | `{"success":true,...}` | 设置仅显示最高画质 |
 | `/api/display` | `GET` | 无 | `{"status":"ok",...}` | 显示模式状态 |
@@ -227,3 +227,9 @@ adb logcat -d | grep -E "flutter|JS-Sniffer|AgentBridge"
   adb pull /sdcard/window.xml
   ```
 - *注：调试页中的 `SelectableText` 不会暴露在 uiautomator dump 中，读取日志统一使用 `agent_cmd.bat logs` 或共享剪贴板。*
+### 2.3 保存页画质四态（PLAN_65/66）
+
+- `/api/selection/state` 的 `quality` / `qualityIndicator` 取值：`none`（无视频）、`highest`、`mixed`、`lowest`。
+- 画质只统计**已选中**的视频作品；未选视频不参与聚合。
+- `none` 时画质按钮灰色不可点，`/api/selection/quality` 返回 `success:false`。
+- 任何画质操作都不会改变作者/作品/资源的选中数量。

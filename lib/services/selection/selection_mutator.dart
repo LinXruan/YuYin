@@ -6,7 +6,7 @@ import '../../models/save_page/selection/work_selection_row.dart';
 import '../../models/save_page/work_kind.dart';
 import 'selection_deriver.dart';
 
-/// 矩阵写入：所有操作只改 cell，不写任何派生标志
+/// 矩阵写入：勾选与画质严格分离
 class SelectionMutator {
   SelectionMutator._();
 
@@ -14,12 +14,12 @@ class SelectionMutator {
     if (target == SelectionState.partial) return;
     for (final row in rows) {
       if (!row.parsed) {
-        // 未解析作品没有 cell，选择意图记在默认值上，解析时物化
         row.defaultSelected = target.isAll;
+        row.videoCell?.write(target.isAll ? 1 : 0);
         continue;
       }
       final value = target.isAll ? 1 : 0;
-      for (final cell in row.cells) {
+      for (final cell in row.allCells) {
         cell.write(value);
       }
     }
@@ -50,7 +50,7 @@ class SelectionMutator {
   }
 
   static void toggleCell(WorkSelectionRow row, String key) {
-    for (final cell in row.cells) {
+    for (final cell in row.allCells) {
       if (cell.key != key) continue;
       cell.write(cell.value > 0 ? 0 : 1);
       return;
@@ -62,13 +62,12 @@ class SelectionMutator {
     MediaType type,
     bool selected,
   ) {
-    for (final cell in row.cells) {
-      if (cell.type != type) continue;
+    for (final cell in row.cellsOf(type)) {
       cell.write(selected ? 1 : 0);
     }
   }
 
-  /// 画质只作用于视频单元；mixed 视为 highest（已确认产品语义）
+  /// 画质只改已选视频的档位，绝不改变是否选中
   static void setQuality(
     Iterable<WorkSelectionRow> rows,
     BatchVideoQualityMode mode,
@@ -78,20 +77,21 @@ class SelectionMutator {
         : BatchVideoQualityMode.highest;
     for (final row in rows) {
       if (!row.isVideo) continue;
+      if (row.videoValue <= 0) continue; // 未选：直接跳过
       if (!row.parsed) {
         row.preferLowest = target == BatchVideoQualityMode.lowest;
         continue;
       }
-      if (row.cells.isEmpty) continue;
+      final cell = row.videoCell;
+      if (cell == null) continue;
       final value = target == BatchVideoQualityMode.lowest
           ? (row.tierCount > 0 ? row.tierCount : 1)
           : 1;
-      row.cells.first.write(value);
+      cell.write(value);
     }
   }
 
   static void setTier(WorkSelectionRow row, int tier) {
-    if (row.cells.isEmpty) return;
-    row.cells.first.write(tier);
+    row.videoCell?.write(tier);
   }
 }

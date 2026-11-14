@@ -14,13 +14,15 @@ extension _TopAuthorSelectionFlow on _MultiHomePreviewSheetState {
   }
 
   void _toggleQuality() {
+    final before = widget.session.globalQuality;
+    if (!before.isEnabled) return;
     widget.session.toggleQuality(_matrix.allRows);
-    final quality =
-        widget.session.globalQuality ?? BatchVideoQualityMode.highest;
+    final mode = widget.session.globalQualityMode;
+    if (mode == null) return;
     unawaited(
-      DownloadSettingsStore.setBatchQuality(SaveMemoryScope.homeTop, quality),
+      DownloadSettingsStore.setBatchQuality(SaveMemoryScope.homeTop, mode),
     );
-    widget.onQualityChanged?.call(quality);
+    widget.onQualityChanged?.call(mode);
     _publishDebugState();
   }
 }

@@ -22,7 +22,7 @@ class SelectionSnapshot {
                 .rowsOf(author.secUid)
                 .where((row) => SelectionDeriver.workState(row).isSelected)
                 .length,
-            'quality': SelectionDeriver.qualityOf(matrix.rowsOf(author.secUid))?.name,
+            'quality': SelectionDeriver.qualityOf(matrix.rowsOf(author.secUid)).name,
           },
       ],
     };
@@ -39,7 +39,7 @@ class SelectionSnapshot {
       'selected': list
           .where((row) => SelectionDeriver.workState(row).isSelected)
           .length,
-      'quality': SelectionDeriver.qualityOf(list)?.name,
+      'quality': SelectionDeriver.qualityOf(list).name,
       'works': [
         for (final row in list)
           {
@@ -47,8 +47,8 @@ class SelectionSnapshot {
             'kind': row.work.kind.name,
             'state': SelectionDeriver.workState(row).name,
             'tier': row.isVideo ? _tierOf(row) : null,
-            'selectedCells': row.cells.where((cell) => cell.isSelected).length,
-            'totalCells': row.cells.length,
+            'selectedCells': row.allCells.where((cell) => cell.isSelected).length,
+            'totalCells': row.allCells.length,
           },
       ],
     };
@@ -62,12 +62,12 @@ class SelectionSnapshot {
       'state': SelectionDeriver.workState(row).name,
       'tier': row.isVideo ? _tierOf(row) : null,
       'cells': [
-        for (final cell in row.cells)
+        for (final cell in row.allCells)
           {'key': cell.key, 'type': cell.type.name, 'value': cell.value},
       ],
       'summary': {
-        'selected': row.cells.where((cell) => cell.isSelected).length,
-        'total': row.cells.length,
+        'selected': row.allCells.where((cell) => cell.isSelected).length,
+        'total': row.allCells.length,
       },
     };
   }
@@ -75,7 +75,7 @@ class SelectionSnapshot {
   static String _tierLabel(WorkSelectionRow row) {
     final state = SelectionDeriver.workState(row);
     if (state == SelectionState.none) return 'none';
-    final value = row.cells.isEmpty ? 0 : row.cells.first.value;
+    final value = row.allCells.isEmpty ? 0 : row.allCells.first.value;
     if (value <= 1) return 'highest';
     if (row.tierCount > 0 && value >= row.tierCount) return 'lowest';
     return 'specific:$value';

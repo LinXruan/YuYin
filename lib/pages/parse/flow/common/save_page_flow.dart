@@ -63,7 +63,7 @@ extension _ParseSavePageFlow on _ParsePageState {
     final row = session.rowOf(workUrl);
     if (row == null) return false;
 
-    final value = row.cells.isEmpty ? 0 : row.cells.first.value;
+    final value = row.videoValue;
     var initialItem = tiers.first;
     if (value > 0 && value <= parsed.videoItems.length) {
       final current = parsed.videoItems[value - 1];

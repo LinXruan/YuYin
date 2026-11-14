@@ -153,7 +153,7 @@ extension _ParseHomeParseFlow on _ParsePageState {
       }
 
       final qualityMode =
-          session.globalQuality ?? BatchVideoQualityMode.highest;
+          session.globalQualityMode ?? BatchVideoQualityMode.highest;
       final homeSaver = UserHomeBatchSaver(workSaver: _workBatchSaver);
       widget.busy.value = true;
       _downloadCancelToken = CancelToken();

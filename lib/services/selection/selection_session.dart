@@ -87,11 +87,19 @@ class SelectionSession extends ChangeNotifier {
     return row == null ? SelectionState.none : SelectionDeriver.workState(row);
   }
 
-  BatchVideoQualityMode? qualityOfRows(Iterable<WorkSelectionRow> rows) =>
+  QualityIndicator qualityOfRows(Iterable<WorkSelectionRow> rows) =>
       SelectionDeriver.qualityOf(rows);
 
-  BatchVideoQualityMode? get globalQuality =>
+  QualityIndicator get globalQuality =>
       SelectionDeriver.qualityOf(matrix.allRows);
+
+  /// 落盘/日志使用的批量模式；无视频时为 null
+  BatchVideoQualityMode? qualityModeForRows(
+    Iterable<WorkSelectionRow> rows,
+  ) =>
+      qualityOfRows(rows).mode;
+
+  BatchVideoQualityMode? get globalQualityMode => globalQuality.mode;
 
   int get authorCount => matrix.authors.length;
 
@@ -135,7 +143,7 @@ class SelectionSession extends ChangeNotifier {
   void setCell(String workUrl, String key, bool selected) {
     final row = matrix.rowOf(workUrl);
     if (row == null) return;
-    for (final cell in row.cells) {
+    for (final cell in row.allCells) {
       if (cell.key != key) continue;
       cell.write(selected ? 1 : 0);
       notifyListeners();
@@ -161,13 +169,16 @@ class SelectionSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setRowsQuality(
+  /// 设置画质；无已选视频时拒绝，返回 false
+  bool setRowsQuality(
     Iterable<WorkSelectionRow> rows,
     BatchVideoQualityMode mode,
   ) {
+    if (!qualityOfRows(rows).isEnabled) return false;
     SelectionMutator.setQuality(rows, mode);
     defaultQuality = mode;
     notifyListeners();
+    return true;
   }
 
   void toggleWork(String workUrl) {
@@ -197,17 +208,18 @@ class SelectionSession extends ChangeNotifier {
   void toggleCellCategory(String workUrl, MediaType type) {
     final row = matrix.rowOf(workUrl);
     if (row == null) return;
-    final cells = row.cells.where((cell) => cell.type == type).toList();
+    final cells = row.allCells.where((cell) => cell.type == type).toList();
     if (cells.isEmpty) return;
     final selected = cells.every((cell) => cell.isSelected);
     SelectionMutator.setCellCategory(row, type, !selected);
     notifyListeners();
   }
 
+  /// 切换画质；无已选视频时不可点击，直接返回
   void toggleQuality(Iterable<WorkSelectionRow> rows) {
-    final current =
-        SelectionDeriver.qualityOf(rows) ?? defaultQuality;
-    final next = current == BatchVideoQualityMode.highest
+    final current = qualityOfRows(rows);
+    if (!current.isEnabled) return;
+    final next = current == QualityIndicator.highest
         ? BatchVideoQualityMode.lowest
         : BatchVideoQualityMode.highest;
     SelectionMutator.setQuality(rows, next);

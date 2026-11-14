@@ -128,7 +128,7 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
         final row = _row;
         final selectedCount = row == null
             ? 0
-            : row.cells.where((cell) => cell.isSelected).length;
+            : row.allCells.where((cell) => cell.isSelected).length;
         final hasImages = _hasType(MediaType.image);
         final hasLive = _hasType(MediaType.video);
         final hasAudio = _hasType(MediaType.audio);
@@ -234,14 +234,14 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
   bool _isAllSelected(MediaType type) {
     final row = _row;
     if (row == null) return false;
-    final cells = row.cells.where((cell) => cell.type == type).toList();
+    final cells = row.cellsOf(type);
     return cells.isNotEmpty && cells.every((cell) => cell.isSelected);
   }
 
   bool _isSelected(MediaItem item) {
     final row = _row;
     if (row == null) return false;
-    for (final cell in row.cells) {
+    for (final cell in row.allCells) {
       if (cell.key == item.url) return cell.isSelected;
     }
     return false;

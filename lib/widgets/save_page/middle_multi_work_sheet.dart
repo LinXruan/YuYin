@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/common/batch_video_quality.dart';
 import '../../models/common/save_memory_scope.dart';
+import '../../models/save_page/selection/quality_indicator.dart';
 import '../../models/save_page/selection/selection_state.dart';
 import '../../models/save_page/selection/work_selection_row.dart';
 import '../../models/save_page/work_kind.dart';
@@ -116,8 +117,7 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
             .where((row) => row.work.kind == WorkMediaKind.image)
             .toList();
         final selected = session.selectedCountOf(_rows);
-        final quality = session.qualityOfRows(_rows) ??
-            BatchVideoQualityMode.highest;
+        final quality = session.qualityOfRows(_rows);
         return SafeArea(
           child: SizedBox(
             height: MediaQuery.of(context).size.height * 0.82,
@@ -139,8 +139,8 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
                       if (videoRows.isNotEmpty)
                         SaveQualityToggleChip(
                           key: const ValueKey('middle_quality_toggle_btn'),
-                          mode: quality,
-                          onTap: _toggleQuality,
+                          indicator: quality,
+                          onTap: quality.isEnabled ? _toggleQuality : null,
                         ),
                       if (videoRows.isNotEmpty) const SizedBox(width: 6),
                       SaveCategoryFilterButton(
