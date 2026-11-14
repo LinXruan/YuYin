@@ -204,18 +204,9 @@ extension _ParseSingleParseFlowFlow on _ParsePageState {
     final session = SaveSelectionSession.singleWork(
       work: work,
       parsed: result,
-      quality: DownloadSettingsStore.getBatchQuality(
-        SaveMemoryScope.singleBottom,
-      ),
+      seed: TerminalMemoryStore.seed,
     );
     try {
-      for (final item in result.items) {
-        final mode = SelectionModeStore.getBottomMode(
-          item.type,
-          SaveMemoryScope.singleBottom,
-        );
-        if (mode == 2) session.setResource(url, item.url, false);
-      }
       if (result.isImagePost) {
         final confirmed = await ImagePreviewSheet.show(
           context,
@@ -223,7 +214,6 @@ extension _ParseSingleParseFlowFlow on _ParsePageState {
           workUrl: url,
           items: result.items,
           headers: _ParsePageState._mediaHeaders,
-          memoryScope: SaveMemoryScope.singleBottom,
         );
         if (!mounted || confirmed != true) return null;
       } else {
@@ -233,7 +223,7 @@ extension _ParseSingleParseFlowFlow on _ParsePageState {
       return session.buildSelectedWork(url);
     } finally {
       SelectionDebugBridge.detach(session);
-      session.dispose();
+      session.close();
     }
   }
 }

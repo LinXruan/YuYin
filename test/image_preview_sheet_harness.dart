@@ -2,11 +2,9 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:yuyin/models/common/save_memory_scope.dart';
 import 'package:yuyin/models/media_item.dart';
 import 'package:yuyin/services/audio_preview_service.dart';
 import 'package:yuyin/services/selection/save_selection_session.dart';
-import 'package:yuyin/utils/selection_mode_store.dart';
 import 'package:yuyin/widgets/save_page/bottom_media_sheet.dart';
 
 // 1x1 像素透明 PNG 二进制数据，避免测试环境下的真实网络请求
@@ -127,6 +125,7 @@ Widget buildPreviewWidget({
   required List<MediaItem> items,
   Brightness brightness = Brightness.light,
   AudioPreviewService? audioService,
+  TerminalSeed seed = const TerminalSeed(),
 }) {
   final work = SaveWorkItem(
     url: 'https://example.com/work',
@@ -139,14 +138,8 @@ Widget buildPreviewWidget({
       cookie: '',
       isImagePost: true,
     ),
+    seed: seed,
   );
-  for (final item in items) {
-    final mode = SelectionModeStore.getBottomMode(
-      item.type,
-      SaveMemoryScope.singleBottom,
-    );
-    if (mode == 2) session.setResource(work.url, item.url, false);
-  }
   return MaterialApp(
     theme: ThemeData(brightness: brightness, useMaterial3: true),
     home: Scaffold(

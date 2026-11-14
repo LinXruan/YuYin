@@ -6,7 +6,7 @@ extension _TopAuthorTile on _MultiHomePreviewSheetState {
     final author = widget.session.authors[index];
     final state = author.selection;
     final isAll = state.isAll;
-    final isPartial = state == SelectionState.partial;
+    final isPartial = state == AggregateState.notAll;
 
     final Widget clippedAvatar = ClipRRect(
       borderRadius: BorderRadius.circular(9),

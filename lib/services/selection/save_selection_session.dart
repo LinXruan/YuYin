@@ -1,10 +1,11 @@
+import 'dart:async';
 import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 
-import '../../models/common/batch_video_quality.dart';
 import '../../models/common/work_type.dart';
 import '../../models/save_page/save_work_item.dart';
+import '../../models/save_page/selection/aggregate_state.dart';
 import '../../models/save_page/selection/author_selection_view.dart';
 import '../../models/save_page/selection/quality_indicator.dart';
 import '../../models/save_page/selection/quality_preference.dart';
@@ -12,14 +13,19 @@ import '../../models/save_page/selection/resource_selection_view.dart';
 import '../../models/save_page/selection/selected_work.dart';
 import '../../models/save_page/selection/selection_source.dart';
 import '../../models/save_page/selection/selection_state.dart';
+import '../../models/save_page/selection/terminal_seed.dart';
+import '../../models/save_page/selection/terminal_view.dart';
 import '../../models/save_page/selection/work_selection_view.dart';
 import '../../models/save_page/work_kind.dart';
 import '../../models/save_page/work_video_quality_choice.dart';
 import '../../models/single_work/media_download_item.dart';
 import '../../models/single_work/single_work_result.dart';
 import '../../models/user_home/user_home_profile.dart';
+import '../../utils/terminal_memory_store.dart';
 import '../../utils/video_quality_utils.dart';
 import 'selection_aggregator.dart';
+
+part 'internal/terminal_node.dart';
 
 part 'internal/author_node.dart';
 
@@ -33,20 +39,25 @@ part 'internal/resource_node.dart';
 
 part 'flow/selection_command_flow.dart';
 
+part 'flow/author_command_flow.dart';
+
+part 'flow/terminal_command_flow.dart';
+
 part 'flow/quality_command_flow.dart';
 
 part 'flow/ingest_flow.dart';
 
 part 'flow/save_resolver_flow.dart';
 
-/// 保存页分层约束传播会话：Author -> Work -> Resource
+/// 保存页四层聚合会话：Terminal -> Author -> Work -> Resource
 ///
-/// 选择轴与画质轴分离；所有命令只通过本类进入，UI 只读 view。
+/// 任意层命令只向下写自己的子树，随后自下而上重算聚合；UI 只读 view。
 class SaveSelectionSession extends ChangeNotifier {
   SaveSelectionSession._({
     required this.source,
     required List<_AuthorNode> authors,
-  }) : _authors = authors {
+  })  : _authors = authors,
+        _terminal = _TerminalNode(authors) {
     for (final author in authors) {
       _authorBySecUid[author.secUid] = author;
       for (final work in author.nodes) {
@@ -61,10 +72,8 @@ class SaveSelectionSession extends ChangeNotifier {
   factory SaveSelectionSession.home({
     required List<UserHomeProfile> profiles,
     required Map<String, List<SaveWorkItem>> worksBySecUid,
-    required bool Function(WorkMediaKind kind) defaultSelected,
-    BatchVideoQualityMode quality = BatchVideoQualityMode.highest,
+    required TerminalSeed seed,
   }) {
-    final edge = _edgeOf(quality);
     final authors = <_AuthorNode>[];
     final seenUrls = <String>{};
     for (final profile in profiles) {
@@ -74,13 +83,7 @@ class SaveSelectionSession extends ChangeNotifier {
       for (final work in worksBySecUid[secUid] ?? const <SaveWorkItem>[]) {
         if (!work.kind.isSaveable) continue;
         if (!seenUrls.add(work.url)) continue;
-        nodes.add(
-          _createWork(
-            work,
-            defaultSelected: defaultSelected(work.kind),
-            edge: edge,
-          ),
-        );
+        nodes.add(_createWork(work, seed));
       }
       authors.add(_authorNode(profile, nodes));
     }
@@ -93,22 +96,14 @@ class SaveSelectionSession extends ChangeNotifier {
   /// 多作品来源：隐藏虚拟作者 -> 作品 -> 资源
   factory SaveSelectionSession.multiWork({
     required List<SaveWorkItem> works,
-    required bool Function(WorkMediaKind kind) defaultSelected,
-    BatchVideoQualityMode quality = BatchVideoQualityMode.highest,
+    required TerminalSeed seed,
   }) {
-    final edge = _edgeOf(quality);
     final nodes = <_WorkNode>[];
     final seenUrls = <String>{};
     for (final work in works) {
       if (!work.kind.isSaveable) continue;
       if (!seenUrls.add(work.url)) continue;
-      nodes.add(
-        _createWork(
-          work,
-          defaultSelected: defaultSelected(work.kind),
-          edge: edge,
-        ),
-      );
+      nodes.add(_createWork(work, seed));
     }
     return SaveSelectionSession._(
       source: SelectionSource.multiWork,
@@ -122,21 +117,14 @@ class SaveSelectionSession extends ChangeNotifier {
   factory SaveSelectionSession.singleWork({
     required SaveWorkItem work,
     required SingleWorkResult parsed,
-    bool selected = true,
-    BatchVideoQualityMode quality = BatchVideoQualityMode.highest,
+    required TerminalSeed seed,
   }) {
     return SaveSelectionSession._(
       source: SelectionSource.singleWork,
       authors: [
         _authorNode(
           _syntheticProfile,
-          [
-            _createWork(
-              work.copyWith(parsedResult: parsed),
-              defaultSelected: selected,
-              edge: _edgeOf(quality),
-            ),
-          ],
+          [_createWork(work.copyWith(parsedResult: parsed), seed)],
           synthetic: true,
         ),
       ],
@@ -153,25 +141,28 @@ class SaveSelectionSession extends ChangeNotifier {
   final SelectionSource source;
 
   final List<_AuthorNode> _authors;
+  final _TerminalNode _terminal;
+
   final List<_WorkNode> _allWorks = <_WorkNode>[];
   final Map<String, _AuthorNode> _authorBySecUid = <String, _AuthorNode>{};
   final Map<String, _WorkNode> _workByUrl = <String, _WorkNode>{};
   final Map<String, _AuthorNode> _authorOfWork = <String, _AuthorNode>{};
 
-  late final List<AuthorSelectionView> _authorViews =
-      UnmodifiableListView(_authors);
   late final List<WorkSelectionView> _allWorkViews =
       UnmodifiableListView(_allWorks);
 
   int _revision = 0;
   int _depth = 0;
   bool _mutated = false;
+  bool _closed = false;
 
   int get revision => _revision;
 
   // ---------- 只读 API ----------
 
-  List<AuthorSelectionView> get authors => _authorViews;
+  TerminalSelectionView get terminal => _terminal;
+
+  List<AuthorSelectionView> get authors => _terminal.authors;
 
   List<WorkSelectionView> get allWorks => _allWorkViews;
 
@@ -192,24 +183,12 @@ class SaveSelectionSession extends ChangeNotifier {
 
   WorkSelectionView? workOf(String workUrl) => _workByUrl[workUrl];
 
-  int get authorCount => _authors.length;
+  int get authorCount => _terminal.authorCount;
 
-  int get selectedAuthorCount =>
-      _authors.where((author) => author.selection.isSelected).length;
+  int get selectedAuthorCount => _terminal.selectedAuthorCount;
 
-  SelectionState get globalState {
-    if (source == SelectionSource.home) {
-      return SelectionAggregator.selectionOfStates(
-        _authors.map((author) => author.selection),
-      );
-    }
-    return _authors.isEmpty
-        ? SelectionState.none
-        : _authors.first.selection;
-  }
-
-  SelectionState authorState(String secUid) =>
-      _authorBySecUid[secUid]?.selection ?? SelectionState.none;
+  AggregateState authorState(String secUid) =>
+      _authorBySecUid[secUid]?.selection ?? AggregateState.empty;
 
   SelectionState workState(String workUrl) =>
       _workByUrl[workUrl]?.selection ?? SelectionState.none;
@@ -217,22 +196,21 @@ class SaveSelectionSession extends ChangeNotifier {
   QualityIndicator authorQuality(String secUid) =>
       _authorBySecUid[secUid]?.quality ?? QualityIndicator.none;
 
-  QualityIndicator qualityOf(Iterable<WorkSelectionView> rows) =>
-      SelectionAggregator.qualityOfWorks(rows);
-
-  QualityIndicator get globalQuality =>
-      SelectionAggregator.qualityOfWorks(_allWorks);
-
-  BatchVideoQualityMode? qualityModeOf(Iterable<WorkSelectionView> rows) =>
-      qualityOf(rows).mode;
-
-  BatchVideoQualityMode? get globalQualityMode => globalQuality.mode;
-
   int selectedCountOf(Iterable<WorkSelectionView> rows) =>
       rows.where((row) => row.selection.isSelected).length;
 
   int selectedResourceCount(String workUrl) =>
       _workByUrl[workUrl]?.selectedResourceCount ?? 0;
+
+  // ---------- 生命周期 ----------
+
+  /// UI 会话结束：把 Terminal 最终聚合写回唯一记忆模板
+  void close() {
+    if (_closed) return;
+    _closed = true;
+    unawaited(TerminalMemoryStore.capture(_terminal));
+    dispose();
+  }
 
   // ---------- 事务与通知 ----------
 
@@ -252,37 +230,24 @@ class SaveSelectionSession extends ChangeNotifier {
 
   void _touch() => _mutated = true;
 
-  static QualityEdge _edgeOf(BatchVideoQualityMode quality) =>
-      quality == BatchVideoQualityMode.lowest
-          ? QualityEdge.lowest
-          : QualityEdge.highest;
-
-  static _WorkNode _createWork(
-    SaveWorkItem work, {
-    required bool defaultSelected,
-    required QualityEdge edge,
-  }) {
+  static _WorkNode _createWork(SaveWorkItem work, TerminalSeed seed) {
     final _WorkNode node;
     if (work.isVideo) {
       node = _VideoWorkNode(
         work: work,
-        defaultSelected: defaultSelected,
-        selected: defaultSelected,
-        qualityPreference: EdgeQualityPreference(edge),
+        selected: seed.videoSelected,
+        qualityPreference: EdgeQualityPreference(
+          seed.qualityLowest ? QualityEdge.lowest : QualityEdge.highest,
+        ),
       );
     } else {
-      node = _MediaWorkNode(
-        work: work,
-        defaultSelected: defaultSelected,
-        selectionState:
-            defaultSelected ? SelectionState.all : SelectionState.none,
-      );
+      node = _MediaWorkNode(work: work, seed: seed);
     }
     _materializePreloaded(node);
     return node;
   }
 
-  /// 多作品/单作品来源的预载解析结果在构造时立即物化，避免二次嗅探
+  /// 预载解析结果在构造时立即物化，避免二次嗅探
   static void _materializePreloaded(_WorkNode node) {
     final parsed = node.work.parsedResult;
     if (parsed == null) return;
@@ -303,8 +268,6 @@ class SaveSelectionSession extends ChangeNotifier {
       profile: profile,
       synthetic: synthetic,
       nodes: nodes,
-      selection: SelectionAggregator.selectionOfWorks(nodes),
-      quality: SelectionAggregator.qualityOfWorks(nodes),
     );
   }
 }

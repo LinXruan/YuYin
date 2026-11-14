@@ -54,36 +54,26 @@ extension _ParseMultiParseFlow on _ParsePageState {
 
       final session = SaveSelectionSession.multiWork(
         works: extractResult.works,
-        defaultSelected: (kind) =>
-            SelectionModeStore.getMiddleCategoryMode(
-              kind,
-              SaveMemoryScope.multiMiddle,
-            ) !=
-            2,
-        quality: DownloadSettingsStore.getBatchQuality(
-          SaveMemoryScope.multiMiddle,
-        ),
+        seed: TerminalMemoryStore.seed,
       );
       SelectionDebugBridge.attach(session);
 
       final confirmed = await MiddleMultiWorkSheet.show(
         context,
         session: session,
-        workUrls: session.allWorkUrls,
+        secUid: SaveSelectionSession.syntheticSecUid,
         headers: _ParsePageState._mediaHeaders,
         nested: false,
-        memoryScope: SaveMemoryScope.multiMiddle,
-        onOpenWork: (workUrl, index) =>
-            _openWorkDetail(session, workUrl, SaveMemoryScope.multiBottom),
+        onOpenWork: (workUrl, index) => _openWorkDetail(session, workUrl),
       );
       if (!mounted) {
         SelectionDebugBridge.detach(session);
-        session.dispose();
+        session.close();
         return;
       }
       if (confirmed != true) {
         SelectionDebugBridge.detach(session);
-        session.dispose();
+        session.close();
         widget.logs.add('已取消多作品保存');
         return;
       }
@@ -93,7 +83,7 @@ extension _ParseMultiParseFlow on _ParsePageState {
           .toList();
       if (urls.isEmpty) {
         SelectionDebugBridge.detach(session);
-        session.dispose();
+        session.close();
         widget.logs.add('未选择任何作品');
         return;
       }
@@ -105,18 +95,18 @@ extension _ParseMultiParseFlow on _ParsePageState {
       );
       if (!mounted) {
         SelectionDebugBridge.detach(session);
-        session.dispose();
+        session.close();
         return;
       }
       if (selected.isEmpty) {
         SelectionDebugBridge.detach(session);
-        session.dispose();
+        session.close();
         widget.logs.add('选中作品没有可保存资源');
         return;
       }
 
       final qualityMode =
-          session.globalQualityMode ?? BatchVideoQualityMode.highest;
+          session.terminal.quality.mode ?? BatchVideoQualityMode.highest;
       widget.busy.value = true;
       _downloadCancelToken = CancelToken();
       widget.logs.add(
@@ -132,7 +122,7 @@ extension _ParseMultiParseFlow on _ParsePageState {
         },
       );
       SelectionDebugBridge.detach(session);
-      session.dispose();
+      session.close();
       if (!mounted) return;
 
       for (final item in results) {

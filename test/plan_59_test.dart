@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
 import 'package:yuyin/services/selection/save_selection_session.dart';
-import 'package:yuyin/utils/download_settings_store.dart';
-import 'package:yuyin/utils/selection_mode_store.dart';
 import 'package:yuyin/utils/url_parser.dart';
 import 'package:yuyin/widgets/save_page/top_multi_home_sheet.dart';
 
@@ -24,32 +22,26 @@ SaveSelectionSession _session() {
             ),
         ],
     },
-    defaultSelected: (_) => true,
+    seed: const TerminalSeed(),
   );
 }
 
 Widget _wrap(
   SaveSelectionSession session, {
-  ValueChanged<BatchVideoQualityMode>? onQuality,
   void Function(String secUid, int index)? onOpen,
 }) {
   return MaterialApp(
     home: Scaffold(
       body: MultiHomePreviewSheet(
         session: session,
-        onQualityChanged: onQuality,
-        onOpenAuthor: onOpen == null ? null : (secUid, index) async => onOpen(secUid, index),
+        onOpenAuthor:
+            onOpen == null ? null : (secUid, index) async => onOpen(secUid, index),
       ),
     ),
   );
 }
 
 void main() {
-  setUp(() {
-    SelectionModeStore.reset();
-    DownloadSettingsStore.resetForTesting();
-  });
-
   group('MultiHomePreviewSheet 顶层保存页 UI 测试', () {
     testWidgets('默认全选，单击作者切换全选/全不选', (tester) async {
       final session = _session();
@@ -85,21 +77,20 @@ void main() {
     });
 
     testWidgets('画质切换：最高 -> 最低 -> 最高', (tester) async {
-      BatchVideoQualityMode? latest;
       final session = _session();
-      await tester.pumpWidget(_wrap(session, onQuality: (mode) => latest = mode));
+      await tester.pumpWidget(_wrap(session));
       await tester.pumpAndSettle();
 
       expect(find.text('最高画质'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('quality_toggle_btn')));
       await tester.pumpAndSettle();
       expect(find.text('最低画质'), findsOneWidget);
-      expect(latest, BatchVideoQualityMode.lowest);
+      expect(session.terminal.quality.name, 'lowest');
 
       await tester.tap(find.byKey(const ValueKey('quality_toggle_btn')));
       await tester.pumpAndSettle();
       expect(find.text('最高画质'), findsOneWidget);
-      expect(latest, BatchVideoQualityMode.highest);
+      expect(session.terminal.quality.name, 'highest');
     });
 
     testWidgets('打开作者触发回调', (tester) async {

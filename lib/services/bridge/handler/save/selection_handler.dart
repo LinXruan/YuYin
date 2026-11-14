@@ -98,7 +98,15 @@ extension AgentSelectionHandlers on AgentAutomationServer {
     final quality = body['quality']?.toString() == 'lowest'
         ? BatchVideoQualityMode.lowest
         : BatchVideoQualityMode.highest;
-    bool defaultSelected(WorkMediaKind kind) => true;
+
+    final memory = TerminalMemoryStore.seed;
+    final seed = TerminalSeed(
+      picture: memory.picture,
+      live: memory.live,
+      music: memory.music,
+      video: memory.video,
+      quality: quality,
+    );
 
     if (source == 'mock') {
       final authors = (body['authors'] as num?)?.toInt() ?? 2;
@@ -123,8 +131,7 @@ extension AgentSelectionHandlers on AgentAutomationServer {
       final session = SaveSelectionSession.home(
         profiles: profiles,
         worksBySecUid: works,
-        defaultSelected: defaultSelected,
-        quality: quality,
+        seed: seed,
       );
       for (var i = 1; i <= authors; i++) {
         for (var w = 1; w <= worksPerAuthor; w++) {
@@ -210,8 +217,7 @@ extension AgentSelectionHandlers on AgentAutomationServer {
       final session = SaveSelectionSession.home(
         profiles: profiles,
         worksBySecUid: works,
-        defaultSelected: defaultSelected,
-        quality: quality,
+        seed: seed,
       );
       SelectionDebugBridge.attach(session);
       return {'success': true, 'source': 'home', 'authors': profiles.length};
@@ -224,8 +230,7 @@ extension AgentSelectionHandlers on AgentAutomationServer {
       }
       final session = SaveSelectionSession.multiWork(
         works: extract.works,
-        defaultSelected: defaultSelected,
-        quality: quality,
+        seed: seed,
       );
       SelectionDebugBridge.attach(session);
       return {
@@ -245,7 +250,7 @@ extension AgentSelectionHandlers on AgentAutomationServer {
         coverUrl: parsed.coverUrl ?? '',
       ),
       parsed: parsed,
-      quality: quality,
+      seed: seed,
     );
     SelectionDebugBridge.attach(session);
     return {

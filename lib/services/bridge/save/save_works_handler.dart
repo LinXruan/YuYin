@@ -57,8 +57,13 @@ extension AgentSaveWorksHandlers on AgentAutomationServer {
       final quality = _qualityModeFrom(body['quality']?.toString());
       final session = SaveSelectionSession.multiWork(
         works: extract.works,
-        defaultSelected: (_) => true,
-        quality: quality,
+        seed: TerminalSeed(
+          picture: TerminalMemoryStore.seed.picture,
+          live: TerminalMemoryStore.seed.live,
+          music: TerminalMemoryStore.seed.music,
+          video: TerminalMemoryStore.seed.video,
+          quality: quality,
+        ),
       );
       final selected = await SessionWorkPreparer.prepare(
         session,

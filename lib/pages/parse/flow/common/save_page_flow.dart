@@ -6,7 +6,6 @@ extension _ParseSavePageFlow on _ParsePageState {
   Future<void> _openWorkDetail(
     SaveSelectionSession session,
     String workUrl,
-    SaveMemoryScope bottomScope,
   ) async {
     final row = session.workOf(workUrl);
     if (row == null) return;
@@ -39,10 +38,10 @@ extension _ParseSavePageFlow on _ParsePageState {
       _presentWorkTier(session, workUrl);
       return;
     }
-    _presentWorkMedia(session, workUrl, parsed.items, bottomScope);
+    _presentWorkMedia(session, workUrl, parsed.items);
   }
 
-  /// 主页/多作品：视频档位面板压栈后立即返回，work 层加载态当帧清除
+  /// 主页/多作品：视频档位面板压栈后立即返回
   void _presentWorkTier(SaveSelectionSession session, String workUrl) {
     final row = session.workOf(workUrl);
     if (row == null || !row.behavesAsVideo) return;
@@ -68,12 +67,11 @@ extension _ParseSavePageFlow on _ParsePageState {
     );
   }
 
-  /// 图文作品：资源网格压栈后立即返回，work 层加载态当帧清除
+  /// 图文作品：资源网格压栈后立即返回
   void _presentWorkMedia(
     SaveSelectionSession session,
     String workUrl,
     List<MediaItem> items,
-    SaveMemoryScope bottomScope,
   ) {
     unawaited(
       ImagePreviewSheet.show(
@@ -83,7 +81,6 @@ extension _ParseSavePageFlow on _ParsePageState {
         items: items,
         headers: _ParsePageState._mediaHeaders,
         nested: true,
-        memoryScope: bottomScope,
       ).then((_) {
         if (!mounted) return;
         final selected = session.selectedResourceCount(workUrl);

@@ -6,23 +6,14 @@ extension IngestCommands on SaveSelectionSession {
     final work = _workByUrl[workUrl];
     if (work == null) return;
     _run(() {
-      final beforeSelection = work.selection;
-      final beforeQuality = work.quality;
       final oldCover = work.work.coverUrl.trim();
       work.work = work.work.copyWith(
         parsedResult: parsed,
         coverUrl: oldCover.isEmpty ? (parsed.coverUrl ?? '') : oldCover,
       );
-      final changed = work.ingest(parsed);
-      if (changed) _touch();
-      final author = _authorOfWork[workUrl];
-      if (author == null) return;
-      if (work.selection != beforeSelection) {
-        if (author.refreshSelection()) _touch();
-      }
-      if (work.quality != beforeQuality) {
-        if (author.refreshQuality()) _touch();
-      }
+      work.ingest(parsed);
+      _terminal.refresh();
+      _touch();
     });
   }
 

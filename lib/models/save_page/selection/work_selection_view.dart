@@ -1,5 +1,7 @@
+import '../../common/work_type.dart';
 import '../../single_work/media_download_item.dart';
 import '../save_work_item.dart';
+import 'aggregate_state.dart';
 import 'quality_indicator.dart';
 import 'resource_selection_view.dart';
 import 'selection_state.dart';
@@ -30,6 +32,9 @@ abstract interface class WorkSelectionView {
   MediaItem? get selectedTier;
 
   List<ResourceSelectionView> get resources;
+
+  /// 某一资源类型的 4 态聚合；视频作品恒为空
+  AggregateState resourceState(MediaType type);
 
   int get selectedResourceCount;
 

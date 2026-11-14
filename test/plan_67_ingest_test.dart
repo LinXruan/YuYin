@@ -39,7 +39,7 @@ void main() {
         worksBySecUid: const {
           'a1': [SaveWorkItem(url: 'n1', kind: WorkMediaKind.image)],
         },
-        defaultSelected: (_) => true,
+        seed: const TerminalSeed(),
       );
       session.ingest('n1', _note('n1', ['r1', 'r2', 'r3']));
       session.setResource('n1', 'n1#r1', false);
@@ -62,7 +62,12 @@ void main() {
         worksBySecUid: const {
           'a1': [SaveWorkItem(url: 'n1', kind: WorkMediaKind.image)],
         },
-        defaultSelected: (_) => false,
+        seed: const TerminalSeed(
+          picture: AggregateState.none,
+          live: AggregateState.none,
+          music: AggregateState.none,
+          video: AggregateState.none,
+        ),
       );
       session.ingest('n1', _note('n1', ['r1']));
       session.ingest('n1', _note('n1', ['r1', 'r2']));
@@ -77,7 +82,7 @@ void main() {
         worksBySecUid: const {
           'a1': [SaveWorkItem(url: 'w1', kind: WorkMediaKind.video)],
         },
-        defaultSelected: (_) => true,
+        seed: const TerminalSeed(),
       );
       session.ingest(
         'w1',
@@ -108,7 +113,7 @@ void main() {
         worksBySecUid: const {
           'a1': [SaveWorkItem(url: 'w1', kind: WorkMediaKind.video)],
         },
-        defaultSelected: (_) => true,
+        seed: const TerminalSeed(),
       );
       session.ingest(
         'w1',
@@ -136,7 +141,7 @@ void main() {
         worksBySecUid: const {
           'a1': [SaveWorkItem(url: 'n1', kind: WorkMediaKind.image)],
         },
-        defaultSelected: (_) => true,
+        seed: const TerminalSeed(),
       );
       final ok = await session.ensureParsed(
         'n1',
@@ -158,7 +163,7 @@ void main() {
         worksBySecUid: const {
           'a1': [SaveWorkItem(url: 'n1', kind: WorkMediaKind.image)],
         },
-        defaultSelected: (_) => true,
+        seed: const TerminalSeed(),
       );
       session.ingest('n1', _note('n1', ['r1', 'r2']));
       session.setResource('n1', 'n1#r1', false);

@@ -7,14 +7,14 @@ import 'utils/app_update_store.dart';
 import 'utils/download_settings_store.dart';
 import 'utils/history_store.dart';
 import 'utils/save_location_store.dart';
-import 'utils/selection_mode_store.dart';
+import 'utils/terminal_memory_store.dart';
 import 'utils/theme_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ThemeStore.init();
   await SaveLocationStore.init();
-  await SelectionModeStore.init();
+  await TerminalMemoryStore.init();
   await DownloadSettingsStore.init();
   await HistoryStore.init();
   unawaited(AppUpdateStore.cleanOldApks());

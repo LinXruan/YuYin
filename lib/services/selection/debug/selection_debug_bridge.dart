@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import '../../../models/common/work_type.dart';
 import '../../../models/save_page/selection/quality_indicator.dart';
 import '../../../models/save_page/selection/selection_state.dart';
-import '../../../models/save_page/selection/work_selection_view.dart';
 import '../../../models/save_page/work_kind.dart';
 import '../../../models/single_work/single_work_result.dart';
 import '../save_selection_session.dart';
@@ -60,7 +59,6 @@ class SelectionDebugBridge {
     };
   }
 
-  /// 执行一次会话操作；返回精简结果，避免响应体过大
   static Map<String, dynamic> run(String action, Map<String, dynamic> body) {
     final session = _session;
     if (session == null) {
@@ -88,12 +86,11 @@ class SelectionDebugBridge {
         _middleCategory(session, body);
         break;
       case 'quality':
-        final applied = _quality(session, body);
-        if (!applied) {
+        if (!_quality(session, body)) {
           return {
             'success': false,
             'error': '当前范围没有已选视频，画质按钮不可用',
-            'quality': session.globalQuality.name,
+            'quality': session.terminal.quality.name,
           };
         }
         break;
@@ -107,14 +104,28 @@ class SelectionDebugBridge {
           };
         }
         break;
+      case 'filter':
+        if (!_filter(session, body)) {
+          return {'success': false, 'error': '筛选参数无效'};
+        }
+        break;
       default:
         return {'success': false, 'error': '未知操作: $action'};
     }
 
     return {
       'success': true,
-      'global': session.globalState.name,
-      'quality': session.globalQuality.name,
+      'global': session.terminal.authorSelection.name,
+      'quality': session.terminal.quality.name,
+      'terminal': {
+        'selection': session.terminal.authorSelection.name,
+        'quality': session.terminal.quality.name,
+        'picture': session.terminal.picture.name,
+        'live': session.terminal.live.name,
+        'music': session.terminal.music.name,
+        'note': session.terminal.noteSelection.name,
+        'video': session.terminal.videoSelection.name,
+      },
       'selectedAuthorCount': session.selectedAuthorCount,
       'revision': session.revision,
     };
@@ -149,9 +160,8 @@ class SelectionDebugBridge {
     final kind = body['kind']?.toString() == 'image'
         ? WorkMediaKind.image
         : WorkMediaKind.video;
-    final secUid = body['secUid']?.toString() ?? '';
-    session.setCategory(
-      session.rowsOf(secUid),
+    session.setAuthorKind(
+      body['secUid']?.toString() ?? '',
       kind,
       _targetOf(body['target']),
     );
@@ -164,19 +174,75 @@ class SelectionDebugBridge {
     final edge = body['mode']?.toString() == 'lowest'
         ? QualityEdge.lowest
         : QualityEdge.highest;
-    final scope = body['scope']?.toString() ?? 'global';
+    final scope = body['scope']?.toString() ?? 'terminal';
     final key = body['key']?.toString() ?? '';
     switch (scope) {
       case 'author':
-        return session.setQuality(session.rowsOf(key), edge);
+        return session.setAuthorQuality(key, edge);
       case 'work':
-        final work = session.workOf(key);
-        if (work == null) return false;
-        return session.setQuality(<WorkSelectionView>[work], edge);
+        return session.setWorkQuality(key, edge);
       default:
-        return session.setQuality(session.allWorks, edge);
+        return session.setTerminalQuality(edge);
     }
   }
+
+  static bool _filter(
+    SaveSelectionSession session,
+    Map<String, dynamic> body,
+  ) {
+    final scope = body['scope']?.toString() ?? 'terminal';
+    if (scope != 'terminal' && scope != 'author') return false;
+    final target = body['target']?.toString() ?? 'all';
+    if (target != 'all' && target != 'none') return false;
+    final selected = target == 'all';
+    final key = body['key']?.toString() ?? '';
+    final authorScope = scope == 'author';
+
+    switch (body['dimension']?.toString()) {
+      case 'picture':
+        if (authorScope) {
+          session.setAuthorResource(key, MediaType.image, selected);
+        } else {
+          session.setTerminalResource(MediaType.image, selected);
+        }
+        return true;
+      case 'live':
+        if (authorScope) {
+          session.setAuthorResource(key, MediaType.video, selected);
+        } else {
+          session.setTerminalResource(MediaType.video, selected);
+        }
+        return true;
+      case 'music':
+        if (authorScope) {
+          session.setAuthorResource(key, MediaType.audio, selected);
+        } else {
+          session.setTerminalResource(MediaType.audio, selected);
+        }
+        return true;
+      case 'note':
+        final kind = WorkMediaKind.image;
+        if (authorScope) {
+          session.setAuthorKind(key, kind, _selectionOf(selected));
+        } else {
+          session.setTerminalKind(kind, _selectionOf(selected));
+        }
+        return true;
+      case 'video':
+        final kind = WorkMediaKind.video;
+        if (authorScope) {
+          session.setAuthorKind(key, kind, _selectionOf(selected));
+        } else {
+          session.setTerminalKind(kind, _selectionOf(selected));
+        }
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  static SelectionState _selectionOf(bool selected) =>
+      selected ? SelectionState.all : SelectionState.none;
 
   static SelectionState _targetOf(Object? raw) {
     return raw?.toString() == 'none'

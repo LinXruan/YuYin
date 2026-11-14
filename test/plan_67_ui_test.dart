@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
 import 'package:yuyin/services/selection/save_selection_session.dart';
 import 'package:yuyin/utils/download_settings_store.dart';
-import 'package:yuyin/utils/selection_mode_store.dart';
 import 'package:yuyin/widgets/save_page/middle_multi_work_sheet.dart';
 import 'package:yuyin/widgets/save_page/top_multi_home_sheet.dart';
 
@@ -13,7 +12,7 @@ SaveSelectionSession _noteSession() {
     worksBySecUid: const {
       'a1': [SaveWorkItem(url: 'n1', kind: WorkMediaKind.image)],
     },
-    defaultSelected: (_) => true,
+    seed: const TerminalSeed(),
   );
   session.ingest(
     'n1',
@@ -38,7 +37,7 @@ SaveSelectionSession _videoSession() {
         SaveWorkItem(url: 'v2', kind: WorkMediaKind.video),
       ],
     },
-    defaultSelected: (_) => true,
+    seed: const TerminalSeed(),
   );
   for (final url in ['v1', 'v2']) {
     session.ingest(
@@ -61,7 +60,6 @@ Widget _wrap(Widget child) =>
 
 void main() {
   setUp(() {
-    SelectionModeStore.reset();
     DownloadSettingsStore.resetForTesting();
   });
 
@@ -99,12 +97,11 @@ void main() {
 
   testWidgets('中层画质切换不改变作品选中数', (tester) async {
     final session = _videoSession();
-    final workUrls = session.workUrlsOf('a1');
     await tester.pumpWidget(
       _wrap(
         MiddleMultiWorkSheet(
           session: session,
-          workUrls: workUrls,
+          secUid: 'a1',
         ),
       ),
     );

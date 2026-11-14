@@ -4,7 +4,6 @@ import 'package:yuyin/services/multi_work/article_work_exception.dart';
 import 'package:yuyin/services/multi_work/i_multi_work_extractor.dart';
 import 'package:yuyin/services/multi_work/multi_work_extractor.dart';
 import 'package:yuyin/utils/download_settings_store.dart';
-import 'package:yuyin/utils/selection_mode_store.dart';
 import 'package:yuyin/utils/url_parser.dart';
 import 'package:yuyin/utils/video_quality_utils.dart';
 
@@ -74,7 +73,6 @@ SingleWorkResult _imageResult() {
 
 void main() {
   setUp(() {
-    SelectionModeStore.reset();
     DownloadSettingsStore.resetForTesting();
   });
 
@@ -270,39 +268,6 @@ https://www.douyin.com/user/MS4wLjABAAAAabc123?from=profile
       final delegate = _FakeMultiWorkDelegate({});
       MultiWorkExtractor(delegate).cancel();
       // Fake 没有状态，只验证不抛异常
-    });
-  });
-
-  group('SelectionModeStore 中层视频/图文记忆状态机', () {
-    test('默认全选，全不选写入 a=2，半选保持原记忆', () {
-      expect(SelectionModeStore.getWorkCategoryMode(WorkMediaKind.video), 1);
-
-      SelectionModeStore.updateFromWorkCategorySelection(
-        kind: WorkMediaKind.video,
-        total: 3,
-        selected: 0,
-        allSelected: false,
-      );
-      expect(SelectionModeStore.getWorkCategoryMode(WorkMediaKind.video), 2);
-
-      // 半选（b=3）不覆盖原记忆
-      SelectionModeStore.updateFromWorkCategorySelection(
-        kind: WorkMediaKind.video,
-        total: 3,
-        selected: 2,
-        allSelected: false,
-      );
-      expect(SelectionModeStore.getWorkCategoryMode(WorkMediaKind.video), 2);
-
-      // 视频与图文记忆互不影响
-      SelectionModeStore.updateFromWorkCategorySelection(
-        kind: WorkMediaKind.image,
-        total: 1,
-        selected: 1,
-        allSelected: true,
-      );
-      expect(SelectionModeStore.getWorkCategoryMode(WorkMediaKind.image), 1);
-      expect(SelectionModeStore.getWorkCategoryMode(WorkMediaKind.video), 2);
     });
   });
 

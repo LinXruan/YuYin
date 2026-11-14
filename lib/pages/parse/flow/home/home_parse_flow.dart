@@ -104,16 +104,7 @@ extension _ParseHomeParseFlow on _ParsePageState {
       final session = SaveSelectionSession.home(
         profiles: profiles,
         worksBySecUid: worksBySecUid,
-        defaultSelected: (kind) =>
-            SelectionModeStore.getHomeTopSelectAllMode() != 2 &&
-            SelectionModeStore.getMiddleCategoryMode(
-              kind,
-              SaveMemoryScope.homeMiddle,
-            ) !=
-                2,
-        quality: DownloadSettingsStore.getBatchQuality(
-          SaveMemoryScope.homeTop,
-        ),
+        seed: TerminalMemoryStore.seed,
       );
       SelectionDebugBridge.attach(session);
 
@@ -125,12 +116,12 @@ extension _ParseHomeParseFlow on _ParsePageState {
       );
       if (!mounted) {
         SelectionDebugBridge.detach(session);
-        session.dispose();
+        session.close();
         return;
       }
       if (confirmed != true) {
         SelectionDebugBridge.detach(session);
-        session.dispose();
+        session.close();
         widget.logs.add('已取消多主页保存');
         return;
       }
@@ -140,7 +131,7 @@ extension _ParseHomeParseFlow on _ParsePageState {
           .toList();
       if (selectedAuthors.isEmpty) {
         SelectionDebugBridge.detach(session);
-        session.dispose();
+        session.close();
         widget.logs.add('未选择任何作者');
         return;
       }
@@ -148,12 +139,12 @@ extension _ParseHomeParseFlow on _ParsePageState {
       final prepared = await _prepareByAuthor(session, selectedAuthors);
       if (!mounted) {
         SelectionDebugBridge.detach(session);
-        session.dispose();
+        session.close();
         return;
       }
 
       final qualityMode =
-          session.globalQualityMode ?? BatchVideoQualityMode.highest;
+          session.terminal.quality.mode ?? BatchVideoQualityMode.highest;
       final homeSaver = UserHomeBatchSaver(workSaver: _workBatchSaver);
       widget.busy.value = true;
       _downloadCancelToken = CancelToken();
@@ -172,7 +163,7 @@ extension _ParseHomeParseFlow on _ParsePageState {
         },
       );
       SelectionDebugBridge.detach(session);
-      session.dispose();
+      session.close();
       if (!mounted) return;
 
       for (final author in result.authors) {
@@ -205,12 +196,10 @@ extension _ParseHomeParseFlow on _ParsePageState {
       MiddleMultiWorkSheet.show(
         context,
         session: session,
-        workUrls: session.workUrlsOf(secUid),
+        secUid: secUid,
         headers: _ParsePageState._mediaHeaders,
         nested: true,
-        memoryScope: SaveMemoryScope.homeMiddle,
-        onOpenWork: (workUrl, index) =>
-            _openWorkDetail(session, workUrl, SaveMemoryScope.homeBottom),
+        onOpenWork: (workUrl, index) => _openWorkDetail(session, workUrl),
       ).then((confirmed) {
         if (!mounted) return;
         if (confirmed == true) {

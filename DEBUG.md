@@ -104,6 +104,7 @@
 | `.\tool\agent_cmd.bat select-cell "<workUrl>" "<资源key>" [1/0]` | 作品 URL + 资源 URL + 选中值 | 精确设置单个资源单元 | 同上 |
 | `.\tool\agent_cmd.bat select-bottom-category "<workUrl>" <image/video/audio> [1/0]` | 作品 URL + 资源类型 | 底层分类全选/全不选（video 表示实况） | 同上 |
 | `.\tool\agent_cmd.bat select-middle-category "<secUid>" <video/image> [all/none]` | 作者 secUid + 分类 | 中层分类全选/全不选 | 同上 |
+| `.\tool\agent_cmd.bat select-filter <terminal/author> <picture/live/music/note/video> <all/none> ["<key>"]` | 作用域 + 维度 + 目标 + 键 | 四层筛选写入 (PLAN_70) | 返回 terminal 七维摘要 |
 | `.\tool\agent_cmd.bat select-quality <global/author/work> "<key>" [highest/lowest]` | 作用域 + 键 + 档位 | 设置画质；author 用 secUid，work 用作品 URL，global 键传 _ | 同上 |
 | `.\tool\agent_cmd.bat selection-ingest "<workUrl>"` | 作品 URL | 触发解析并物化资源/档位（等价于打开底层） | 返回 success |
 | `.\tool\agent_cmd.bat history [query]` | 可选搜索词 | 查看历史记录，支持关键词模糊搜索 | 终端输出历史记录表格（标题、媒体摘要、时间） |
@@ -142,6 +143,7 @@
 | `/api/selection/cell` | `POST` | `{"workUrl":"...","key":"<资源URL>","selected":true}` | 同上 | 设置单个资源单元 |
 | `/api/selection/bottom-category` | `POST` | `{"workUrl":"...","type":"image|video|audio","selected":false}` | 同上 | 底层分类切换 |
 | `/api/selection/middle-category` | `POST` | `{"secUid":"...","kind":"video|image","target":"all|none"}` | 同上 | 中层分类切换 |
+| `/api/selection/filter` | `POST` | `{"scope":"terminal|author","key":"...","dimension":"picture|live|music|note|video","target":"all|none"}` | `{"success":true,"terminal":{...}}` | 四层筛选写入 (PLAN_70) |
 | `/api/selection/quality` | `POST` | `{"scope":"global|author|work","key":"...","mode":"highest|lowest"}` | 同上 | 设置画质；只统计已选视频，写入范围内全部视频偏好 |
 | `/api/selection/tier` | `POST` | `{"workUrl":"...","tierKey":"<档位URL>"}` | `{"success":true,...}` | 设置视频具体档位，不改变选中 (PLAN_67) |
 | `/api/selection/load` | `POST` | `{"source":"mock|home|multi|single","text":"<链接>","quality":"highest|lowest","video":true}` | `{"success":true,"source":"home","authors":2}` | 无界面加载分层会话；mock 加 `video:true` 生成 3 档视频作品 |
@@ -244,3 +246,12 @@ adb logcat -d | grep -E "flutter|JS-Sniffer|AgentBridge"
 - 画质页开启「仅显示最高画质」时，每个分辨率保留最优档位，并额外保留全量规范排序最后一档；`/api/selection/quality-options` 可直接核对 `display` 是否包含 `full` 最后一项。
 - 任何画质操作都不会改变作者/作品/资源的选中数量。
 - `/api/selection/verify` 返回 `consistent:true` 表示父层缓存与全量重算一致；不一致时 `violations` 列出节点。
+
+### 2.4 保存页四层聚合（PLAN_70）
+
+- 结构升级为 `Terminal -> Author -> Work -> Resource`；multi/single 仍使用隐藏虚拟作者。
+- Terminal 7 维：`picture / live / music / noteSelection / videoSelection / quality / authorSelection`；Author 7 维；Work note 4 维；resource 层不变。
+- 取值 `all / notAll / none / empty`：`empty` 置灰；`notAll` 与 `none` 同按钮样式；父层聚合跳过 `empty`。
+- 任意层按钮只向下写自己的子树，再向上聚合；author 页按钮作用于全部作者，work 页作用于当前作者。
+- 唯一记忆模板 `terminal_memory.json` 只存 5 个值；会话结束仅 `all/none` 与 `highest/lowest` 覆盖，其余保留。
+- `/api/selection/state` 的 `terminal` 块与各节点 `picture/live/music`、`note/video` 字段可直接核对。

@@ -16,16 +16,7 @@ extension _TopSheetActionFlow on _MultiHomePreviewSheetState {
   }
 
   void _confirm() {
-    _recordSelectionMemory();
     _publishDebugState();
     Navigator.pop(context, true);
-  }
-
-  void _recordSelectionMemory() {
-    if (_hasRecordedMemory) return;
-    _hasRecordedMemory = true;
-    SelectionModeStore.updateFromHomeSelections(
-      widget.session.authors.map((author) => author.selection).toList(),
-    );
   }
 }

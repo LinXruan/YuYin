@@ -1,22 +1,18 @@
 import 'package:flutter/material.dart';
 
-import '../../models/common/save_memory_scope.dart';
 import '../../models/media_item.dart';
 import '../../services/audio_preview_service.dart';
 import '../../services/selection/debug/selection_snapshot.dart';
 import '../../services/selection/save_selection_session.dart';
 import '../../utils/save_page_debug_store.dart';
-import '../../utils/selection_mode_store.dart';
 import 'bottom_media_widgets.dart';
-import 'save_page_common.dart';
+import 'filter/filter_controls.dart';
 
 part 'bottom/flow/bottom_state_flow.dart';
 
 part 'bottom/flow/bottom_media_selection_flow.dart';
 
 part 'bottom/flow/bottom_audio_flow.dart';
-
-part 'bottom/flow/bottom_selection_memory.dart';
 
 part 'bottom/flow/bottom_confirm_flow.dart';
 
@@ -38,7 +34,6 @@ class ImagePreviewSheet extends StatefulWidget {
     required this.headers,
     this.audioService,
     this.nested = false,
-    this.memoryScope = SaveMemoryScope.singleBottom,
   });
 
   final SaveSelectionSession session;
@@ -54,8 +49,6 @@ class ImagePreviewSheet extends StatefulWidget {
   /// true 表示由中层进入，底部按钮显示“返回”
   final bool nested;
 
-  final SaveMemoryScope memoryScope;
-
   static Future<bool?> show(
     BuildContext context, {
     required SaveSelectionSession session,
@@ -64,7 +57,6 @@ class ImagePreviewSheet extends StatefulWidget {
     required Map<String, String> headers,
     AudioPreviewService? audioService,
     bool nested = false,
-    SaveMemoryScope memoryScope = SaveMemoryScope.singleBottom,
   }) {
     return showModalBottomSheet<bool>(
       context: context,
@@ -77,7 +69,6 @@ class ImagePreviewSheet extends StatefulWidget {
         headers: headers,
         audioService: audioService,
         nested: nested,
-        memoryScope: memoryScope,
       ),
     );
   }
@@ -89,7 +80,6 @@ class ImagePreviewSheet extends StatefulWidget {
 class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
   late final AudioPreviewService _audioService;
   bool _createdOwnAudioService = false;
-  bool _hasRecordedMemory = false;
 
   bool _showAudioPlayerBar = false;
   MediaItem? _currentPlayingItem;
@@ -110,7 +100,6 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
 
   @override
   void dispose() {
-    _recordSelectionMemory();
     if (_createdOwnAudioService) {
       _audioService.dispose();
     } else {
@@ -130,9 +119,6 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
       builder: (context, _) {
         final selectedCount =
             widget.session.selectedResourceCount(widget.workUrl);
-        final hasImages = _hasType(MediaType.image);
-        final hasLive = _hasType(MediaType.video);
-        final hasAudio = _hasType(MediaType.audio);
         return SafeArea(
           child: SizedBox(
             height: MediaQuery.of(context).size.height * 0.82,
@@ -154,24 +140,21 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
                       SaveCategoryFilterButton(
                         key: const ValueKey('category_btn_image'),
                         label: '图片',
-                        hasItems: hasImages,
-                        isSelected: _isAllSelected(MediaType.image),
+                        state: _resourceState(MediaType.image),
                         onTap: () => _toggleCategory(MediaType.image),
                       ),
                       const SizedBox(width: 6),
                       SaveCategoryFilterButton(
                         key: const ValueKey('category_btn_live'),
                         label: '实况',
-                        hasItems: hasLive,
-                        isSelected: _isAllSelected(MediaType.video),
+                        state: _resourceState(MediaType.video),
                         onTap: () => _toggleCategory(MediaType.video),
                       ),
                       const SizedBox(width: 6),
                       SaveCategoryFilterButton(
                         key: const ValueKey('category_btn_audio'),
                         label: '音频',
-                        hasItems: hasAudio,
-                        isSelected: _isAllSelected(MediaType.audio),
+                        state: _resourceState(MediaType.audio),
                         onTap: () => _toggleCategory(MediaType.audio),
                       ),
                     ],

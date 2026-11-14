@@ -67,7 +67,12 @@ SaveSelectionSession _homeSession({
         ),
       ],
     },
-    defaultSelected: (_) => selected,
+    seed: TerminalSeed(
+      picture: selected ? AggregateState.all : AggregateState.none,
+      live: selected ? AggregateState.all : AggregateState.none,
+      music: selected ? AggregateState.all : AggregateState.none,
+      video: selected ? AggregateState.all : AggregateState.none,
+    ),
   );
   if (video) {
     session.ingest('w1', _video('w1'));
@@ -85,15 +90,15 @@ void main() {
   group('PLAN_67 选择轴传播', () {
     test('作者全不选 -> 作品全不选 -> 资源全不选', () {
       final session = _homeSession(video: false);
-      expect(session.authorState('a1'), SelectionState.all);
+      expect(session.authorState('a1'), AggregateState.all);
 
       session.setAuthor('a1', SelectionState.none);
 
-      expect(session.authorState('a1'), SelectionState.none);
+      expect(session.authorState('a1'), AggregateState.none);
       expect(session.workState('w1'), SelectionState.none);
       expect(session.workState('w2'), SelectionState.none);
       expect(session.workOf('w1')!.resources.every((r) => !r.selected), isTrue);
-      expect(session.globalState, SelectionState.partial);
+      expect(session.terminal.authorSelection, AggregateState.notAll);
     });
 
     test('作品全不选 -> 作者变为部分选择，资源同步', () {
@@ -101,7 +106,7 @@ void main() {
       session.setWork('w1', SelectionState.none);
 
       expect(session.workState('w1'), SelectionState.none);
-      expect(session.authorState('a1'), SelectionState.partial);
+      expect(session.authorState('a1'), AggregateState.notAll);
       expect(session.workState('w2'), SelectionState.all);
       expect(session.workOf('w1')!.selectedResourceCount, 0);
     });
@@ -114,7 +119,7 @@ void main() {
       session.setResource('w1', first.key, false);
 
       expect(session.workState('w1'), SelectionState.partial);
-      expect(session.authorState('a1'), SelectionState.partial);
+      expect(session.authorState('a1'), AggregateState.notAll);
       expect(session.selectedResourceCount('w1'), 2);
       expect(session.workState('w2'), SelectionState.all);
     });
@@ -125,26 +130,26 @@ void main() {
 
       session.setResource('w1', resources[0].key, false);
       expect(session.workState('w1'), SelectionState.partial);
-      expect(session.authorState('a1'), SelectionState.partial);
+      expect(session.authorState('a1'), AggregateState.notAll);
 
       final revisionBefore = session.revision;
       session.setResource('w1', resources[1].key, false);
       expect(session.workState('w1'), SelectionState.partial);
-      expect(session.authorState('a1'), SelectionState.partial);
+      expect(session.authorState('a1'), AggregateState.notAll);
       expect(session.revision, revisionBefore + 1);
     });
 
     test('全选按钮：partial -> all，all -> none', () {
       final session = _homeSession(video: false);
       session.toggleWork('w1');
-      expect(session.globalState, SelectionState.partial);
+      expect(session.terminal.authorSelection, AggregateState.notAll);
 
       session.toggleAll();
-      expect(session.globalState, SelectionState.all);
+      expect(session.terminal.authorSelection, AggregateState.all);
       expect(session.workState('w1'), SelectionState.all);
 
       session.toggleAll();
-      expect(session.globalState, SelectionState.none);
+      expect(session.terminal.authorSelection, AggregateState.none);
     });
 
     test('单次作者命令只通知一次', () {
@@ -171,12 +176,12 @@ void main() {
   group('PLAN_67 视频选择与画质互不污染', () {
     test('取消视频不会丢失画质偏好，重新选中恢复', () {
       final session = _homeSession(video: true);
-      expect(session.globalQuality, QualityIndicator.highest);
+      expect(session.terminal.quality, QualityIndicator.highest);
 
       session.setWork('w1', SelectionState.none);
       expect(session.workState('w1'), SelectionState.none);
       expect(session.workOf('w1')!.quality, QualityIndicator.none);
-      expect(session.globalQuality, QualityIndicator.highest);
+      expect(session.terminal.quality, QualityIndicator.highest);
 
       session.setWork('w1', SelectionState.all);
       expect(session.workOf('w1')!.quality, QualityIndicator.highest);
@@ -186,13 +191,13 @@ void main() {
       final session = _homeSession(video: true);
       session.setAll(SelectionState.none);
 
-      expect(session.globalQuality, QualityIndicator.none);
-      expect(session.globalQualityMode, isNull);
+      expect(session.terminal.quality, QualityIndicator.none);
+      expect(session.terminal.quality.mode, isNull);
     });
 
     test('图文作品的实况视频不参与画质', () {
       final session = _homeSession(video: false);
-      expect(session.globalQuality, QualityIndicator.none);
+      expect(session.terminal.quality, QualityIndicator.none);
       expect(session.allWorks.every((work) => !work.behavesAsVideo), isTrue);
     });
   });
@@ -204,7 +209,12 @@ void main() {
         worksBySecUid: const {
           'a1': [SaveWorkItem(url: 'n1', kind: WorkMediaKind.image)],
         },
-        defaultSelected: (_) => false,
+        seed: const TerminalSeed(
+          picture: AggregateState.none,
+          live: AggregateState.none,
+          music: AggregateState.none,
+          video: AggregateState.none,
+        ),
       );
       expect(session.workState('n1'), SelectionState.none);
       expect(session.workOf('n1')!.parsed, isFalse);
@@ -223,20 +233,21 @@ void main() {
           SaveWorkItem(url: 'm1', kind: WorkMediaKind.image),
           SaveWorkItem(url: 'm2', kind: WorkMediaKind.video),
         ],
-        defaultSelected: (_) => true,
+        seed: const TerminalSeed(),
       );
 
       expect(session.authors.length, 1);
       expect(session.authors.single.synthetic, isTrue);
       expect(session.authors.single.secUid, SaveSelectionSession.syntheticSecUid);
       expect(session.rowsOf(session.authors.single.secUid).length, 2);
-      expect(session.globalState, SelectionState.all);
+      expect(session.terminal.authorSelection, AggregateState.all);
     });
 
     test('单作品来源使用隐藏虚拟作者', () {
       final session = SaveSelectionSession.singleWork(
         work: const SaveWorkItem(url: 's1', kind: WorkMediaKind.image),
         parsed: _note('s1'),
+        seed: const TerminalSeed(),
       );
 
       expect(session.authors.single.synthetic, isTrue);

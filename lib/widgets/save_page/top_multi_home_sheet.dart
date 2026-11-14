@@ -2,15 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../models/common/batch_video_quality.dart';
-import '../../models/common/save_memory_scope.dart';
+import '../../models/common/work_type.dart';
+import '../../models/save_page/selection/aggregate_state.dart';
 import '../../models/save_page/selection/quality_indicator.dart';
-import '../../models/save_page/selection/selection_state.dart';
+import '../../models/save_page/work_kind.dart';
 import '../../services/selection/debug/selection_snapshot.dart';
 import '../../services/selection/save_selection_session.dart';
-import '../../utils/download_settings_store.dart';
 import '../../utils/save_page_debug_store.dart';
-import '../../utils/selection_mode_store.dart';
+import 'filter/filter_controls.dart';
+import 'filter/filter_strip.dart';
 import 'save_page_common.dart';
 
 part 'top/flow/top_author_selection_flow.dart';
@@ -23,19 +23,18 @@ part 'top/widget/top_author_tile.dart';
 
 part 'top/widget/top_avatar.dart';
 
-/// 进入中层（作者作品列表）的回调；选择状态由 [SelectionSession] 维护
+/// 进入中层（作者作品列表）的回调
 typedef OnOpenAuthorCallback = FutureOr<void> Function(String secUid, int index);
 
 /// 三层结构保存页 — 顶层（多主页）预览与选择面板
 ///
-/// 视图只读取 [SelectionSession] 的派生状态，自身不持有任何选择标志。
+/// 7 个控件全部由 [SaveSelectionSession.terminal] 驱动。
 class MultiHomePreviewSheet extends StatefulWidget {
   const MultiHomePreviewSheet({
     super.key,
     required this.session,
     this.headers = const {},
     this.onOpenAuthor,
-    this.onQualityChanged,
   });
 
   final SaveSelectionSession session;
@@ -44,15 +43,12 @@ class MultiHomePreviewSheet extends StatefulWidget {
 
   final OnOpenAuthorCallback? onOpenAuthor;
 
-  final ValueChanged<BatchVideoQualityMode>? onQualityChanged;
-
   /// 返回 true 表示确认保存；null/false 表示取消
   static Future<bool?> show(
     BuildContext context, {
     required SaveSelectionSession session,
     Map<String, String> headers = const {},
     OnOpenAuthorCallback? onOpenAuthor,
-    ValueChanged<BatchVideoQualityMode>? onQualityChanged,
   }) {
     return showModalBottomSheet<bool>(
       context: context,
@@ -62,7 +58,6 @@ class MultiHomePreviewSheet extends StatefulWidget {
         session: session,
         headers: headers,
         onOpenAuthor: onOpenAuthor,
-        onQualityChanged: onQualityChanged,
       ),
     );
   }
@@ -72,29 +67,18 @@ class MultiHomePreviewSheet extends StatefulWidget {
 }
 
 class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
-  bool _hasRecordedMemory = false;
-
   /// 正在打开中层的作者索引（仅局部加载态）
   int? _openingIndex;
-
-  @override
-  void dispose() {
-    _recordSelectionMemory();
-    super.dispose();
-  }
 
   /// 供流程分片调用的状态刷新入口
   void _refresh(VoidCallback fn) => setState(fn);
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return ListenableBuilder(
       listenable: widget.session,
       builder: (context, _) {
-        final session = widget.session;
-        final authors = session.authors;
-        final quality = session.globalQuality;
+        final terminal = widget.session.terminal;
         return SafeArea(
           child: SizedBox(
             height: MediaQuery.of(context).size.height * 0.82,
@@ -102,29 +86,48 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '已选 ${session.selectedAuthorCount} / ${authors.length} 位作者',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                  child: SaveFilterStrip(
+                    summary: '已选 ${terminal.selectedAuthorCount} / '
+                        '${terminal.authorCount} 位作者',
+                    quality: terminal.quality,
+                    onQualityTap:
+                        terminal.quality.isEnabled ? _toggleQuality : null,
+                    trailing: SaveCategoryFilterButton(
+                      key: const ValueKey('home_select_all_btn'),
+                      label: '全部',
+                      state: terminal.authorSelection,
+                      onTap: _toggleSelectAll,
+                    ),
+                    filters: [
+                      SaveFilterSpec(
+                        key: const ValueKey('top_picture_filter_btn'),
+                        label: '图片',
+                        state: terminal.picture,
+                        onTap: () => _toggleResource(MediaType.image),
                       ),
-                      const SizedBox(width: 8),
-                      SaveQualityToggleChip(
-                        key: const ValueKey('quality_toggle_btn'),
-                        indicator: quality,
-                        onTap: quality.isEnabled ? _toggleQuality : null,
+                      SaveFilterSpec(
+                        key: const ValueKey('top_live_filter_btn'),
+                        label: '实况',
+                        state: terminal.live,
+                        onTap: () => _toggleResource(MediaType.video),
                       ),
-                      const SizedBox(width: 6),
-                      SaveCategoryFilterButton(
-                        key: const ValueKey('home_select_all_btn'),
-                        label: '全选',
-                        hasItems: authors.isNotEmpty,
-                        isSelected: session.globalState.isAll,
-                        onTap: _toggleSelectAll,
+                      SaveFilterSpec(
+                        key: const ValueKey('top_music_filter_btn'),
+                        label: '音频',
+                        state: terminal.music,
+                        onTap: () => _toggleResource(MediaType.audio),
+                      ),
+                      SaveFilterSpec(
+                        key: const ValueKey('top_note_filter_btn'),
+                        label: '图文',
+                        state: terminal.noteSelection,
+                        onTap: () => _toggleKind(WorkMediaKind.image),
+                      ),
+                      SaveFilterSpec(
+                        key: const ValueKey('top_video_filter_btn'),
+                        label: '视频',
+                        state: terminal.videoSelection,
+                        onTap: () => _toggleKind(WorkMediaKind.video),
                       ),
                     ],
                   ),
@@ -138,7 +141,7 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
                           crossAxisSpacing: 8,
                           mainAxisSpacing: 8,
                         ),
-                    itemCount: authors.length,
+                    itemCount: widget.session.authors.length,
                     itemBuilder: (context, index) => _buildAuthorTile(index),
                   ),
                 ),
@@ -148,11 +151,13 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
                     width: double.infinity,
                     child: FilledButton.icon(
                       key: const ValueKey('multi_home_confirm_btn'),
-                      onPressed: session.selectedAuthorCount == 0
+                      onPressed: terminal.selectedAuthorCount == 0
                           ? null
                           : _confirm,
                       icon: const Icon(Icons.save_alt),
-                      label: Text('保存选中项 (${session.selectedAuthorCount})'),
+                      label: Text(
+                        '保存选中项 (${terminal.selectedAuthorCount})',
+                      ),
                     ),
                   ),
                 ),

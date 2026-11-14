@@ -2,17 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../models/common/batch_video_quality.dart';
-import '../../models/common/save_memory_scope.dart';
+import '../../models/common/work_type.dart';
+import '../../models/save_page/selection/aggregate_state.dart';
 import '../../models/save_page/selection/quality_indicator.dart';
 import '../../models/save_page/selection/selection_state.dart';
 import '../../models/save_page/selection/work_selection_view.dart';
 import '../../models/save_page/work_kind.dart';
 import '../../services/selection/debug/selection_snapshot.dart';
 import '../../services/selection/save_selection_session.dart';
-import '../../utils/download_settings_store.dart';
 import '../../utils/save_page_debug_store.dart';
-import '../../utils/selection_mode_store.dart';
+import 'filter/filter_strip.dart';
 import 'save_page_common.dart';
 
 part 'middle/flow/middle_work_selection_flow.dart';
@@ -23,53 +22,45 @@ part 'middle/flow/middle_work_open_flow.dart';
 
 part 'middle/flow/middle_confirm_flow.dart';
 
-part 'middle/flow/middle_selection_memory.dart';
-
 part 'middle/debug/middle_debug_snapshot.dart';
 
 part 'middle/widget/middle_work_tile.dart';
 
 part 'middle/widget/middle_cover.dart';
 
-/// 中层保存页：作品列表，选择状态全部来自 [SelectionSession]
+/// 中层保存页：单个作者的作品列表
+///
+/// 6 个控件由当前 Author 的 7 维聚合驱动。
 class MiddleMultiWorkSheet extends StatefulWidget {
   const MiddleMultiWorkSheet({
     super.key,
     required this.session,
-    required this.workUrls,
+    required this.secUid,
     this.headers = const {},
     this.nested = false,
-    this.memoryScope = SaveMemoryScope.multiMiddle,
     this.onOpenWork,
-    this.onQualityChanged,
   });
 
   final SaveSelectionSession session;
 
-  /// 当前层展示的作品 URL 范围（主页来源为该作者的作品）
-  final List<String> workUrls;
+  /// 当前作者（multi/single 为隐藏虚拟作者）
+  final String secUid;
 
   final Map<String, String> headers;
 
   /// true 表示由顶层进入，底部按钮显示“返回”
   final bool nested;
 
-  final SaveMemoryScope memoryScope;
-
   final Future<void> Function(String workUrl, int index)? onOpenWork;
-
-  final ValueChanged<BatchVideoQualityMode>? onQualityChanged;
 
   /// 返回 true 表示确认（nested 时为返回上层）
   static Future<bool?> show(
     BuildContext context, {
     required SaveSelectionSession session,
-    required List<String> workUrls,
+    required String secUid,
     Map<String, String> headers = const {},
     bool nested = false,
-    SaveMemoryScope memoryScope = SaveMemoryScope.multiMiddle,
     Future<void> Function(String workUrl, int index)? onOpenWork,
-    ValueChanged<BatchVideoQualityMode>? onQualityChanged,
   }) {
     return showModalBottomSheet<bool>(
       context: context,
@@ -77,12 +68,10 @@ class MiddleMultiWorkSheet extends StatefulWidget {
       showDragHandle: true,
       builder: (_) => MiddleMultiWorkSheet(
         session: session,
-        workUrls: workUrls,
+        secUid: secUid,
         headers: headers,
         nested: nested,
-        memoryScope: memoryScope,
         onOpenWork: onOpenWork,
-        onQualityChanged: onQualityChanged,
       ),
     );
   }
@@ -92,23 +81,9 @@ class MiddleMultiWorkSheet extends StatefulWidget {
 }
 
 class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
-  bool _hasRecordedMemory = false;
   int? _openingIndex;
 
-  List<WorkSelectionView> get _rows {
-    final result = <WorkSelectionView>[];
-    for (final url in widget.workUrls) {
-      final work = widget.session.workOf(url);
-      if (work != null) result.add(work);
-    }
-    return result;
-  }
-
-  @override
-  void dispose() {
-    _recordSelectionMemory();
-    super.dispose();
-  }
+  List<WorkSelectionView> get _rows => widget.session.rowsOf(widget.secUid);
 
   /// 供流程分片调用的状态刷新入口
   void _refresh(VoidCallback fn) => setState(fn);
@@ -120,13 +95,10 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
       listenable: widget.session,
       builder: (context, _) {
         final session = widget.session;
-        final videoRows =
-            _rows.where((row) => row.behavesAsVideo).toList();
-        final imageRows = _rows
-            .where((row) => row.work.kind == WorkMediaKind.image)
-            .toList();
-        final selected = session.selectedCountOf(_rows);
-        final quality = session.qualityOf(_rows);
+        final author = session.authorOf(widget.secUid);
+        final rows = _rows;
+        final selected = session.selectedCountOf(rows);
+        final quality = author?.quality ?? QualityIndicator.none;
         return SafeArea(
           child: SizedBox(
             height: MediaQuery.of(context).size.height * 0.82,
@@ -134,44 +106,47 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '已选 $selected / ${_rows.length} 项',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                  child: SaveFilterStrip(
+                    summary: '已选 $selected / ${rows.length} 项',
+                    qualityKey: const ValueKey('middle_quality_toggle_btn'),
+                    quality: quality,
+                    onQualityTap: quality.isEnabled ? _toggleQuality : null,
+                    filters: [
+                      SaveFilterSpec(
+                        key: const ValueKey('middle_picture_filter_btn'),
+                        label: '图片',
+                        state: author?.picture ?? AggregateState.empty,
+                        onTap: () => _toggleResource(MediaType.image),
                       ),
-                      const SizedBox(width: 8),
-                      if (videoRows.isNotEmpty)
-                        SaveQualityToggleChip(
-                          key: const ValueKey('middle_quality_toggle_btn'),
-                          indicator: quality,
-                          onTap: quality.isEnabled ? _toggleQuality : null,
-                        ),
-                      if (videoRows.isNotEmpty) const SizedBox(width: 6),
-                      SaveCategoryFilterButton(
-                        key: const ValueKey('middle_video_filter_btn'),
-                        label: '视频',
-                        hasItems: videoRows.isNotEmpty,
-                        isSelected: _isAllSelected(videoRows),
-                        onTap: () => _toggleCategory(WorkMediaKind.video),
+                      SaveFilterSpec(
+                        key: const ValueKey('middle_live_filter_btn'),
+                        label: '实况',
+                        state: author?.live ?? AggregateState.empty,
+                        onTap: () => _toggleResource(MediaType.video),
                       ),
-                      const SizedBox(width: 6),
-                      SaveCategoryFilterButton(
+                      SaveFilterSpec(
+                        key: const ValueKey('middle_music_filter_btn'),
+                        label: '音频',
+                        state: author?.music ?? AggregateState.empty,
+                        onTap: () => _toggleResource(MediaType.audio),
+                      ),
+                      SaveFilterSpec(
                         key: const ValueKey('middle_image_filter_btn'),
                         label: '图文',
-                        hasItems: imageRows.isNotEmpty,
-                        isSelected: _isAllSelected(imageRows),
-                        onTap: () => _toggleCategory(WorkMediaKind.image),
+                        state: author?.noteSelection ?? AggregateState.empty,
+                        onTap: () => _toggleKind(WorkMediaKind.image),
+                      ),
+                      SaveFilterSpec(
+                        key: const ValueKey('middle_video_filter_btn'),
+                        label: '视频',
+                        state: author?.videoSelection ?? AggregateState.empty,
+                        onTap: () => _toggleKind(WorkMediaKind.video),
                       ),
                     ],
                   ),
                 ),
                 Expanded(
-                  child: _rows.isEmpty
+                  child: rows.isEmpty
                       ? Center(
                           child: Text(
                             '暂无可保存的作品',
@@ -188,7 +163,7 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
                                 crossAxisSpacing: 8,
                                 mainAxisSpacing: 8,
                               ),
-                          itemCount: _rows.length,
+                          itemCount: rows.length,
                           itemBuilder: (context, index) =>
                               _buildWorkTile(index),
                         ),
@@ -224,7 +199,4 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
       },
     );
   }
-
-  bool _isAllSelected(List<WorkSelectionView> rows) =>
-      rows.isNotEmpty && rows.every((row) => row.selection.isAll);
 }

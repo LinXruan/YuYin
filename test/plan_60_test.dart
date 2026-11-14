@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
 import 'package:yuyin/services/selection/save_selection_session.dart';
-import 'package:yuyin/utils/download_settings_store.dart';
-import 'package:yuyin/utils/selection_mode_store.dart';
 import 'package:yuyin/widgets/save_page/top_multi_home_sheet.dart';
 
 const _tiers = SingleWorkResult(
@@ -31,37 +29,26 @@ SaveSelectionSession _session() {
         ),
       ],
     },
-    defaultSelected: (_) => true,
+    seed: const TerminalSeed(),
   );
   session.ingest('https://example.com/w1', _tiers);
   session.ingest('https://example.com/w2', _tiers);
   return session;
 }
 
-Widget _wrap(SaveSelectionSession session, {ValueChanged<BatchVideoQualityMode>? onQuality}) {
+Widget _wrap(SaveSelectionSession session) {
   return MaterialApp(
-    home: Scaffold(
-      body: MultiHomePreviewSheet(
-        session: session,
-        onQualityChanged: onQuality,
-      ),
-    ),
+    home: Scaffold(body: MultiHomePreviewSheet(session: session)),
   );
 }
 
 void main() {
-  setUp(() {
-    SelectionModeStore.reset();
-    DownloadSettingsStore.resetForTesting();
-  });
-
-  group('PLAN_60 顶层保存页画质标签与记忆规则测试', () {
+  group('PLAN_60 顶层保存页画质标签测试', () {
     testWidgets('混合画质渲染，点击后切为最高画质', (tester) async {
-      BatchVideoQualityMode? latest;
       final session = _session();
       session.setTier('https://example.com/w2', 'v3');
 
-      await tester.pumpWidget(_wrap(session, onQuality: (mode) => latest = mode));
+      await tester.pumpWidget(_wrap(session));
       await tester.pumpAndSettle();
 
       expect(find.text('混合画质'), findsOneWidget);
@@ -70,43 +57,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('最高画质'), findsOneWidget);
-      expect(latest, BatchVideoQualityMode.highest);
+      expect(session.terminal.quality.name, 'highest');
 
       await tester.tap(find.byKey(const ValueKey('quality_toggle_btn')));
       await tester.pumpAndSettle();
       expect(find.text('最低画质'), findsOneWidget);
-      expect(latest, BatchVideoQualityMode.lowest);
-    });
-
-    test('recordBatchVideoQualitySelection 遵循 a/b 记忆规则', () async {
-      expect(
-        DownloadSettingsStore.batchVideoQualityMode,
-        BatchVideoQualityMode.highest,
-      );
-
-      await DownloadSettingsStore.recordBatchVideoQualitySelection(
-        BatchVideoQualityMode.mixed,
-      );
-      expect(
-        DownloadSettingsStore.batchVideoQualityMode,
-        BatchVideoQualityMode.highest,
-      );
-
-      await DownloadSettingsStore.recordBatchVideoQualitySelection(
-        BatchVideoQualityMode.lowest,
-      );
-      expect(
-        DownloadSettingsStore.batchVideoQualityMode,
-        BatchVideoQualityMode.lowest,
-      );
-
-      await DownloadSettingsStore.recordBatchVideoQualitySelection(
-        BatchVideoQualityMode.mixed,
-      );
-      expect(
-        DownloadSettingsStore.batchVideoQualityMode,
-        BatchVideoQualityMode.lowest,
-      );
+      expect(session.terminal.quality.name, 'lowest');
     });
 
     testWidgets('最低画质按钮背景色使用 tertiaryContainer', (tester) async {

@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
 import 'package:yuyin/services/selection/save_selection_session.dart';
 import 'package:yuyin/utils/download_settings_store.dart';
-import 'package:yuyin/utils/selection_mode_store.dart';
 import 'package:yuyin/utils/video_quality_utils.dart';
 import 'package:yuyin/widgets/save_page/bottom/widget/video_tier_picker_sheet.dart';
 import 'package:yuyin/widgets/save_page/middle_multi_work_sheet.dart';
@@ -53,6 +52,7 @@ SaveSelectionSession _singleVideoSession() {
   return SaveSelectionSession.singleWork(
     work: const SaveWorkItem(url: 'v1', kind: WorkMediaKind.video),
     parsed: _video('v1'),
+    seed: const TerminalSeed(),
   );
 }
 
@@ -85,7 +85,6 @@ Widget _pickerHost(
 
 void main() {
   setUp(() {
-    SelectionModeStore.reset();
     DownloadSettingsStore.resetForTesting(defaultValue: false);
   });
 
@@ -104,7 +103,7 @@ void main() {
             parsedResult: _note('m2'),
           ),
         ],
-        defaultSelected: (_) => true,
+        seed: const TerminalSeed(),
       );
 
       final video = session.workOf('m1')!;
@@ -132,8 +131,7 @@ void main() {
             parsedResult: _video('m1'),
           ),
         ],
-        defaultSelected: (_) => true,
-        quality: BatchVideoQualityMode.lowest,
+        seed: const TerminalSeed(quality: BatchVideoQualityMode.lowest),
       );
 
       expect(session.workOf('m1')!.selectedTier?.url, 'm1#low');
@@ -149,7 +147,12 @@ void main() {
             parsedResult: _note('m2'),
           ),
         ],
-        defaultSelected: (_) => false,
+        seed: const TerminalSeed(
+          picture: AggregateState.none,
+          live: AggregateState.none,
+          music: AggregateState.none,
+          video: AggregateState.none,
+        ),
       );
 
       expect(session.workState('m2'), SelectionState.none);
@@ -160,6 +163,7 @@ void main() {
       final session = SaveSelectionSession.singleWork(
         work: const SaveWorkItem(url: 's1', kind: WorkMediaKind.video),
         parsed: _video('s1', cover: 'https://cover/1.jpg'),
+        seed: const TerminalSeed(),
       );
 
       final work = session.workOf('s1')!;
@@ -223,7 +227,7 @@ void main() {
           SaveWorkItem(url: 'v1', kind: WorkMediaKind.video),
           SaveWorkItem(url: 'v2', kind: WorkMediaKind.video),
         ],
-        defaultSelected: (_) => true,
+        seed: const TerminalSeed(),
       );
       final completer = Completer<void>();
 
@@ -232,7 +236,7 @@ void main() {
           home: Scaffold(
             body: MiddleMultiWorkSheet(
               session: session,
-              workUrls: session.allWorkUrls,
+              secUid: SaveSelectionSession.syntheticSecUid,
               nested: true,
               onOpenWork: (url, index) => completer.future,
             ),

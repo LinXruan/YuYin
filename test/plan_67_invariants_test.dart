@@ -45,7 +45,7 @@ SaveSelectionSession _session() {
       UserHomeProfile(secUid: 'a2', nickname: '作者二'),
     ],
     worksBySecUid: works,
-    defaultSelected: (_) => true,
+    seed: const TerminalSeed(),
   );
   for (final work in session.allWorks) {
     session.ingest(
@@ -65,7 +65,7 @@ void main() {
       final authors = session.authors;
       final works = session.allWorks;
       final work = works[random.nextInt(works.length)];
-      final op = random.nextInt(11);
+      final op = random.nextInt(15);
       switch (op) {
         case 0:
         case 1:
@@ -98,20 +98,19 @@ void main() {
           final kind = random.nextBool()
               ? WorkMediaKind.video
               : WorkMediaKind.image;
-          session.toggleCategory(
-            session.rowsOf(authors[random.nextInt(authors.length)].secUid),
+          session.toggleAuthorKind(
+            authors[random.nextInt(authors.length)].secUid,
             kind,
           );
           break;
         case 7:
-          session.setQuality(
-            works,
+          session.setTerminalQuality(
             random.nextBool() ? QualityEdge.highest : QualityEdge.lowest,
           );
           break;
         case 8:
-          session.toggleQuality(
-            session.rowsOf(authors[random.nextInt(authors.length)].secUid),
+          session.toggleAuthorQuality(
+            authors[random.nextInt(authors.length)].secUid,
           );
           break;
         case 9:
@@ -130,6 +129,32 @@ void main() {
               random.nextBool() ? SelectionState.all : SelectionState.none,
             );
           }
+          break;
+        case 11:
+          session.setAuthorResource(
+            authors[random.nextInt(authors.length)].secUid,
+            MediaType.values[random.nextInt(MediaType.values.length)],
+            random.nextBool(),
+          );
+          break;
+        case 12:
+          session.setTerminalResource(
+            MediaType.values[random.nextInt(MediaType.values.length)],
+            random.nextBool(),
+          );
+          break;
+        case 13:
+          session.setTerminalKind(
+            random.nextBool() ? WorkMediaKind.video : WorkMediaKind.image,
+            random.nextBool() ? SelectionState.all : SelectionState.none,
+          );
+          break;
+        case 14:
+          session.setAuthorKind(
+            authors[random.nextInt(authors.length)].secUid,
+            random.nextBool() ? WorkMediaKind.video : WorkMediaKind.image,
+            random.nextBool() ? SelectionState.all : SelectionState.none,
+          );
           break;
       }
 

@@ -40,6 +40,7 @@ SaveSelectionSession _session() {
   return SaveSelectionSession.singleWork(
     work: const SaveWorkItem(url: 'w1', kind: WorkMediaKind.video),
     parsed: _videoResult(),
+    seed: const TerminalSeed(),
   );
 }
 
@@ -63,7 +64,7 @@ void main() {
     final session = _session();
     final view = session.workOf('w1')!;
 
-    session.setQuality(session.allWorks, QualityEdge.lowest);
+    session.setTerminalQuality(QualityEdge.lowest);
 
     final selected = view.selectedTier!;
     final display = VideoQualityUtils.displayTiers(view.tiers);
@@ -98,6 +99,7 @@ void main() {
   test('最低档已经是唯一档位时不重复追加', () {
     final session = SaveSelectionSession.singleWork(
       work: const SaveWorkItem(url: 'w2', kind: WorkMediaKind.video),
+      seed: const TerminalSeed(),
       parsed: const SingleWorkResult(
         items: [
           MediaItem(
@@ -127,6 +129,7 @@ void main() {
   test('单档位时 edge(lowest) 显示 highest', () {
     final session = SaveSelectionSession.singleWork(
       work: const SaveWorkItem(url: 'w3', kind: WorkMediaKind.video),
+      seed: const TerminalSeed(),
       parsed: const SingleWorkResult(
         items: [
           MediaItem(
@@ -141,7 +144,7 @@ void main() {
       ),
     );
 
-    session.setQuality(session.allWorks, QualityEdge.lowest);
+    session.setTerminalQuality(QualityEdge.lowest);
 
     expect(session.workOf('w3')!.quality, QualityIndicator.highest);
   });
@@ -149,7 +152,7 @@ void main() {
   test('quality-options 快照的 display 最后一项等于 full 最后一项', () {
     final session = _session();
     final view = session.workOf('w1')!;
-    session.setQuality(session.allWorks, QualityEdge.lowest);
+    session.setTerminalQuality(QualityEdge.lowest);
 
     final options = QualityOptionsSnapshot.of(session, 'w1');
     final full = options['full'] as List<dynamic>;

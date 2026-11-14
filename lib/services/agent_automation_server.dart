@@ -19,6 +19,7 @@ import '../utils/save_location_store.dart';
 import '../utils/save_page_debug_store.dart';
 import '../utils/author_folder_name.dart';
 import '../utils/home_save_path.dart';
+import '../utils/terminal_memory_store.dart';
 import '../utils/url_parser.dart';
 import 'batch_work/work_batch_saver.dart';
 import 'selection/debug/selection_debug_bridge.dart';

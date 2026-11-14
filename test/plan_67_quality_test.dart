@@ -27,7 +27,7 @@ SaveSelectionSession _videoSession() {
         SaveWorkItem(url: 'w2', kind: WorkMediaKind.video),
       ],
     },
-    defaultSelected: (_) => true,
+    seed: const TerminalSeed(),
   );
   session.ingest('w1', _video('w1'));
   session.ingest('w2', _video('w2'));
@@ -40,10 +40,10 @@ void main() {
       final session = _videoSession();
       final selectedBefore = session.selectedCountOf(session.allWorks);
 
-      expect(session.globalQuality, QualityIndicator.highest);
-      expect(session.setQuality(session.allWorks, QualityEdge.lowest), isTrue);
+      expect(session.terminal.quality, QualityIndicator.highest);
+      expect(session.setTerminalQuality(QualityEdge.lowest), isTrue);
 
-      expect(session.globalQuality, QualityIndicator.lowest);
+      expect(session.terminal.quality, QualityIndicator.lowest);
       expect(session.selectedCountOf(session.allWorks), selectedBefore);
       expect(session.workOf('w1')!.quality, QualityIndicator.lowest);
       expect(session.workOf('w2')!.quality, QualityIndicator.lowest);
@@ -52,11 +52,11 @@ void main() {
     test('未选视频保留画质偏好，重新选中后恢复', () {
       final session = _videoSession();
       session.setWork('w1', SelectionState.none);
-      session.setQuality(session.allWorks, QualityEdge.lowest);
+      session.setTerminalQuality(QualityEdge.lowest);
 
       expect(session.workOf('w1')!.quality, QualityIndicator.none);
       expect(session.workOf('w2')!.quality, QualityIndicator.lowest);
-      expect(session.globalQuality, QualityIndicator.lowest);
+      expect(session.terminal.quality, QualityIndicator.lowest);
 
       session.setWork('w1', SelectionState.all);
       expect(session.workOf('w1')!.quality, QualityIndicator.lowest);
@@ -68,19 +68,19 @@ void main() {
       session.setTier('w2', 'w2#t2');
 
       expect(session.workOf('w2')!.quality, QualityIndicator.none);
-      expect(session.globalQuality, QualityIndicator.highest);
+      expect(session.terminal.quality, QualityIndicator.highest);
 
       session.setWork('w2', SelectionState.all);
       expect(session.workOf('w2')!.quality, QualityIndicator.lowest);
-      expect(session.globalQuality, QualityIndicator.mixed);
+      expect(session.terminal.quality, QualityIndicator.mixed);
     });
 
     test('全部取消视频后画质命令被拒绝', () {
       final session = _videoSession();
       session.setAll(SelectionState.none);
 
-      expect(session.globalQuality, QualityIndicator.none);
-      expect(session.setQuality(session.allWorks, QualityEdge.lowest), isFalse);
+      expect(session.terminal.quality, QualityIndicator.none);
+      expect(session.setTerminalQuality(QualityEdge.lowest), isFalse);
       expect(session.selectedCountOf(session.allWorks), 0);
     });
 
@@ -116,10 +116,10 @@ void main() {
         worksBySecUid: const {
           'a1': [SaveWorkItem(url: 'w1', kind: WorkMediaKind.video)],
         },
-        defaultSelected: (_) => true,
+        seed: const TerminalSeed(),
       );
       session.ingest('w1', _video('w1', tiers: 1));
-      session.setQuality(session.allWorks, QualityEdge.lowest);
+      session.setTerminalQuality(QualityEdge.lowest);
 
       expect(session.workOf('w1')!.tierCount, 1);
       expect(session.workOf('w1')!.quality, QualityIndicator.highest);
@@ -131,7 +131,7 @@ void main() {
         worksBySecUid: const {
           'a1': [SaveWorkItem(url: 'w1', kind: WorkMediaKind.video)],
         },
-        defaultSelected: (_) => true,
+        seed: const TerminalSeed(),
       );
       session.ingest(
         'w1',

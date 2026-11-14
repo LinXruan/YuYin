@@ -2,13 +2,10 @@ part of '../save_selection_session.dart';
 
 /// 作品节点契约：视频作品与图文作品共用只读视图，写入只允许会话命令调用。
 abstract class _WorkNode implements WorkSelectionView {
-  _WorkNode({required this.work, required this.defaultSelected});
+  _WorkNode({required this.work});
 
   @override
   SaveWorkItem work;
-
-  /// 再次解析时新资源的默认选中值
-  final bool defaultSelected;
 
   @override
   String get url => work.url;
@@ -39,14 +36,17 @@ abstract class _WorkNode implements WorkSelectionView {
   /// 写入选择；返回「是否发生变化」
   bool applySelection(SelectionState target);
 
+  /// 写入某一资源类型；返回「是否发生变化」
+  bool applyResourceType(MediaType type, bool selected);
+
   /// 写入画质偏好；图文作品返回 false
   bool applyQuality(QualityPreference preference);
 
-  /// 物化解析结果；返回「是否发生变化」
-  bool ingest(SingleWorkResult parsed);
-
   /// 资源变化后重算自身聚合；返回「是否发生变化」
   bool refreshSelection();
+
+  /// 物化解析结果；返回「是否发生变化」
+  bool ingest(SingleWorkResult parsed);
 
   List<MediaItem> get selectedItems;
 }

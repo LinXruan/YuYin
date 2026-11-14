@@ -6,9 +6,9 @@ class _AuthorNode implements AuthorSelectionView {
     required this.profile,
     required this.synthetic,
     required this.nodes,
-    required this.selection,
-    required this.quality,
-  });
+  }) {
+    refresh();
+  }
 
   @override
   final String secUid;
@@ -22,10 +22,25 @@ class _AuthorNode implements AuthorSelectionView {
   final List<_WorkNode> nodes;
 
   @override
-  SelectionState selection;
+  AggregateState selection = AggregateState.empty;
 
   @override
-  QualityIndicator quality;
+  QualityIndicator quality = QualityIndicator.none;
+
+  @override
+  AggregateState picture = AggregateState.empty;
+
+  @override
+  AggregateState live = AggregateState.empty;
+
+  @override
+  AggregateState music = AggregateState.empty;
+
+  @override
+  AggregateState noteSelection = AggregateState.empty;
+
+  @override
+  AggregateState videoSelection = AggregateState.empty;
 
   late final List<WorkSelectionView> _views = UnmodifiableListView(nodes);
 
@@ -39,17 +54,27 @@ class _AuthorNode implements AuthorSelectionView {
   int get selectedWorks =>
       nodes.where((node) => node.selection.isSelected).length;
 
-  bool refreshSelection() {
-    final next = SelectionAggregator.selectionOfWorks(nodes);
-    if (next == selection) return false;
-    selection = next;
-    return true;
-  }
-
-  bool refreshQuality() {
-    final next = SelectionAggregator.qualityOfWorks(nodes);
-    if (next == quality) return false;
-    quality = next;
-    return true;
+  void refresh() {
+    selection = SelectionAggregator.aggregateSelections(
+      nodes.map((node) => node.selection),
+    );
+    quality = SelectionAggregator.qualityOfWorks(nodes);
+    picture = SelectionAggregator.aggregateStates(
+      nodes.map((node) => node.resourceState(MediaType.image)),
+    );
+    live = SelectionAggregator.aggregateStates(
+      nodes.map((node) => node.resourceState(MediaType.video)),
+    );
+    music = SelectionAggregator.aggregateStates(
+      nodes.map((node) => node.resourceState(MediaType.audio)),
+    );
+    noteSelection = SelectionAggregator.aggregateSelections(
+      nodes
+          .where((node) => !node.isVideo)
+          .map((node) => node.selection),
+    );
+    videoSelection = SelectionAggregator.aggregateSelections(
+      nodes.where((node) => node.isVideo).map((node) => node.selection),
+    );
   }
 }

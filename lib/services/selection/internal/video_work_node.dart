@@ -3,7 +3,6 @@ part of '../save_selection_session.dart';
 class _VideoWorkNode extends _WorkNode {
   _VideoWorkNode({
     required super.work,
-    required super.defaultSelected,
     required this.selected,
     required this.qualityPreference,
   });
@@ -58,6 +57,12 @@ class _VideoWorkNode extends _WorkNode {
   List<_ResourceNode> get resourceNodes => _fallbackResources;
 
   @override
+  AggregateState resourceState(MediaType type) {
+    if (behavesAsVideo) return AggregateState.empty;
+    return SelectionAggregator.resourceStateOf(_fallbackResources, type);
+  }
+
+  @override
   bool applySelection(SelectionState target) {
     if (target == SelectionState.partial) return false;
     if (behavesAsVideo) {
@@ -76,6 +81,21 @@ class _VideoWorkNode extends _WorkNode {
     }
     return changed;
   }
+
+  @override
+  bool applyResourceType(MediaType type, bool selected) {
+    if (behavesAsVideo) return false;
+    var changed = false;
+    for (final resource in _fallbackResources) {
+      if (resource.type != type || resource.selected == selected) continue;
+      resource.selected = selected;
+      changed = true;
+    }
+    return changed;
+  }
+
+  @override
+  bool refreshSelection() => false;
 
   @override
   bool applyQuality(QualityPreference preference) {
@@ -151,9 +171,6 @@ class _VideoWorkNode extends _WorkNode {
       );
     }
   }
-
-  @override
-  bool refreshSelection() => false;
 
   @override
   List<MediaItem> get selectedItems {

@@ -86,11 +86,17 @@ extension AgentSaveHomeHandlers on AgentAutomationServer {
       );
       final config = SaveLocationStore.current;
       final quality = _qualityModeFrom(body['quality']?.toString());
+      final memory = TerminalMemoryStore.seed;
       final session = SaveSelectionSession.home(
         profiles: [home.profile],
         worksBySecUid: {home.secUid: works},
-        defaultSelected: (_) => true,
-        quality: quality,
+        seed: TerminalSeed(
+          picture: memory.picture,
+          live: memory.live,
+          music: memory.music,
+          video: memory.video,
+          quality: quality,
+        ),
       );
       final selected = await SessionWorkPreparer.prepare(
         session,

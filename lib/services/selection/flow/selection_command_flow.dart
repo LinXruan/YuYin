@@ -5,7 +5,7 @@ extension SelectionCommands on SaveSelectionSession {
   void toggleAuthor(String secUid) {
     _run(() {
       final author = _authorBySecUid[secUid];
-      if (author == null) return;
+      if (author == null || !author.selection.isEnabled) return;
       final target = author.selection.isAll
           ? SelectionState.none
           : SelectionState.all;
@@ -23,21 +23,15 @@ extension SelectionCommands on SaveSelectionSession {
 
   void toggleAll() {
     _run(() {
-      final target = globalState.isAll
+      final target = _terminal.authorSelection.isAll
           ? SelectionState.none
           : SelectionState.all;
-      for (final author in _authors) {
-        _applyAuthorSelection(author, target);
-      }
+      _applyGlobalSelection(target);
     });
   }
 
   void setAll(SelectionState target) {
-    _run(() {
-      for (final author in _authors) {
-        _applyAuthorSelection(author, target);
-      }
-    });
+    _run(() => _applyGlobalSelection(target));
   }
 
   void toggleWork(String workUrl) {
@@ -56,34 +50,6 @@ extension SelectionCommands on SaveSelectionSession {
       final work = _workByUrl[workUrl];
       if (work == null) return;
       _applyWorkSelection(work, target);
-    });
-  }
-
-  void toggleCategory(List<WorkSelectionView> rows, WorkMediaKind kind) {
-    _run(() {
-      final scoped = _nodesOf(rows, kind: kind);
-      if (scoped.isEmpty) return;
-      final target = scoped.every(
-        (work) => work.selection.isAll,
-      )
-          ? SelectionState.none
-          : SelectionState.all;
-      for (final work in scoped) {
-        _applyWorkSelection(work, target);
-      }
-    });
-  }
-
-  void setCategory(
-    List<WorkSelectionView> rows,
-    WorkMediaKind kind,
-    SelectionState target,
-  ) {
-    _run(() {
-      final scoped = _nodesOf(rows, kind: kind);
-      for (final work in scoped) {
-        _applyWorkSelection(work, target);
-      }
     });
   }
 
@@ -134,41 +100,35 @@ extension SelectionCommands on SaveSelectionSession {
 
   // ---------- 传播内部实现 ----------
 
-  List<_WorkNode> _nodesOf(
-    List<WorkSelectionView> rows, {
-    WorkMediaKind? kind,
-  }) {
-    final result = <_WorkNode>[];
-    for (final view in rows) {
-      if (kind != null && view.work.kind != kind) continue;
-      final node = _workByUrl[view.url];
-      if (node != null) result.add(node);
+  void _applyGlobalSelection(SelectionState target) {
+    if (target == SelectionState.partial) return;
+    var changed = false;
+    for (final author in _authors) {
+      for (final work in author.nodes) {
+        if (work.applySelection(target)) changed = true;
+      }
     }
-    return result;
+    if (!changed) return;
+    _terminal.refresh();
+    _touch();
   }
 
   void _applyAuthorSelection(_AuthorNode author, SelectionState target) {
     if (target == SelectionState.partial) return;
-    if (author.selection != target) {
-      author.selection = target;
-      _touch();
-    }
+    var changed = false;
     for (final work in author.nodes) {
-      if (work.applySelection(target)) _touch();
+      if (work.applySelection(target)) changed = true;
     }
-    // 选择集合变化可能改变作者画质聚合；只更新作者自身，不回写作品
-    if (author.refreshQuality()) _touch();
+    if (!changed) return;
+    _terminal.refresh();
+    _touch();
   }
 
   void _applyWorkSelection(_WorkNode work, SelectionState target) {
     if (target == SelectionState.partial) return;
-    final changed = work.applySelection(target);
-    if (!changed) return;
+    if (!work.applySelection(target)) return;
+    _terminal.refresh();
     _touch();
-    final author = _authorOfWork[work.url];
-    if (author == null) return;
-    if (author.refreshSelection()) _touch();
-    if (work.behavesAsVideo && author.refreshQuality()) _touch();
   }
 
   void _applyResourceSelection(
@@ -177,33 +137,22 @@ extension SelectionCommands on SaveSelectionSession {
     bool selected,
   ) {
     if (resource.selected == selected) return;
-    final before = work.selection;
     resource.selected = selected;
+    work.refreshSelection();
+    _terminal.refresh();
     _touch();
-    final workChanged = work.refreshSelection();
-    final after = work.selection;
-    if (!workChanged && before == after) return;
-    final author = _authorOfWork[work.url];
-    if (author != null && author.refreshSelection()) _touch();
   }
 
   void _applyResourceCategory(_WorkNode work, MediaType type, bool selected) {
-    final targets = work.resourceNodes
-        .where((resource) => resource.type == type)
-        .toList();
-    if (targets.isEmpty) return;
-    final before = work.selection;
     var changed = false;
-    for (final resource in targets) {
-      if (resource.selected == selected) continue;
+    for (final resource in work.resourceNodes) {
+      if (resource.type != type || resource.selected == selected) continue;
       resource.selected = selected;
       changed = true;
     }
     if (!changed) return;
-    _touch();
     work.refreshSelection();
-    if (before == work.selection) return;
-    final author = _authorOfWork[work.url];
-    if (author != null && author.refreshSelection()) _touch();
+    _terminal.refresh();
+    _touch();
   }
 }
