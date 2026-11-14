@@ -150,7 +150,8 @@ object StorageBridge {
             ok
         }
         return if (mimeType.startsWith("audio/")) {
-            openFolder() || openFile()
+            // 音频只定位到所在文件夹，不直接播放
+            openFolder()
         } else {
             openFile() || openFolder()
         }

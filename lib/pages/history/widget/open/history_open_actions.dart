@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../../../models/common/work_type.dart';
 import '../../../../models/history/saved_media_availability.dart';
 import '../../../../models/history_item.dart';
 import '../../../../widgets/save_page/save_page_common.dart';
-import 'history_action_chip.dart';
+import 'history_open_popup.dart';
 import 'history_open_scan_flow.dart';
 
-/// 历史卡片右侧跳转操作：放大徽标 + 左侧纵向三个资源按钮。
+/// 历史卡片右侧跳转入口：点击徽标在浮窗中展开三个资源按钮，不影响卡片布局。
 class HistoryOpenActions extends StatefulWidget {
   const HistoryOpenActions({
     super.key,
@@ -27,125 +28,95 @@ class _HistoryOpenActionsState extends State<HistoryOpenActions> {
   static const double _badgeSize = 34;
   static const double _badgeIconSize = 20;
 
+  final GlobalKey _badgeKey = GlobalKey();
   late final HistoryOpenScanFlow _flow = HistoryOpenScanFlow(
     scanner: widget.scanner,
     opener: widget.opener,
   );
-  bool _expanded = false;
-  bool _loading = false;
+  OverlayEntry? _overlay;
   List<SavedMediaAvailability> _results = const [];
 
+  @override
+  void dispose() {
+    _removeOverlay();
+    super.dispose();
+  }
+
   Future<void> _toggle() async {
-    if (_expanded) {
-      setState(() => _expanded = false);
+    if (_overlay != null) {
+      _removeOverlay();
       return;
     }
-    setState(() {
-      _expanded = true;
-      _loading = true;
-    });
+    _results = const [];
+    _insertOverlay(loading: true);
     try {
       final results = await _flow.scan(widget.item);
       if (!mounted) return;
-      setState(() {
-        _results = results;
-        _loading = false;
-      });
+      _results = results;
+      _insertOverlay(loading: false);
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _results = const [];
-        _loading = false;
-      });
+      _results = const [];
+      _insertOverlay(loading: false);
     }
   }
 
-  Future<void> _open(SavedMediaAvailability availability) async {
+  void _insertOverlay({required bool loading}) {
+    _removeOverlay();
+    final box = _badgeKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final anchor = box.localToGlobal(Offset.zero);
+    final size = box.size;
+    _overlay = OverlayEntry(
+      builder: (_) => HistoryOpenPopup(
+        anchor: anchor,
+        anchorSize: size,
+        loading: loading,
+        results: _results,
+        onOpen: _open,
+        onDismiss: _removeOverlay,
+      ),
+    );
+    Overlay.of(context).insert(_overlay!);
+  }
+
+  void _removeOverlay() {
+    final overlay = _overlay;
+    _overlay = null;
+    if (overlay == null) return;
+    try {
+      overlay.remove();
+    } catch (_) {}
+    overlay.dispose();
+  }
+
+  Future<void> _open(
+    MediaType type,
+    SavedMediaAvailability availability,
+  ) async {
     final opened = await _flow.open(availability);
     if (!mounted) return;
-    if (!opened) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('未找到可用的图库或文件管理器'),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(milliseconds: 1500),
-          ),
-        );
-      return;
-    }
-    setState(() => _expanded = false);
+    _removeOverlay();
+    if (opened) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('未找到可用的图库或文件管理器'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(milliseconds: 1500),
+        ),
+      );
   }
 
   @override
   Widget build(BuildContext context) {
-    final available = _results.where((item) => item.available).toList();
-    final showGroup = _expanded;
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        if (showGroup) ...[
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.only(right: 8, bottom: 10),
-              child: SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            )
-          else if (available.isEmpty)
-            const _GoneChip()
-          else
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                for (final item in available)
-                  HistoryActionChip(
-                    key: ValueKey('history-open-${item.type.name}'),
-                    type: item.type,
-                    onTap: () => _open(item),
-                  ),
-              ],
-            ),
-          const SizedBox(width: 8),
-        ],
-        SaveOpenBadge(
-          semanticLabel: '打开保存位置',
-          size: _badgeSize,
-          iconSize: _badgeIconSize,
-          onTap: _toggle,
-        ),
-      ],
-    );
-  }
-}
-
-class _GoneChip extends StatelessWidget {
-  const _GoneChip();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      key: const ValueKey('history-open-gone'),
-      margin: const EdgeInsets.only(right: 8, bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        '已消失',
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: theme.colorScheme.outline,
-          fontSize: 11,
-        ),
-      ),
+    return SaveOpenBadge(
+      key: _badgeKey,
+      semanticLabel: '打开保存位置',
+      size: _badgeSize,
+      iconSize: _badgeIconSize,
+      onTap: _toggle,
     );
   }
 }

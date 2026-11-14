@@ -2,21 +2,28 @@ import 'package:flutter/material.dart';
 
 import '../../../../models/common/work_type.dart';
 
-/// 历史卡片内的单个资源跳转按钮：横排「小图标 + 两个汉字」。
+/// 浮窗内的资源按钮：横排「小图标 + 两个汉字」，缺失时置灰禁用。
 class HistoryActionChip extends StatelessWidget {
   const HistoryActionChip({
     super.key,
     required this.type,
-    required this.onTap,
+    this.enabled = true,
+    this.onTap,
   });
 
   final MediaType type;
-  final VoidCallback onTap;
+  final bool enabled;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = theme.colorScheme.primary;
+    final color = enabled
+        ? theme.colorScheme.onTertiaryContainer
+        : theme.colorScheme.outline;
+    final background = enabled
+        ? theme.colorScheme.onTertiaryContainer.withValues(alpha: 0.14)
+        : theme.colorScheme.outline.withValues(alpha: 0.10);
     final icon = switch (type) {
       MediaType.video => Icons.movie_outlined,
       MediaType.image => Icons.image_outlined,
@@ -24,25 +31,24 @@ class HistoryActionChip extends StatelessWidget {
     };
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: 3),
       child: Material(
-        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(8),
+        color: background,
+        borderRadius: BorderRadius.circular(7),
         child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(7),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 13, color: color),
-                const SizedBox(width: 3),
+                Icon(icon, size: 17, color: color),
+                const SizedBox(width: 6),
                 Text(
                   type.label,
-                  style: theme.textTheme.labelSmall?.copyWith(
+                  style: theme.textTheme.labelLarge?.copyWith(
                     color: color,
-                    fontSize: 11,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

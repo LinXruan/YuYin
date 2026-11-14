@@ -61,17 +61,18 @@
 | --- | --- |
 | `isSaved = false` | 不渲染跳转徽标 |
 | `isSaved = true` | 渲染放大徽标（34×34，图标 20，点击热区 ≥44） |
-| 点击徽标 | 在徽标**左侧**展开纵向排列的三个横排小按钮：`[图标] 视频`、`[图标] 图片`、`[图标] 音频` |
-| 三种资源都未搜到 | 同一位置只显示一个「已消失」标签（禁用态） |
-| 再次点击徽标 | 收起按钮组 |
-| 扫描中 | 徽标旁显示小进度圈，不展开空按钮 |
+| 点击徽标 | 在徽标**左侧浮窗**展示三个横排小按钮：`[图标] 视频`、`[图标] 图片`、`[图标] 音频`；浮窗独立于卡片，不改变卡片布局 |
+| 某类资源缺失 | 对应按钮**置灰禁用**，仍保留三个按钮 |
+| 配色 | 浮窗使用 `tertiaryContainer`，与「已保存」的 `primaryContainer` 区分 |
+| 再次点击徽标 / 点击浮窗外 | 关闭浮窗 |
+| 扫描中 | 浮窗内显示小进度圈 |
 
 ### 2.3 跳转
 
 | 类型 | 行为 |
 | --- | --- |
 | 视频 / 图片 | 用**首个资源**的 `contentUri` 以 `ACTION_VIEW` 打开系统图库，图库直接显示该资源 |
-| 音频 | 打开音频所在文件夹（保持现状） |
+| 音频 | 只定位到所在文件夹，**不打开播放** |
 | 首个资源 | 按文件名升序的第一个（SAF: `minBy(name)`；MediaStore: `DISPLAY_NAME ASC`） |
 | 打开失败 | 回退到另一条路径（文件 ↔ 文件夹），仍失败提示「未找到可用的图库或文件管理器」 |
 
@@ -95,7 +96,8 @@
 | 路径 | 角色 | 预估行数 |
 | --- | --- | --- |
 | `lib/pages/history/widget/open/history_open_actions.dart` | 徽标 + 展开/收起控制 | 110 |
-| `lib/pages/history/widget/open/history_action_chip.dart` | 单条横排小按钮（图标 + 文字） | 60 |
+| `lib/pages/history/widget/open/history_action_chip.dart` | 单条横排小按钮（图标 + 文字，支持置灰） | 60 |
+| `lib/pages/history/widget/open/history_open_popup.dart` | 锚定徽标的浮窗 | 110 |
 | `lib/pages/history/widget/open/history_open_scan_flow.dart` | 扫描与打开策略（可注入） | 60 |
 | `lib/models/history/history_saved_state.dart` | 纯函数：作者/作品保存态判定 | 40 |
 | `lib/models/parse/parse_action_state.dart` | 纯函数：解析/下载/空闲按钮态 | 40 |
@@ -170,7 +172,8 @@
 - [ ] 未保存记录不显示跳转徽标。
 - [ ] 徽标尺寸放大，点击热区 ≥44dp。
 - [ ] 点击徽标在左侧展开三个横排按钮，再次点击收起。
-- [ ] 三类资源全缺失时只显示「已消失」。
+- [ ] 浮窗始终显示三个按钮，缺失项置灰。
+- [ ] 浮窗不影响历史卡片布局，配色与「已保存」不同。
 - [ ] 视频/图片跳转打开系统图库并定位首个资源；音频跳转文件夹。
 - [ ] `HistoryOpenSheet` 删除，无残留引用。
 - [ ] `flutter analyze` 0、`flutter test` 全绿、单文件 ≤250 行。
