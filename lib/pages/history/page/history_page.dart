@@ -7,8 +7,7 @@ import 'package:flutter/services.dart';
 import '../../../models/history_item.dart';
 import '../../../utils/history/history_store.dart';
 import '../../../utils/thumbnail/history_thumbnail_cache.dart';
-import '../../../widgets/history/history_open_sheet.dart';
-import '../../../widgets/save_page/save_page_common.dart';
+import '../widget/open/history_open_actions.dart';
 
 part '../flow/search/history_search_flow.dart';
 

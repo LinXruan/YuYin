@@ -109,6 +109,9 @@ extension _ParseMultiParseFlow on _ParsePageState {
           session.terminal.quality.mode ?? BatchVideoQualityMode.highest;
       widget.busy.value = true;
       _downloadCancelToken = CancelToken();
+      DownloadCancelRegistry.attach(
+        () => _downloadCancelToken?.cancel('用户取消下载'),
+      );
       widget.logs.add(
         '开始保存 ${selected.length} 个作品（${_qualityLabel(qualityMode)}）...',
       );
@@ -143,6 +146,8 @@ extension _ParseMultiParseFlow on _ParsePageState {
         widget.logs.add('多作品捕获失败：${_friendlyError(e)}');
       }
     } finally {
+      DownloadCancelRegistry.detach();
+      _downloadCancelToken = null;
       if (mounted) {
         widget.busy.value = false;
         _isParsing = false;

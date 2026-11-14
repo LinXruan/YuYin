@@ -27,6 +27,7 @@ import '../../selection/save_selection_session.dart';
 import '../../selection/session_work_preparer.dart';
 import '../../sniffer/facade/douyin_sniffer.dart';
 import '../../history/album_locator.dart';
+import '../../download/download_cancel_registry.dart';
 import '../../media/video_downloader.dart';
 
 part '../parse/parse_handler.dart';

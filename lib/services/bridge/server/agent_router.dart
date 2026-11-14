@@ -49,6 +49,8 @@ extension AgentRouting on AgentAutomationServer {
         });
       } else if (path == '/api/history' && request.method == 'GET') {
         await _handleGetHistory(request);
+      } else if (path == '/api/history/seed' && request.method == 'POST') {
+        await _handleSeedHistory(request);
       } else if (path == '/api/history/scan' && request.method == 'POST') {
         await _handleScanHistory(request);
       } else if (path == '/api/history/open' && request.method == 'POST') {

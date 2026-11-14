@@ -148,6 +148,9 @@ extension _ParseHomeParseFlow on _ParsePageState {
       final homeSaver = UserHomeBatchSaver(workSaver: _workBatchSaver);
       widget.busy.value = true;
       _downloadCancelToken = CancelToken();
+      DownloadCancelRegistry.attach(
+        () => _downloadCancelToken?.cancel('用户取消下载'),
+      );
       widget.logs.add(
         '开始保存 ${selectedAuthors.length} 位作者（${_qualityLabel(qualityMode)}）...',
       );
@@ -168,7 +171,7 @@ extension _ParseHomeParseFlow on _ParsePageState {
 
       for (final author in result.authors) {
         if (author.success) {
-          HistoryStore.markSaved('home:${author.secUid}', true);
+          await HistoryStore.markSaved('home:${author.secUid}', true);
         }
       }
 
@@ -179,6 +182,8 @@ extension _ParseHomeParseFlow on _ParsePageState {
     } on DouyinDownloadCancelledException {
       if (mounted) widget.logs.add('已取消主页批量保存');
     } finally {
+      DownloadCancelRegistry.detach();
+      _downloadCancelToken = null;
       if (mounted) {
         widget.busy.value = false;
         _isParsing = false;

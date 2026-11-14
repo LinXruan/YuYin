@@ -8,12 +8,20 @@ class SaveOpenBadge extends StatelessWidget {
     super.key,
     required this.onTap,
     this.semanticLabel = '打开',
+    this.size = 22,
+    this.iconSize = 13,
   });
 
   final VoidCallback onTap;
 
   /// 无障碍与 adb/uiautomator 自动化标签
   final String semanticLabel;
+
+  /// 圆形视觉直径
+  final double size;
+
+  /// 图标尺寸
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
@@ -24,16 +32,16 @@ class SaveOpenBadge extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: Container(
-          width: 22,
-          height: 22,
+          width: size,
+          height: size,
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: 0.55),
             shape: BoxShape.circle,
           ),
-          child: const Icon(
+          child: Icon(
             Icons.open_in_new_rounded,
             color: Colors.white,
-            size: 13,
+            size: iconSize,
           ),
         ),
       ),

@@ -120,28 +120,40 @@ object StorageBridge {
         }
     }
 
-    /// 优先跳转文件管理器文件夹，失败时打开文件
+    /// 音频优先文件夹；视频/图片优先具体媒体 URI，系统图库会打开该资源
     fun openMediaLocation(
         context: Context,
         contentUri: String?,
         folderUri: String?,
         mimeType: String
     ): Boolean {
-        if (!folderUri.isNullOrBlank()) {
-            val folderTypes = listOf(
-                DocumentsContract.Document.MIME_TYPE_DIR,
-                "resource/folder"
-            )
-            for (type in folderTypes) {
-                if (tryOpen(context, Uri.parse(folderUri), type)) return true
+        val openFile = {
+            if (!contentUri.isNullOrBlank()) {
+                val type = if (mimeType.isBlank()) "*/*" else mimeType
+                tryOpen(context, Uri.parse(contentUri), type)
+            } else false
+        }
+        val openFolder = {
+            var ok = false
+            if (!folderUri.isNullOrBlank()) {
+                val folderTypes = listOf(
+                    DocumentsContract.Document.MIME_TYPE_DIR,
+                    "resource/folder"
+                )
+                for (type in folderTypes) {
+                    if (tryOpen(context, Uri.parse(folderUri), type)) {
+                        ok = true
+                        break
+                    }
+                }
             }
+            ok
         }
-
-        if (!contentUri.isNullOrBlank()) {
-            val type = if (mimeType.isBlank()) "*/*" else mimeType
-            if (tryOpen(context, Uri.parse(contentUri), type)) return true
+        return if (mimeType.startsWith("audio/")) {
+            openFolder() || openFile()
+        } else {
+            openFile() || openFolder()
         }
-        return false
     }
 
     private fun tryOpen(context: Context, uri: Uri, mimeType: String): Boolean {
@@ -174,12 +186,12 @@ object StorageBridge {
                 matchesType(context, file, spec.type) &&
                 (prefix.isNullOrBlank() || (file.name?.startsWith(prefix) == true))
         }
-        val latest = files.maxByOrNull { it.lastModified() }
+        val first = files.minByOrNull { it.name.orEmpty() }
         return mapOf(
             "type" to spec.type,
             "found" to files.isNotEmpty(),
             "count" to files.size,
-            "uri" to latest?.uri?.toString(),
+            "uri" to first?.uri?.toString(),
             "folderUri" to dir.uri.toString(),
             "displayPath" to spec.displayPath
         )
@@ -219,7 +231,7 @@ object StorageBridge {
             projection,
             selectionParts.joinToString(" AND "),
             selectionArgs.toTypedArray(),
-            MediaStore.MediaColumns.DATE_MODIFIED + " DESC"
+            MediaStore.MediaColumns.DISPLAY_NAME + " ASC"
         )
 
         cursor?.use {

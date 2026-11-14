@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../models/history/history_saved_state.dart';
 import '../../models/media_item.dart';
 import '../../utils/save/author_folder_name.dart';
 import '../../utils/save/home_save_path.dart';
@@ -76,7 +77,9 @@ class UserHomeBatchSaver {
           }
         }
 
-        final success = counts.values.any((count) => count > 0);
+        final success = HistorySavedState.resolveAuthorSaved(
+          workResults.map((result) => result.success),
+        );
         results.add(
           UserHomeAuthorSaveResult(
             secUid: secUid,

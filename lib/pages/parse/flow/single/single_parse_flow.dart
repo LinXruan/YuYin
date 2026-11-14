@@ -141,6 +141,9 @@ extension _ParseSingleParseFlowFlow on _ParsePageState {
         FileNameFormatter.buildBaseName(candidateDesc),
       );
       _downloadCancelToken = CancelToken();
+      DownloadCancelRegistry.attach(
+        () => _downloadCancelToken?.cancel('用户取消下载'),
+      );
       final savedTypes = await widget.downloader.downloadItems(
         selected,
         cookie: result.cookie,
@@ -167,6 +170,8 @@ extension _ParseSingleParseFlowFlow on _ParsePageState {
           '音频已保存到${SaveLocationStore.getDisplayPath(MediaType.audio)}',
         );
       }
+    } on DouyinDownloadCancelledException {
+      if (mounted) widget.logs.add('已取消下载');
     } catch (error) {
       if (!mounted) return;
       final errorText = error.toString();
@@ -179,6 +184,7 @@ extension _ParseSingleParseFlowFlow on _ParsePageState {
         widget.logs.add('操作失败：${_friendlyError(error)}');
       }
     } finally {
+      DownloadCancelRegistry.detach();
       _downloadCancelToken = null;
       if (mounted) {
         _isParsing = false;

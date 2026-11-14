@@ -6,7 +6,6 @@ class _HistoryCard extends StatelessWidget {
     required this.item,
     required this.isSelectionMode,
     required this.isSelected,
-    required this.onOpen,
     required this.onTap,
     required this.onLongPress,
   });
@@ -14,7 +13,6 @@ class _HistoryCard extends StatelessWidget {
   final HistoryItem item;
   final bool isSelectionMode;
   final bool isSelected;
-  final VoidCallback onOpen;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
@@ -118,11 +116,10 @@ class _HistoryCard extends StatelessWidget {
                               ),
                             ),
                           ],
-                          const SizedBox(width: 8),
-                          SaveOpenBadge(
-                            semanticLabel: '打开保存位置',
-                            onTap: onOpen,
-                          ),
+                          if (item.isSaved) ...[
+                            const SizedBox(width: 8),
+                            HistoryOpenActions(item: item),
+                          ],
                         ],
                       ),
                     ],

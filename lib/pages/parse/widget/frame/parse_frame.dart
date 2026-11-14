@@ -4,6 +4,10 @@ part of '../../page/parse_page.dart';
 extension _ParsePageFrame on _ParsePageState {
   Widget _buildParsePage(BuildContext context) {
     final theme = Theme.of(context);
+    final action = ParseActionState.resolve(
+      isParsing: _isParsing,
+      isDownloading: _isDownloading,
+    );
     return Column(
       children: [
         Expanded(
@@ -87,12 +91,21 @@ extension _ParsePageFrame on _ParsePageState {
                           ),
                         ),
                       ),
-                      if (_isParsing) ...[
+                      if (action != ParseAction.idle) ...[
                         const SizedBox(width: 8),
                         IconButton.filledTonal(
-                          onPressed: _cancelParse,
-                          icon: const Icon(Icons.close_rounded, size: 20),
-                          tooltip: '终止解析',
+                          onPressed: action == ParseAction.cancelParse
+                              ? _cancelParse
+                              : _cancelDownload,
+                          icon: Icon(
+                            action == ParseAction.cancelParse
+                                ? Icons.close_rounded
+                                : Icons.stop_circle_outlined,
+                            size: 20,
+                          ),
+                          tooltip: action == ParseAction.cancelParse
+                              ? '终止解析'
+                              : '取消下载',
                           style: IconButton.styleFrom(
                             shape: const CircleBorder(),
                             minimumSize: const Size(48, 48),

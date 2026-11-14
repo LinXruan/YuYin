@@ -125,7 +125,6 @@ extension _HistoryPageFrame on _HistoryPageState {
                           item: item,
                           isSelectionMode: _isSelectionMode,
                           isSelected: isSelected,
-                          onOpen: () => HistoryOpenSheet.show(context, item),
                           onTap: () {
                             if (_isSelectionMode) {
                               _refresh(() {

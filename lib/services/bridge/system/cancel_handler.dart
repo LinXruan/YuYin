@@ -4,12 +4,16 @@ part of '../server/agent_automation_server.dart';
 extension AgentCancelHandlers on AgentAutomationServer {
   /// POST /api/cancel：取消当前进行中的任务
   Future<void> _handleCancel(HttpRequest request) async {
+    final downloadCancelled = DownloadCancelRegistry.cancel();
     sniffer?.cancelActiveTask();
     _activeDownloadToken?.cancel('Agent 指令取消');
     _activeDownloadToken = null;
     busy.value = false;
-    logs.add('已取消解析');
-    _sendJson(request, HttpStatus.ok, {'success': true});
+    logs.add(downloadCancelled ? '已取消下载' : '已取消解析');
+    _sendJson(request, HttpStatus.ok, {
+      'success': true,
+      'downloadCancelled': downloadCancelled,
+    });
   }
 
 }

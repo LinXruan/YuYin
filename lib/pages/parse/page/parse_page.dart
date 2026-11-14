@@ -9,6 +9,7 @@ import '../../../services/batch_work/work_batch_saver.dart';
 import '../../../services/sniffer/facade/douyin_sniffer.dart';
 import '../../../services/multi_work/article_work_exception.dart';
 import '../../../services/user_home/user_home_batch_saver.dart';
+import '../../../services/download/download_cancel_registry.dart';
 import '../../../services/media/video_downloader.dart';
 import '../../../utils/save/file_name_formatter.dart';
 import '../../../utils/debug/log_controller.dart';
@@ -19,6 +20,7 @@ import '../../../utils/memory/terminal_memory_store.dart';
 import '../../../utils/url_parser.dart';
 import '../../../utils/settings/video_quality_utils.dart';
 import '../../../models/history_item.dart';
+import '../../../models/parse/parse_action_state.dart';
 import '../../../utils/history/history_store.dart';
 import '../../../services/selection/debug/selection_debug_bridge.dart';
 import '../../../services/selection/save_selection_session.dart';
@@ -84,6 +86,9 @@ class _ParsePageState extends State<ParsePage>
   double _thumbHeight = 40.0;
   bool _isParsing = false;
   bool _cancelLogged = false;
+
+  /// 下载中：由活动取消令牌派生，不新增第二份布尔状态
+  bool get _isDownloading => _downloadCancelToken != null;
 
   /// 加载封面/头像所需的统一请求头
   static const Map<String, String> _mediaHeaders = {

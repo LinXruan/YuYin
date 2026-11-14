@@ -15,4 +15,26 @@ extension AgentHistoryQueryHandlers on AgentAutomationServer {
     });
   }
 
+  /// POST /api/history/seed：注入测试用历史记录（仅 Debug 构建）
+  Future<void> _handleSeedHistory(HttpRequest request) async {
+    final body = await _readJsonBody(request);
+    final raw = body['records'];
+    if (raw is! List) {
+      _sendJson(request, HttpStatus.badRequest, {
+        'error': 'records is required',
+      });
+      return;
+    }
+    for (final entry in raw) {
+      if (entry is Map) {
+        await HistoryStore.addRecord(
+          HistoryItem.fromJson(Map<String, dynamic>.from(entry)),
+        );
+      }
+    }
+    _sendJson(request, HttpStatus.ok, {
+      'success': true,
+      'count': HistoryStore.records.length,
+    });
+  }
 }

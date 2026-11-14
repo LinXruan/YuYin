@@ -118,7 +118,12 @@ class HistoryStore {
     String? savedBaseName,
   }) async {
     final index = _records.indexWhere(
-      (item) => item.id == id || (item.url.isNotEmpty && item.url == id),
+      (item) =>
+          item.id == id ||
+          (item.url.isNotEmpty && item.url == id) ||
+          (item.isUserHome &&
+              item.authorSecUid != null &&
+              'home:${item.authorSecUid}' == id),
     );
     if (index == -1) return;
 
