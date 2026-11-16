@@ -12,6 +12,9 @@
 .swiftpm/
 migrate_working_dir/
 
+# Tool local state
+tool/.adb_last_endpoint
+
 # IntelliJ related
 *.iml
 *.ipr
