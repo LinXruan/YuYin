@@ -8,6 +8,9 @@ extension SnifferMessageFlowFlow on DouyinSniffer {
       final data = jsonDecode(message.message);
       if (data is! Map) return;
 
+      // 只接收当前任务文档的消息；旧文档的迟到消息一律丢弃
+      if (data['type'] != 'login_state' && data['task'] != _taskNonce) return;
+
       // 日志与结果分开接收：结果只处理一次，日志覆盖到任务收尾
       if (data['type'] == 'log') {
         if (!_acceptLogs) return;
@@ -125,6 +128,7 @@ extension SnifferMessageFlowFlow on DouyinSniffer {
           _taskId,
           desc: desc?.trim().isNotEmpty == true ? desc!.trim() : null,
           coverUrl: coverUrl?.trim().isNotEmpty == true ? coverUrl!.trim() : null,
+          awemeId: data['awemeId']?.toString(),
         );
       }
     } catch (e) {

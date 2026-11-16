@@ -10,6 +10,7 @@ class SingleWorkResult {
     this.title,
     this.desc,
     this.coverUrl,
+    this.awemeId,
   });
 
   /// 解析出的全部媒体资源项列表
@@ -29,6 +30,9 @@ class SingleWorkResult {
 
   /// 单作品封面缩略图网络地址（若存在）
   final String? coverUrl;
+
+  /// 本结果所属作品的 awemeId（页面无法识别时为空）
+  final String? awemeId;
 
   /// 视频数量（含实况图视频）
   int get videoCount =>

@@ -172,17 +172,14 @@ extension _ParseSingleParseFlowFlow on _ParsePageState {
       }
     } on DouyinDownloadCancelledException {
       if (mounted) widget.logs.add('已取消下载');
+    } on SniffCancelledException {
+      if (mounted && !_cancelLogged) {
+        _cancelLogged = true;
+        widget.logs.add('已取消解析');
+      }
     } catch (error) {
       if (!mounted) return;
-      final errorText = error.toString();
-      if (errorText.contains('用户已取消解析')) {
-        if (!_cancelLogged) {
-          _cancelLogged = true;
-          widget.logs.add('已取消解析');
-        }
-      } else {
-        widget.logs.add('操作失败：${_friendlyError(error)}');
-      }
+      widget.logs.add('操作失败：${_friendlyError(error)}');
     } finally {
       DownloadCancelRegistry.detach();
       _downloadCancelToken = null;

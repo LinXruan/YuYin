@@ -5,7 +5,7 @@ class MultiWorkExtractResult {
   const MultiWorkExtractResult({
     required this.works,
     this.filteredArticleCount = 0,
-    this.failedCount = 0,
+    this.failedUrls = const <String>[],
   });
 
   /// 可用于中层保存页的作品条目
@@ -14,6 +14,9 @@ class MultiWorkExtractResult {
   /// 已过滤的纯文章作品数量
   final int filteredArticleCount;
 
-  /// 解析失败或未捕获到资源的作品数量
-  final int failedCount;
+  /// 重试后仍未成功的作品链接（唯一失败来源）
+  final List<String> failedUrls;
+
+  /// 失败作品数（派生，不单独存储）
+  int get failedCount => failedUrls.length;
 }

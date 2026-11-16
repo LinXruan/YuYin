@@ -64,6 +64,7 @@ extension AgentParseWorksHandlers on AgentAutomationServer {
         'filteredArticles':
             batch.filteredArticleCount + result.filteredArticleCount,
         'failedCount': result.failedCount,
+        'failedUrls': result.failedUrls,
         'works': [
           for (final work in result.works)
             {

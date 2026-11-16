@@ -6,9 +6,6 @@ abstract class IMultiWorkSnifferDelegate {
   /// 解析单个作品链接，返回完整资源结果
   Future<SingleWorkResult> sniffVideoUrl(String workUrl);
 
-  /// 最近一次解析最终落地的作品页面 URL（用于短链解析后按 awemeId 去重）
-  String? get awemePageUrl;
-
   /// 取消当前正在执行的捕获任务
   void cancelActiveTask();
 }

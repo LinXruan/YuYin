@@ -41,6 +41,7 @@ extension SnifferLifecycleFlow on DouyinSniffer {
     _imageGraceTimer?.cancel();
     _imageGraceTimer = null;
     _pendingImageResult = null;
+    _cancelScheduledUnload();
     _shareApi.cancelPending();
     if (_webviewShareFallback) {
       _webviewShareFallback = false;
@@ -48,11 +49,16 @@ extension SnifferLifecycleFlow on DouyinSniffer {
     }
   }
 
-  /// 主页作品捕获成功完成当前任务
+  /// 当前任务标识：脚本与回传消息共用，旧文档的迟到消息据此丢弃
+  String get _taskNonce => 't$_taskId';
+
+  /// 注入捕获脚本；脚本在 nonce 不一致或 about: 页时自行返回
   Future<void> _injectScript() async {
     if (_disposed || !_isTaskActive) return;
     try {
-      await _controller.runJavaScript(kDouyinSniffJs);
+      await _controller.runJavaScript(
+        "window.__dyTaskNonce='$_taskNonce';\n$kDouyinSniffJs",
+      );
       _acceptMessages = true;
       _acceptLogs = true;
     } catch (e) {

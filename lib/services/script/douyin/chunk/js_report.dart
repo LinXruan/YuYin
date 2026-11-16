@@ -32,6 +32,8 @@ const String jsReport = r'''  }
       log('解析完成: 共 ' + unique.length + ' 个资源');
       window.DouyinChannel.postMessage(JSON.stringify({
         type: 'result',
+        task: S.nonce,
+        awemeId: S.targetId || '',
         isImagePost: !!isImagePost,
         items: unique,
         desc: finalDesc,
@@ -64,6 +66,7 @@ const String jsReport = r'''  }
         window.DouyinChannel && window.DouyinChannel.postMessage(
           JSON.stringify({
             type: 'hint',
+            task: S.nonce,
             kind: 'video-waiting',
             awemeId: S.targetId || ''
           })

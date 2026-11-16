@@ -22,6 +22,9 @@ extension _ParseMultiParseFlow on _ParsePageState {
         '${extractResult.filteredArticleCount} 条文章已过滤，'
         '${extractResult.failedCount} 条失败',
       );
+      if (extractResult.failedUrls.isNotEmpty) {
+        widget.logs.add('未捕获成功的链接：${extractResult.failedUrls.join('、')}');
+      }
 
       if (extractResult.works.isEmpty) {
         widget.logs.add('未捕获到可保存的作品');
@@ -141,6 +144,8 @@ extension _ParseMultiParseFlow on _ParsePageState {
       widget.logs.add('多作品保存完成：成功 $successCount/${results.length}');
     } on DouyinDownloadCancelledException {
       if (mounted) widget.logs.add('已取消多作品保存');
+    } on SniffCancelledException {
+      if (mounted) widget.logs.add('已取消解析');
     } catch (e) {
       if (mounted) {
         widget.logs.add('多作品捕获失败：${_friendlyError(e)}');

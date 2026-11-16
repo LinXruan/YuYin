@@ -36,6 +36,7 @@ extension SnifferMessageLoginFlow on DouyinSniffer {
               title: cached.title,
               desc: cached.desc,
               coverUrl: cached.coverUrl,
+              awemeId: _targetAwemeId,
             ),
           );
         }

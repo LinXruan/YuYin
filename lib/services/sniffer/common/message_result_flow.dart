@@ -10,6 +10,7 @@ extension SnifferMessageResultFlow on DouyinSniffer {
     String? title,
     String? desc,
     String? coverUrl,
+    String? awemeId,
   }) async {
     if (taskId != _taskId) return;
     final completer = _completer;
@@ -56,7 +57,10 @@ extension SnifferMessageResultFlow on DouyinSniffer {
       title: title,
       desc: desc,
       coverUrl: effectiveCover.isEmpty ? null : effectiveCover,
+      awemeId: awemeId,
     );
+    _retiredAwemeId =
+        awemeId ?? UrlParser.extractAwemeId(_lastPageUrl ?? '');
     final audioPart =
         result.audioCount > 0 ? '、${result.audioCount} 首配乐音频' : '';
     final summary = isImagePost
@@ -70,12 +74,8 @@ extension SnifferMessageResultFlow on DouyinSniffer {
     completer.complete(result);
     if (identical(_completer, completer)) _completer = null;
 
-    // 解析成功后立即卸载当前网页，释放 DOM、播放器及后台脚本占用的内存
-    unawaited(
-      _controller.loadRequest(Uri.parse('about:blank')).catchError((Object error) {
-        debugPrint('卸载网页释放内存失败: $error');
-      }),
-    );
+    // 无新任务时延迟卸载；批量下一条会先取消
+    _schedulePageUnload();
   }
 
   /// 检测验证码中间页，命中后提前结束等待

@@ -9,24 +9,14 @@ import 'package:yuyin/utils/settings/video_quality_utils.dart';
 
 /// 多作品抓取代理 Fake：按 URL 返回预置结果
 class _FakeMultiWorkDelegate implements IMultiWorkSnifferDelegate {
-  _FakeMultiWorkDelegate(
-    this.responses, {
-    this.resolvedPageUrls = const {},
-  });
+  _FakeMultiWorkDelegate(this.responses);
 
   final Map<String, Object> responses;
-
-  /// 短链解析后最终落地的规范作品页 URL
-  final Map<String, String> resolvedPageUrls;
   final List<String> calls = [];
-
-  @override
-  String? awemePageUrl;
 
   @override
   Future<SingleWorkResult> sniffVideoUrl(String workUrl) async {
     calls.add(workUrl);
-    awemePageUrl = resolvedPageUrls[workUrl];
     final value = responses[workUrl];
     if (value is Exception) throw value;
     if (value is SingleWorkResult) return value;
@@ -37,7 +27,7 @@ class _FakeMultiWorkDelegate implements IMultiWorkSnifferDelegate {
   void cancelActiveTask() {}
 }
 
-SingleWorkResult _videoResult({String? coverUrl}) {
+SingleWorkResult _videoResult({String? coverUrl, String? awemeId}) {
   return SingleWorkResult(
     items: const [
       MediaItem(
@@ -53,6 +43,7 @@ SingleWorkResult _videoResult({String? coverUrl}) {
     title: '视频标题',
     desc: '视频文案',
     coverUrl: coverUrl,
+    awemeId: awemeId,
   );
 }
 
@@ -211,13 +202,10 @@ https://www.douyin.com/user/MS4wLjABAAAAabc123?from=profile
     test('同一作品口令+网址混贴时按 awemeId 去重并统一为网址形式', () async {
       const shortUrl = 'https://v.douyin.com/sameWork/';
       const fullUrl = 'https://www.douyin.com/video/7300000000000000009';
-      final delegate = _FakeMultiWorkDelegate(
-        {
-          shortUrl: _videoResult(),
-          fullUrl: _videoResult(),
-        },
-        resolvedPageUrls: {shortUrl: fullUrl},
-      );
+      final delegate = _FakeMultiWorkDelegate({
+        shortUrl: _videoResult(awemeId: '7300000000000000009'),
+        fullUrl: _videoResult(awemeId: '7300000000000000009'),
+      });
 
       final result = await MultiWorkExtractor(
         delegate,
@@ -232,13 +220,10 @@ https://www.douyin.com/user/MS4wLjABAAAAabc123?from=profile
     test('同一作品网址在前、口令在后时也只保留一个条目', () async {
       const shortUrl = 'https://v.douyin.com/sameWork/';
       const fullUrl = 'https://www.douyin.com/video/7300000000000000009';
-      final delegate = _FakeMultiWorkDelegate(
-        {
-          shortUrl: _videoResult(),
-          fullUrl: _videoResult(),
-        },
-        resolvedPageUrls: {shortUrl: fullUrl},
-      );
+      final delegate = _FakeMultiWorkDelegate({
+        shortUrl: _videoResult(awemeId: '7300000000000000009'),
+        fullUrl: _videoResult(awemeId: '7300000000000000009'),
+      });
 
       final result = await MultiWorkExtractor(
         delegate,
@@ -253,10 +238,9 @@ https://www.douyin.com/user/MS4wLjABAAAAabc123?from=profile
     test('单独口令短链也统一落为规范网址形式', () async {
       const shortUrl = 'https://v.douyin.com/sameWork/';
       const fullUrl = 'https://www.douyin.com/video/7300000000000000009';
-      final delegate = _FakeMultiWorkDelegate(
-        {shortUrl: _videoResult()},
-        resolvedPageUrls: {shortUrl: fullUrl},
-      );
+      final delegate = _FakeMultiWorkDelegate({
+        shortUrl: _videoResult(awemeId: '7300000000000000009'),
+      });
 
       final result = await MultiWorkExtractor(delegate).extractWorks([shortUrl]);
 

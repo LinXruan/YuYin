@@ -15,6 +15,7 @@ import 'chunk/js_report.dart';
 import 'chunk/js_network_hook.dart';
 import 'chunk/js_scan_engine.dart';
 import 'chunk/js_home_collect.dart';
+import 'chunk/js_home_finish.dart';
 import 'chunk/js_profile_extract.dart';
 import 'chunk/js_home_dispatch.dart';
 import 'chunk/js_bootstrap.dart';
@@ -32,6 +33,7 @@ const String kDouyinSniffJs =
     '$jsNetworkHook'
     '$jsScanEngine'
     '$jsHomeCollect'
+    '$jsHomeFinish'
     '$jsProfileExtract'
     '$jsHomeDispatch'
     '$jsBootstrap';

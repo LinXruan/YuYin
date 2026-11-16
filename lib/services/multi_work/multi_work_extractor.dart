@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import '../../models/common/work_type.dart';
 import '../../models/save_page/multi_work_extract_result.dart';
 import '../../models/save_page/save_work_item.dart';
 import '../../models/save_page/work_kind.dart';
 import '../../models/single_work/single_work_result.dart';
 import '../../utils/url_parser.dart';
+import '../sniffer/lifecycle/sniff_cancelled_exception.dart';
 import 'article_work_exception.dart';
 import 'i_multi_work_extractor.dart';
 
@@ -13,6 +16,9 @@ class MultiWorkExtractor implements IMultiWorkExtractor {
 
   final IMultiWorkSnifferDelegate _delegate;
 
+  /// 单条作品的最多尝试次数：首次失败后重试一次
+  static const int _maxAttempts = 2;
+
   @override
   Future<MultiWorkExtractResult> extractWorks(
     List<String> workUrls, {
@@ -21,12 +27,13 @@ class MultiWorkExtractor implements IMultiWorkExtractor {
   }) async {
     final works = <SaveWorkItem>[];
     final indexByAwemeId = <String, int>{};
+    final failedUrls = <String>[];
     var filteredArticleCount = 0;
-    var failedCount = 0;
     final total = workUrls.length;
 
     for (var i = 0; i < total; i++) {
       final workUrl = workUrls[i];
+      final label = '${i + 1}/$total';
       if (UrlParser.isArticleUrl(workUrl)) {
         filteredArticleCount++;
         onLog?.call('已过滤文章作品: $workUrl');
@@ -34,44 +41,37 @@ class MultiWorkExtractor implements IMultiWorkExtractor {
         continue;
       }
 
-      // 明确网址链接：若该 awemeId 已解析过，直接跳过，避免重复解析
       final explicitAwemeId = UrlParser.extractAwemeId(workUrl);
       if (explicitAwemeId != null &&
           indexByAwemeId.containsKey(explicitAwemeId)) {
         onLog?.call('重复作品已去重（保留网址形式）: $workUrl');
-        onProgress?.call(i + 1, total, '已去重重复作品 (${i + 1}/$total)');
+        onProgress?.call(i + 1, total, '已去重重复作品 ($label)');
         continue;
       }
 
-      onProgress?.call(i + 1, total, "正在捕获作品封面 (${i + 1}/$total)...");
+      onProgress?.call(i + 1, total, '正在捕获作品封面 ($label)...');
 
       try {
-        final result = await _delegate.sniffVideoUrl(workUrl);
-        if (result.items.isEmpty) {
-          failedCount++;
-          onLog?.call("第 ${i + 1} 条作品未捕获到可下载资源，已跳过");
+        final result =
+            await _sniffWithRetry(workUrl, explicitAwemeId, label, onLog);
+        if (result == null) {
+          failedUrls.add(workUrl);
           continue;
         }
 
-        // 短链解析后从最终页面 URL 提取 awemeId，与明确网址形式统一去重
-        final resolvedAwemeId = explicitAwemeId ??
-            UrlParser.extractAwemeId(_delegate.awemePageUrl ?? '');
+        final resolvedAwemeId = explicitAwemeId ?? result.awemeId;
         if (resolvedAwemeId != null &&
             indexByAwemeId.containsKey(resolvedAwemeId)) {
           onLog?.call('重复作品已去重（同一作品的口令与网址）: $workUrl');
-          onProgress?.call(i + 1, total, '已去重重复作品 (${i + 1}/$total)');
+          onProgress?.call(i + 1, total, '已去重重复作品 ($label)');
           continue;
         }
 
         final kind = result.isImagePost
             ? WorkMediaKind.image
             : WorkMediaKind.video;
-        // 统一落为规范网址形式，避免短链/模态链接在后续流程中重复解析
         final canonicalUrl =
             _canonicalWorkUrl(workUrl, resolvedAwemeId, kind);
-        if (resolvedAwemeId != null) {
-          indexByAwemeId[resolvedAwemeId] = works.length;
-        }
         works.add(
           SaveWorkItem(
             url: canonicalUrl,
@@ -81,21 +81,68 @@ class MultiWorkExtractor implements IMultiWorkExtractor {
             parsedResult: result,
           ),
         );
+        if (resolvedAwemeId != null) {
+          indexByAwemeId[resolvedAwemeId] = works.length - 1;
+        }
         onLog?.call(_successLog(i + 1, total, kind, result));
       } on ArticleWorkException catch (e) {
         filteredArticleCount++;
         onLog?.call('已过滤文章作品: ${e.message}');
+      } on SniffCancelledException {
+        rethrow;
       } catch (e) {
-        failedCount++;
-        onLog?.call("第 ${i + 1} 条作品解析失败: $e");
+        failedUrls.add(workUrl);
+        onLog?.call('第 $label 条作品解析失败: $e');
       }
     }
 
     return MultiWorkExtractResult(
       works: works,
       filteredArticleCount: filteredArticleCount,
-      failedCount: failedCount,
+      failedUrls: failedUrls,
     );
+  }
+
+  /// 单条抓取：空结果、异常或作品 id 与显式链接不一致时重试一次
+  Future<SingleWorkResult?> _sniffWithRetry(
+    String workUrl,
+    String? expectedAwemeId,
+    String label,
+    void Function(String message)? onLog,
+  ) async {
+    Object? lastError;
+    for (var attempt = 0; attempt < _maxAttempts; attempt++) {
+      try {
+        final result = await _delegate
+            .sniffVideoUrl(workUrl)
+            .timeout(const Duration(seconds: 40));
+        if (result.items.isEmpty) {
+          lastError = StateError('未捕获到可下载资源');
+        } else if (_matchesTarget(result, expectedAwemeId)) {
+          return result;
+        } else {
+          lastError = StateError('结果作品 id 与目标链接不一致');
+        }
+      } on ArticleWorkException {
+        rethrow;
+      } on SniffCancelledException {
+        rethrow;
+      } catch (e) {
+        lastError = e;
+      }
+      if (attempt + 1 < _maxAttempts) {
+        onLog?.call('第 $label 条作品未捕获到有效结果，正在重试一次');
+      }
+    }
+    onLog?.call('第 $label 条作品重试后仍失败: $lastError');
+    return null;
+  }
+
+  /// 显式链接必须与页面结果指向同一作品；短链没有预期 id 时直接信任结果
+  bool _matchesTarget(SingleWorkResult result, String? expectedAwemeId) {
+    if (expectedAwemeId == null) return true;
+    final actual = result.awemeId;
+    return actual == null || actual == expectedAwemeId;
   }
 
   @override

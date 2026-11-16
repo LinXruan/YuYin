@@ -32,12 +32,21 @@ class UserHomeExtractor implements IUserHomeExtractor {
     return _delegate.sniffUserProfile(homeUrl);
   }
 
+  /// 主页滚动偶发超时：仅对超时重试一次，其余错误（未登录/取消）直接上抛
   @override
   Future<UserHomeResult> extractAllWorks(
     String homeUrl, {
     void Function(int current, int total)? onProgress,
-  }) {
-    return _delegate.sniffUserHomeUrl(homeUrl);
+  }) async {
+    for (var attempt = 0; ; attempt++) {
+      try {
+        return await _delegate
+            .sniffUserHomeUrl(homeUrl)
+            .timeout(const Duration(seconds: 90));
+      } on TimeoutException {
+        if (attempt >= 1) rethrow;
+      }
+    }
   }
 
   @override

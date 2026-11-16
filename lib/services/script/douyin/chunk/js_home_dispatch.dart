@@ -43,15 +43,14 @@ const String jsHomeDispatch = r'''  // 从 /aweme/v1/web/aweme/post/ 接口响�
       appendHomeWorks(validUrls, nickname, coversMap, titlesMap, avatar);
     }
 
-    var tabCount = extractWorksTabCount();
-    if (tabCount > 0) S.worksTabCount = tabCount;
+    updateWorksTabCount();
 
     // 若达到总数或已无更多，立即完成
     tryFinishHomeCollection();
     if (S.homeFinished) return;
 
     // 若作品总数大于当前已捕获数，启动自动滚动定时器持续拉取
-    if (!S.homeScrollInterval && (S.worksTabCount > S.homeWorks.length || S.homeHasMore === 1)) {
+    if (!S.homeScrollInterval && shouldKeepHomeScrolling()) {
       S.homeScrollInterval = setInterval(triggerHomeScroll, 1000);
     }
   }
@@ -64,14 +63,13 @@ const String jsHomeDispatch = r'''  // 从 /aweme/v1/web/aweme/post/ 接口响�
       appendHomeWorks(domResult.urls, '', domResult.covers, domResult.titles, '');
     }
 
-    var tabCount = extractWorksTabCount();
-    if (tabCount > 0) S.worksTabCount = tabCount;
+    updateWorksTabCount();
 
     tryFinishHomeCollection();
     if (S.homeFinished) return;
 
     // 若需要翻页且未启动定时器，启动自动滚动
-    if (!S.homeScrollInterval && S.worksTabCount > 0 && S.worksTabCount > S.homeWorks.length) {
+    if (!S.homeScrollInterval && shouldKeepHomeScrolling()) {
       S.homeScrollInterval = setInterval(triggerHomeScroll, 1000);
     }
   }

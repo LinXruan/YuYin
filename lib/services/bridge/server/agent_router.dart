@@ -25,6 +25,8 @@ extension AgentRouting on AgentAutomationServer {
         await _handleParse(request);
       } else if (path == '/api/parse-works' && request.method == 'POST') {
         await _handleParseWorks(request);
+      } else if (path == '/api/parse-homes' && request.method == 'POST') {
+        await _handleParseHomes(request);
       } else if (path == '/api/save/works' && request.method == 'POST') {
         await _handleSaveWorks(request);
       } else if (path == '/api/save/home' && request.method == 'POST') {

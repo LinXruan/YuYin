@@ -7,6 +7,9 @@ extension SnifferHomeSniffFlowFlow on DouyinSniffer {
     _finishHomeWithError(StateError('已有新的解析任务开始，旧任务已取消'));
     _finishProfileWithError(StateError('已有新的解析任务开始，旧任务已取消'));
 
+    // 任务边界：旧任务结束后先拆掉旧文档，再让新任务接管
+    await _resetPageBeforeStart();
+
     final taskId = ++_taskId;
     final completer = Completer<UserHomeResult>();
     _homeCompleter = completer;
@@ -26,6 +29,7 @@ extension SnifferHomeSniffFlowFlow on DouyinSniffer {
     _sourceUrl = homeUrl;
     _awemePageUrl = null;
     _taskStartedAt = DateTime.now();
+    _taskPageStarted = false;
     _blockedSchemes.clear();
     _lastWebResourceError = null;
     _loggedNonWebPage = false;
@@ -87,7 +91,9 @@ extension SnifferHomeSniffFlowFlow on DouyinSniffer {
     }
 
     try {
-      await _controller.setUserAgent(DouyinSniffer.desktopUserAgent);
+      await _controller
+          .setUserAgent(DouyinSniffer.desktopUserAgent)
+          .timeout(const Duration(seconds: 3));
     } catch (e) {
       _log('设置桌面 UA 失败: $e');
     }
@@ -95,21 +101,21 @@ extension SnifferHomeSniffFlowFlow on DouyinSniffer {
     if (taskId != _taskId) return completer.future;
 
     try {
-      await _controller.runJavaScript(
-        'window.__douyinSnifferReset && window.__douyinSnifferReset();',
-      );
+      await _controller
+          .runJavaScript(
+            'window.__douyinSnifferReset && window.__douyinSnifferReset();',
+          )
+          .timeout(const Duration(seconds: 3));
     } catch (_) {}
 
     if (taskId != _taskId) return completer.future;
 
-    try {
-      await _controller.loadRequest(uri);
-      unawaited(_injectScript());
-    } catch (e) {
-      if (taskId == _taskId) {
-        _finishHomeWithError(e, taskId: taskId);
-      }
-    }
+    unawaited(
+      _controller.loadRequest(uri).catchError((Object e) {
+        if (taskId == _taskId) _finishHomeWithError(e, taskId: taskId);
+      }),
+    );
+    unawaited(_injectScript());
 
     return completer.future;
   }

@@ -36,6 +36,8 @@ part '../parse/status_handler.dart';
 
 part '../parse/parse_works_handler.dart';
 
+part '../parse/parse_homes_handler.dart';
+
 part '../save/save_works_handler.dart';
 
 part '../save/save_home_handler.dart';

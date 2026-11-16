@@ -76,7 +76,8 @@ Debug 包内置轻量 HTTP 服务，用于替代坐标点击与 XML Dump；Relea
 | --- | --- | --- |
 | `/api/status` | GET | 应用状态、登录态、忙碌标记 |
 | `/api/parse` | POST `{"text":"..."}` | 单作品解析 |
-| `/api/parse-works` | POST `{"text":"..."}` | 多作品逐条捕获，返回 `count / failedCount / works` |
+| `/api/parse-works` | POST `{"text":"..."}` | 多作品逐条捕获，返回 `count / failedCount / failedUrls / works`（失败链接重试一次后仍失败才计入） |
+| `/api/parse-homes` | POST `{"text":"..."}` | 多主页逐条捕获（调试），返回 `count / authors[] / failedUrls` |
 | `/api/save/works` | POST `{"text":"...","quality":"highest|lowest"}` | 多作品批量保存 |
 | `/api/save/home` | POST `{"url":"...","limit":2}` | 主页批量保存 |
 | `/api/logs` | GET `?tail=20` | 日志流 |

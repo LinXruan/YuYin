@@ -8,6 +8,10 @@ const String jsStateHeader = r'''
     homeWorks: [], homeWorkSet: {}, homeWorkCovers: {}, homeWorkTitles: {}, homeLoggedCount: 0, homeScrollInterval: null,
     homeHasMore: null, homeIdleScrolls: 0, homeLastCount: 0, homeFinished: false, authorNickname: ''
   });
+  // 任务归属：首个注入该文档的任务写入 nonce；后续任务的注入直接返回
+  if (!S.nonce) S.nonce = window.__dyTaskNonce || '';
+  if (location.protocol === 'about:') return;
+  if (!S.nonce || S.nonce !== window.__dyTaskNonce) return;
   function isUserPage() {
     try { return location.pathname.indexOf('/user/') !== -1; } catch (e) { return false; }
   }

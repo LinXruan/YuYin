@@ -46,6 +46,7 @@ extension SnifferShareFallbackFlowFlow on DouyinSniffer {
               title: result.title,
               desc: result.desc,
               coverUrl: result.coverUrl,
+              awemeId: awemeId,
             ),
           );
         } else {
@@ -90,6 +91,7 @@ extension SnifferShareFallbackFlowFlow on DouyinSniffer {
           title: pending.title,
           desc: pending.desc,
           coverUrl: pending.coverUrl,
+          awemeId: _targetAwemeId,
         ),
       );
     });

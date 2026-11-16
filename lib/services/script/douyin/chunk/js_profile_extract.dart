@@ -92,6 +92,7 @@ const String jsProfileExtract = r'''  // 从用户信息接口（如 /aweme/v1/w
         log('上报主页作者信息: 【' + S.authorNickname + '】(avatar=' + (S.authorAvatar ? 'yes' : 'no') + ')');
         window.DouyinChannel.postMessage(JSON.stringify({
           type: 'user_profile_result',
+          task: S.nonce,
           secUid: secUid,
           nickname: S.authorNickname || '',
           avatarUrl: S.authorAvatar || ''

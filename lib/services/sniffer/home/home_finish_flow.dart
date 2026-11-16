@@ -12,6 +12,7 @@ extension SnifferHomeFinishFlowFlow on DouyinSniffer {
 
     _acceptMessages = false;
     _acceptLogs = false;
+    _retiredAwemeId = null;
     _stopTimers();
 
     final author = result.nickname.isNotEmpty ? result.nickname : '未知作者';
@@ -35,11 +36,7 @@ extension SnifferHomeFinishFlowFlow on DouyinSniffer {
     completer.complete(result);
     if (identical(_homeCompleter, completer)) _homeCompleter = null;
 
-    unawaited(
-      _controller.loadRequest(Uri.parse('about:blank')).catchError((Object error) {
-        debugPrint('卸载网页释放内存失败: $error');
-      }),
-    );
+    _schedulePageUnload();
   }
 
   /// 主页作者资料捕获成功完成当前任务
@@ -51,6 +48,7 @@ extension SnifferHomeFinishFlowFlow on DouyinSniffer {
 
     _acceptMessages = false;
     _acceptLogs = false;
+    _retiredAwemeId = null;
     _stopTimers();
 
     final author = profile.nickname.isNotEmpty ? profile.nickname : '未知作者';
@@ -59,11 +57,7 @@ extension SnifferHomeFinishFlowFlow on DouyinSniffer {
     completer.complete(profile);
     if (identical(_profileCompleter, completer)) _profileCompleter = null;
 
-    unawaited(
-      _controller.loadRequest(Uri.parse('about:blank')).catchError((Object error) {
-        debugPrint('卸载网页释放内存失败: $error');
-      }),
-    );
+    _schedulePageUnload();
   }
 
   /// 超时、取消或异常时结束当前主页作者资料任务

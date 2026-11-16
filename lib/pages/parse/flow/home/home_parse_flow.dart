@@ -83,6 +83,8 @@ extension _ParseHomeParseFlow on _ParsePageState {
             '作品捕获完成：${works.length} 条可保存，'
             '已关联封面 ${homeResult.coversCount} 条$articleText',
           );
+        } on SniffCancelledException {
+          rethrow;
         } catch (e) {
           if (!mounted || !_isParsing) return;
           widget.logs.add('第 ${i + 1} 个主页捕获失败：${_friendlyError(e)}');
@@ -181,6 +183,8 @@ extension _ParseHomeParseFlow on _ParsePageState {
       );
     } on DouyinDownloadCancelledException {
       if (mounted) widget.logs.add('已取消主页批量保存');
+    } on SniffCancelledException {
+      if (mounted) widget.logs.add('已取消解析');
     } finally {
       DownloadCancelRegistry.detach();
       _downloadCancelToken = null;

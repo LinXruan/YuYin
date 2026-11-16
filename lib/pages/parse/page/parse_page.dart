@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../../models/media_item.dart';
 import '../../../services/batch_work/work_batch_saver.dart';
 import '../../../services/sniffer/facade/douyin_sniffer.dart';
+import '../../../services/sniffer/lifecycle/sniff_cancelled_exception.dart';
 import '../../../services/multi_work/article_work_exception.dart';
 import '../../../services/user_home/user_home_batch_saver.dart';
 import '../../../services/download/download_cancel_registry.dart';

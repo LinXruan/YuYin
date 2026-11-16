@@ -37,6 +37,12 @@ extension SnifferNavigationFlowFlow on DouyinSniffer {
       _logNonWebPage(url);
       return;
     }
+    // 新任务尚未真正加载目标页时，旧任务作品页的迟到事件一律忽略
+    if (!_taskPageStarted &&
+        _retiredAwemeId != null &&
+        UrlParser.extractAwemeId(url) == _retiredAwemeId) {
+      return;
+    }
     _lastPageUrl = url;
 
     // 纯文章作品不进入保存页：单作品解析中一旦重定向到 /article/ 立即快速失败

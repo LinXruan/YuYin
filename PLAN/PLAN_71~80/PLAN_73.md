@@ -47,6 +47,8 @@
 2. **重置后的空白页会重新打开接收开关**：`onPageStarted(about:blank)` 会设 `_acceptMessages=true` 并重注入。改为页面回调**先识别空白页并只放行重置信号，随后直接 return**，不参与 URL 处理与注入。
 3. **完成后卸载仍是 fire-and-forget**：它会在下一条加载之后落地，仍会复现原竞态。改为**延迟卸载定时器**（600ms），任何新任务开始时取消；批量中不触发，单作品解析完仍能释放内存。
 
+**真机验证又发现一处**：nonce 只能挡消息，挡不住**导航回调**。旧作品的 `onPageFinished` 仍会在新任务里触发上一部作品的分享页兜底，导致 3 条链接只出 2 条。补充：完成时记录 `_retiredAwemeId`，新任务真正加载目标页前（`_taskPageStarted == false`）忽略该 id 的导航事件；页面开始后自动解除屏障。
+
 ---
 
 ## 三、分层设计
@@ -103,7 +105,7 @@ sniffXxx 开始
 | 文件 | 预估行数 | 职责 |
 | --- | --- | --- |
 | `lib/services/sniffer/lifecycle/sniff_cancelled_exception.dart` | 15 | 类型化取消错误 |
-| `lib/services/sniffer/lifecycle/page_lifecycle_flow.dart` | 60 | 任务开始前重置页面、空白页信号、空闲延迟卸载 |
+| `lib/services/sniffer/lifecycle/page_lifecycle_flow.dart` | 60 | 任务开始前重置页面（有界 800ms）、旧任务导航屏障、空闲延迟卸载 |
 | `lib/services/script/douyin/chunk/js_home_finish.dart` | 60 | 主页计数只增、进度上报、完成判定 |
 | `test/plan_73_task_nonce_test.dart` | 90 | nonce 门禁、脚本切片、取消异常 |
 | `test/plan_73_multi_retry_test.dart` | 160 | 重试、id 不一致、失败清单、取消不重试 |
@@ -116,7 +118,7 @@ sniffXxx 开始
 | 文件 | 现/预计行数 | 改动 |
 | --- | --- | --- |
 | `pubspec.yaml:19` / `lib/app_info.dart:3` | — | `1.5.5+187` → `1.5.6+188` |
-| `lib/services/sniffer/facade/douyin_sniffer.dart` | 329 → 341 | `_pageReset`、`_unloadTimer` 两个字段；回调顶部标记空白页；part 声明；类型化取消 |
+| `lib/services/sniffer/facade/douyin_sniffer.dart` | 329 → 345 | `_pageReset`、`_unloadTimer`、`_retiredAwemeId`、`_taskPageStarted`；回调顶部标记空白页与旧任务屏障；类型化取消 |
 | `lib/services/sniffer/lifecycle/sniffer_lifecycle_flow.dart` | 65 → 72 | `_injectScript` 前缀 nonce；`_taskNonce` getter；`_stopTimers` 取消延迟卸载 |
 | `lib/services/sniffer/single/sniff_start_flow.dart` | 129 → 133 | 旧任务结束后 `await _resetPageBeforeStart()` |
 | `lib/services/sniffer/home/home_sniff_flow.dart` | 116 → 120 | 同上 |
@@ -165,7 +167,7 @@ sniffXxx 开始
 
 1. **版本**：`pubspec.yaml` 与 `lib/app_info.dart` 改为 `1.5.6+188`。
 2. **取消类型化**：新增 `SniffCancelledException`；`cancelActiveTask` 与三个解析页的 catch 同步替换。
-3. **页面生命周期**：新增 `page_lifecycle_flow.dart`；三个 `flowSniff*` 在旧任务结束后、`taskId++` 之前 `await _resetPageBeforeStart()`；页面回调顶部 `_markPageReset(url)`，空白页只放行信号后 return；完成路径改 `_schedulePageUnload()`，新任务与 `_stopTimers` 取消。
+3. **页面生命周期**：新增 `page_lifecycle_flow.dart`；三个 `flowSniff*` 在旧任务结束后、`taskId++` 之前 `await _resetPageBeforeStart()`（不 await 平台调用，800ms 上限）；页面回调顶部 `_markPageReset(url)`，空白页只放行信号后 return；完成路径改 `_schedulePageUnload()`，新任务与 `_stopTimers` 取消。完成时记录 `_retiredAwemeId`，新页面开始前忽略该 id 的导航事件。批量层再兜一层 40s（作品）/90s（主页）单次上限。
 4. **任务 nonce**：`_injectScript` 注入 `window.__dyTaskNonce='t$taskId';` + 脚本；header 发现 nonce 不一致或 `about:` 时整段返回；result/hint/home/profile 消息带 `task`；Dart 顶部丢弃不匹配消息（login_state 例外）。
 5. **结果身份**：注入结果与分享页兜底都写入 `awemeId`；`MultiWorkExtractor` 只用结果 id 去重，显式 id 与结果 id 不一致 → 重试，二次仍不一致 → `failedUrls`。
 6. **重试与清单**：多作品对超时/空结果/id 不一致重试一次；多主页仅对 `TimeoutException` 重试；`SniffCancelledException` 一律上抛；`failedUrls` 贯通日志、页面、REST。
@@ -208,3 +210,15 @@ sniffXxx 开始
 | JS 切片拆分 | 拼接边界可能影响注入 | 同一 IIFE 内函数声明提升；保留 plan_54~56 断言并比对拼接结果 |
 
 回退：改动集中在 `services/sniffer`、`services/multi_work`、`services/user_home` 与 `script/douyin/chunk`；`git revert` 即可，不影响保存页会话与下载链路。
+
+---
+
+## 十一、真机验证记录（2026-11-16，1.5.6+188）
+
+- 单条短链：1/1，无卡顿
+- 3 条短链 ×2 轮：3/3、3/3，0 失败，约 5~6s
+- 10 条不重复链接 ×3 轮：10/10、10/10、10/10，0 失败，约 16~20s
+- 多主页（151 + 63 + 重复项）×3 轮：作者 2 位，151/151、63/63，重复项被去重，约 19~22s
+- 修复前日志已确认：旧作品 `onPageFinished` 会把上一部 id 触发成新任务的分享页兜底，导致 3 条只出 2 条
+- 门禁：`flutter analyze` 0 issues，`flutter test` 365 全绿
+- 调试端点：`POST /api/parse-homes`（`count / authors[] / failedUrls`）
