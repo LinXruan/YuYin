@@ -58,7 +58,7 @@ extension AgentVerifyCoversHandlers on AgentAutomationServer {
         ? 0.0
         : (matchedCount / AgentAutomationServer.kReference167Map.length);
 
-    logs.add('[封面验证] 167 样本比对完成: 匹配 $matchedCount / ${AgentAutomationServer.kReference167Map.length} (${(rate * 100).toStringAsFixed(1)}%)');
+    logs.add('167 样本比对完成: 匹配 $matchedCount / ${AgentAutomationServer.kReference167Map.length} (${(rate * 100).toStringAsFixed(1)}%)');
 
     _sendJson(request, HttpStatus.ok, {
       'status': 'ok',

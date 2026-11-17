@@ -9,7 +9,7 @@ extension _ParseMultiParseFlow on _ParsePageState {
         workUrls,
         onProgress: (current, total, message) {
           if (!mounted) return;
-          widget.logs.upsertLast('正在捕获作品封面', message);
+          widget.logs.upsertLast('正在抓取作品', message);
         },
         onLog: (message) {
           if (mounted) widget.logs.add(message);
@@ -61,91 +61,94 @@ extension _ParseMultiParseFlow on _ParsePageState {
       );
       SelectionDebugBridge.attach(session);
 
-      final confirmed = await MiddleMultiWorkSheet.show(
-        context,
-        session: session,
-        secUid: SaveSelectionSession.syntheticSecUid,
-        headers: _ParsePageState._mediaHeaders,
-        nested: false,
-        onOpenWork: (workUrl, index) => _openWorkDetail(session, workUrl),
-      );
-      if (!mounted) {
-        SelectionDebugBridge.detach(session);
-        session.close();
-        return;
-      }
-      if (confirmed != true) {
-        SelectionDebugBridge.detach(session);
-        session.close();
-        widget.logs.add('已取消多作品保存');
-        return;
-      }
-
-      final urls = session.allWorkUrls
-          .where((url) => session.workState(url).isSelected)
-          .toList();
-      if (urls.isEmpty) {
-        SelectionDebugBridge.detach(session);
-        session.close();
-        widget.logs.add('未选择任何作品');
-        return;
-      }
-
-      final selected = await SessionWorkPreparer.prepare(
-        session,
-        urls,
-        widget.sniffer.sniffVideoUrl,
-      );
-      if (!mounted) {
-        SelectionDebugBridge.detach(session);
-        session.close();
-        return;
-      }
-      if (selected.isEmpty) {
-        SelectionDebugBridge.detach(session);
-        session.close();
-        widget.logs.add('选中作品没有可保存资源');
-        return;
-      }
-
-      final qualityMode =
-          session.terminal.quality.mode ?? BatchVideoQualityMode.highest;
-      widget.busy.value = true;
-      _downloadCancelToken = CancelToken();
-      DownloadCancelRegistry.attach(
-        () => _downloadCancelToken?.cancel('用户取消下载'),
-      );
-      widget.logs.add(
-        '开始保存 ${selected.length} 个作品（${_qualityLabel(qualityMode)}）...',
-      );
-
-      final results = await _workBatchSaver.saveWorks(
-        selected,
-        cancelToken: _downloadCancelToken,
-        onProgress: _updateBatchSaveProgress,
-        onLog: (message) {
-          if (mounted) widget.logs.add(message);
-        },
-      );
-      SelectionDebugBridge.detach(session);
-      session.close();
-      if (!mounted) return;
-
-      for (final item in results) {
-        if (item.success) {
-          HistoryStore.markSavedWithMeta(
-            item.url,
-            savedBaseName: item.savedBaseName,
-          );
+      try {
+        final confirmed = await MiddleMultiWorkSheet.show(
+          context,
+          session: session,
+          secUid: SaveSelectionSession.syntheticSecUid,
+          headers: _ParsePageState._mediaHeaders,
+          nested: false,
+          onOpenWork: (workUrl, index) => _openWorkDetail(session, workUrl),
+        );
+        if (!mounted) return;
+        if (confirmed != true) {
+          widget.logs.add('已取消多作品保存');
+          return;
         }
-      }
 
-      final successCount = results.where((item) => item.success).length;
-      widget.logs.add('多作品保存完成：成功 $successCount/${results.length}');
+        final urls = session.allWorkUrls
+            .where((url) => session.workState(url).isSelected)
+            .toList();
+        if (urls.isEmpty) {
+          widget.logs.add('未选择任何作品');
+          return;
+        }
+
+        final qualityMode =
+            session.terminal.quality.mode ?? BatchVideoQualityMode.highest;
+        widget.busy.value = true;
+        _downloadCancelToken = CancelToken();
+        DownloadCancelRegistry.attach(
+          () => _downloadCancelToken?.cancel('用户取消保存'),
+        );
+        widget.logs.add('正在准备保存 ${urls.length} 个作品...');
+
+        final selected = await SessionWorkPreparer.prepare(
+          session,
+          urls,
+          widget.sniffer.sniffVideoUrl,
+          isCancelled: () => _downloadCancelToken?.isCancelled ?? false,
+          onProgress: (current, total, label) => _updateBatchSaveProgress(
+            current,
+            total,
+            '正在准备保存 $current/$total：$label',
+          ),
+        );
+        if (!mounted) return;
+        if (_downloadCancelToken?.isCancelled ?? false) {
+          throw const DouyinDownloadCancelledException();
+        }
+        if (selected.isEmpty) {
+          widget.logs.add('选中作品没有可保存资源');
+          return;
+        }
+
+        widget.logs.add(
+          '开始保存 ${selected.length} 个作品（${_qualityLabel(qualityMode)}）...',
+        );
+        final results = await _workBatchSaver.saveWorks(
+          selected,
+          cancelToken: _downloadCancelToken,
+          onProgress: _updateBatchSaveProgress,
+          onLog: (message) {
+            if (mounted) widget.logs.add(message);
+          },
+        );
+        if (!mounted) return;
+
+        for (final item in results) {
+          if (item.success) {
+            HistoryStore.markSavedWithMeta(
+              item.url,
+              savedBaseName: item.savedBaseName,
+            );
+          }
+        }
+
+        final successCount = results.where((item) => item.success).length;
+        widget.logs.add('多作品保存完成：成功 $successCount/${results.length}');
+      } finally {
+        SelectionDebugBridge.detach(session);
+        session.close();
+      }
     } on DouyinDownloadCancelledException {
       if (mounted) widget.logs.add('已取消多作品保存');
     } on SniffCancelledException {
-      if (mounted) widget.logs.add('已取消解析');
+      if (mounted) {
+        widget.logs.add(
+          _downloadCancelToken?.isCancelled == true ? '已取消多作品保存' : '已取消解析',
+        );
+      }
     } catch (e) {
       if (mounted) {
         widget.logs.add('多作品捕获失败：${_friendlyError(e)}');

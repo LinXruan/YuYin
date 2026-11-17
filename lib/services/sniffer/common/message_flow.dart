@@ -16,7 +16,11 @@ extension SnifferMessageFlowFlow on DouyinSniffer {
         if (!_acceptLogs) return;
         final msg = data['msg']?.toString() ?? '';
         if (msg.isNotEmpty) {
-          _log(msg);
+          if (LogMessagePolicy.classify(msg) == SnifferLogKind.homeProgress) {
+            _report(LogMessagePolicy.formatHomeProgress(msg));
+          } else {
+            _log(msg);
+          }
           if (msg.contains('正在加载')) {
             _refreshHomeInactivityTimer(_taskId);
           }
@@ -36,10 +40,7 @@ extension SnifferMessageFlowFlow on DouyinSniffer {
         if (data['kind'] == 'video-waiting') {
           final hintId = data['awemeId']?.toString() ?? '';
           if (hintId.isNotEmpty && hintId == _targetAwemeId) {
-            if (!_degradedVideoSeen) {
-              _degradedVideoSeen = true;
-              _log('已确认视频作品，保留主 WebView 等待完整画质');
-            }
+            _degradedVideoSeen = true;
           }
         }
         return;
@@ -97,7 +98,7 @@ extension SnifferMessageFlowFlow on DouyinSniffer {
           workUrls.removeWhere(articleUrls.contains);
           workCovers.removeWhere((key, _) => articleUrls.contains(key));
           workTitles.removeWhere((key, _) => articleUrls.contains(key));
-          _log('已过滤 ${articleUrls.length} 条文章作品链接');
+          _report('已过滤 ${articleUrls.length} 条文章作品链接');
         }
 
         final homeResult = UserHomeResult(

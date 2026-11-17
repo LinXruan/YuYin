@@ -73,7 +73,7 @@ extension AgentVerifyTitlesHandlers on AgentAutomationServer {
         ? 0.0
         : (matchedCount / AgentAutomationServer.kReference168TitlesMap.length);
 
-    logs.add('[标题验证] 168 样本比对完成: 匹配 $matchedCount / ${AgentAutomationServer.kReference168TitlesMap.length} (${(rate * 100).toStringAsFixed(1)}%)');
+    logs.add('168 样本比对完成: 匹配 $matchedCount / ${AgentAutomationServer.kReference168TitlesMap.length} (${(rate * 100).toStringAsFixed(1)}%)');
 
     _sendJson(request, HttpStatus.ok, {
       'status': 'ok',

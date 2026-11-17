@@ -9,11 +9,12 @@ extension _ParseParseInputFlowFlow on _ParsePageState {
     widget.sniffer.cancelActiveTask();
   }
 
-  /// 取消当前下载：只发取消信号，令牌由保存流程的 finally 统一清理
+  /// 取消当前保存：同时中断下载与准备阶段的补解析，令牌由 finally 统一清理
   void _cancelDownload() {
     final token = _downloadCancelToken;
     if (token == null) return;
-    token.cancel('用户取消下载');
+    token.cancel('用户取消保存');
+    widget.sniffer.cancelActiveTask();
     if (mounted) _refresh(() {});
   }
 

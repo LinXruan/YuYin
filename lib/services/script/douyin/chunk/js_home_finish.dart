@@ -10,18 +10,16 @@ const String jsHomeFinish = r'''  // 作品总数只增不减，避免被瞬时�
     var target = S.worksTabCount || 0;
     return target > S.homeWorks.length || S.homeHasMore === 1;
   }
-  // 按照规范汇报进度：超过 15 条的主页，每获取 10 条打印一次
+  // 汇报进度：首条立即上报；小主页逐条上报，其余每 10 条上报一次
   function reportHomeProgress() {
     var current = S.homeWorks.length;
+    if (current <= 0) return;
     var target = S.worksTabCount || 0;
     var targetStr = target > 0 ? ' / ' + target : '';
-
-    if (target > 0 && target <= 15) {
-      return;
-    }
-    if (current >= 10 && current - S.homeLoggedCount >= 10) {
-      S.homeLoggedCount = Math.floor(current / 10) * 10;
-      log('已捕获 ' + S.homeLoggedCount + targetStr + ' 条...');
+    var step = (target > 0 && target <= 15) ? 1 : 10;
+    if (S.homeLoggedCount === 0 || current - S.homeLoggedCount >= step) {
+      S.homeLoggedCount = current;
+      log('已捕获 ' + current + targetStr + ' 条...');
     }
   }
   // 检查是否满足主页作品采集结束条件

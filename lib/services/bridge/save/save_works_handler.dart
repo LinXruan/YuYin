@@ -30,7 +30,7 @@ extension AgentSaveWorksHandlers on AgentAutomationServer {
 
     busy.value = true;
     try {
-      logs.add('[AgentBridge] 批量保存作品：${batch.workUrls.length} 条');
+      logs.add('批量保存作品：${batch.workUrls.length} 条');
       final extract = await sniffer.multiWork.extractWorks(
         batch.workUrls,
         onLog: logs.add,

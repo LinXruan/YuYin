@@ -35,7 +35,6 @@ const String jsScanEngine = r'''  }
         var audioUrl = pickAudioUrl(node);
         if (audioUrl) {
           items.push({ url: audioUrl, mediaType: 'audio', gearName: '配乐' });
-          log('捕获图文配乐音频');
         }
         var postDesc = node.desc || (node.share_info && node.share_info.share_desc) || S.desc || '';
         var postCover = pickCover(node, null) || S.coverUrl || '';
@@ -45,7 +44,6 @@ const String jsScanEngine = r'''  }
         var tiers = collectVideos(video);
         var postDesc = node.desc || (node.share_info && node.share_info.share_desc) || S.desc || '';
         if (tiers.length) {
-          log('scanTree 发现视频档位: ' + tiers.length + ' 档');
           var postCover = pickCover(node, video) || S.coverUrl || '';
           if (postCover && !S.coverUrl) S.coverUrl = postCover;
           if (sendVideoItems(tiers, postDesc, postCover)) return;
@@ -70,7 +68,6 @@ const String jsScanEngine = r'''  }
       if (postDesc && !S.desc) S.desc = String(postDesc);
       var tiers = collectVideos(v);
       if (tiers.length) {
-        log('scanPlayerData 发现播放器档位: ' + tiers.length + ' 档');
         var postCover = pickCover(info, v) || S.coverUrl || '';
         if (postCover && !S.coverUrl) S.coverUrl = postCover;
         return sendVideoItems(tiers, postDesc, postCover);
@@ -84,7 +81,7 @@ const String jsScanEngine = r'''  }
     if (!el || !el.textContent || el.__dyScanned) return;
     el.__dyScanned = true;
     try { scanTree(JSON.parse(decodeURIComponent(el.textContent))); }
-    catch (e) { log('#RENDER_DATA 解析失败，继续扫描其它数据源'); }
+    catch (e) {}
   }
   // 静态数据源（SSR JSON），页面加载期可多次即时探测
   function scanStatic() {

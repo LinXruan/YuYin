@@ -126,7 +126,7 @@ extension _ParseSingleParseFlowFlow on _ParsePageState {
       if (!mounted) return;
       if (selection == null) {
         widget.sniffer.cancelActiveTask();
-        widget.logs.add('已取消下载');
+        widget.logs.add('已取消保存');
         return;
       }
       final selected = selection.items;
@@ -171,7 +171,7 @@ extension _ParseSingleParseFlowFlow on _ParsePageState {
         );
       }
     } on DouyinDownloadCancelledException {
-      if (mounted) widget.logs.add('已取消下载');
+      if (mounted) widget.logs.add('已取消保存');
     } on SniffCancelledException {
       if (mounted && !_cancelLogged) {
         _cancelLogged = true;

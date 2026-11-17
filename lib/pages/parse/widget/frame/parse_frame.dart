@@ -4,10 +4,6 @@ part of '../../page/parse_page.dart';
 extension _ParsePageFrame on _ParsePageState {
   Widget _buildParsePage(BuildContext context) {
     final theme = Theme.of(context);
-    final action = ParseActionState.resolve(
-      isParsing: _isParsing,
-      isDownloading: _isDownloading,
-    );
     return Column(
       children: [
         Expanded(
@@ -74,7 +70,7 @@ extension _ParsePageFrame on _ParsePageState {
                       FilledButton.tonalIcon(
                         onPressed: _pasteFromClipboard,
                         icon: const Icon(Icons.paste_rounded, size: 18),
-                        label: const Text('粘贴'),
+                        label: const Text('清除并粘贴'),
                       ),
                     ],
                   ),
@@ -91,27 +87,12 @@ extension _ParsePageFrame on _ParsePageState {
                           ),
                         ),
                       ),
-                      if (action != ParseAction.idle) ...[
-                        const SizedBox(width: 8),
-                        IconButton.filledTonal(
-                          onPressed: action == ParseAction.cancelParse
-                              ? _cancelParse
-                              : _cancelDownload,
-                          icon: Icon(
-                            action == ParseAction.cancelParse
-                                ? Icons.close_rounded
-                                : Icons.stop_circle_outlined,
-                            size: 20,
-                          ),
-                          tooltip: action == ParseAction.cancelParse
-                              ? '终止解析'
-                              : '取消下载',
-                          style: IconButton.styleFrom(
-                            shape: const CircleBorder(),
-                            minimumSize: const Size(48, 48),
-                          ),
-                        ),
-                      ],
+                      ParseActionButton(
+                        token: _downloadToken,
+                        isParsing: _isParsing,
+                        onCancelParse: _cancelParse,
+                        onCancelDownload: _cancelDownload,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -130,6 +111,8 @@ extension _ParsePageFrame on _ParsePageState {
                     loggedIn: widget.loggedIn,
                     onTapLogin: widget.onTapAccount,
                   ),
+                  const SizedBox(height: 8),
+                  const _BatchSupportBanner(),
                   const SizedBox(height: 16),
                 ],
               );

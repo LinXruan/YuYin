@@ -8,6 +8,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../app_info.dart';
 import '../../../services/bridge/server/agent_automation_server.dart';
+import '../../../services/sniffer/common/log_message_policy.dart';
 import '../../../services/sniffer/facade/douyin_sniffer.dart';
 import '../../../services/update/client/update_checker.dart';
 import '../../../services/media/video_downloader.dart';
@@ -58,7 +59,7 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     // 异步检测并上报屏幕高刷跟随状态（正式版 Release 静默运行，不在解析页显示 Hz 提示）
-    DisplayModeService.init(logs: kDebugMode ? _logs : null);
+    DisplayModeService.init();
 
     // 仅在 Debug 模式下启动 Agent 自动化本地控制台服务（Release 模式物理隔离）
     if (kDebugMode) {
@@ -71,8 +72,10 @@ class _AppShellState extends State<AppShell> {
       )..start();
     }
 
-    // JS 内部调试日志统一加 [解析] 前缀后写入共享日志
-    _sniffer.onLog = (message) => _logs.add('[解析] $message');
+    // 内部诊断只在 debug 版可见；用户可见进度两版都写入
+    _sniffer.onLog = (message) => _logs.add(message);
+    _sniffer.onUserLog = (message) =>
+        _logs.upsertLast(LogMessagePolicy.homeProgressPrefix, message);
     _sniffer.isLoggedIn = () => _loggedIn.value;
     _sniffer.onLoginStateDetected = (remoteLoggedIn) {
       if (!mounted) return;
@@ -80,7 +83,7 @@ class _AppShellState extends State<AppShell> {
         _loggedIn.value = false;
         LoginStateStore.clearLogin();
         if (kDebugMode) {
-          _logs.add('[登录] 检测到抖音远端会话已失效，已自动同步为未登录状态');
+          _logs.add('检测到抖音远端会话已失效，已自动同步为未登录状态');
         }
       } else if (remoteLoggedIn && !_loggedIn.value) {
         _loggedIn.value = true;
@@ -115,6 +118,7 @@ class _AppShellState extends State<AppShell> {
     _autoCheckUpdateTimer?.cancel();
     _automationServer?.stop();
     _sniffer.onLog = null;
+    _sniffer.onUserLog = null;
     _sniffer.onLoginStateDetected = null;
     _sniffer.dispose();
     _logs.dispose();

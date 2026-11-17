@@ -35,30 +35,10 @@ class _LoginPromptBannerState extends State<_LoginPromptBanner> {
         }
 
         final theme = Theme.of(context);
-        final isDark = theme.brightness == Brightness.dark;
+        final style = _PromptStyle.of(context);
 
-        // 亮/暗双模式精细化卡片配色
-        final backgroundColor = isDark
-            ? const Color(0xFF261F22)
-            : theme.colorScheme.primaryContainer.withValues(alpha: 0.28);
-        final borderColor = isDark
-            ? const Color(0xFF7B2949).withValues(alpha: 0.6)
-            : theme.colorScheme.primary.withValues(alpha: 0.25);
-        final iconColor = isDark
-            ? const Color(0xFFFFB0C8)
-            : theme.colorScheme.primary;
-        final textColor = isDark
-            ? const Color(0xFFECE0E2)
-            : theme.colorScheme.onSurface;
-
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: borderColor, width: 1.0),
-          ),
+        return _PromptSurface(
+          style: style,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -73,7 +53,7 @@ class _LoginPromptBannerState extends State<_LoginPromptBanner> {
                       child: Icon(
                         Icons.tips_and_updates_outlined,
                         size: 20,
-                        color: iconColor,
+                        color: style.icon,
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -81,7 +61,7 @@ class _LoginPromptBannerState extends State<_LoginPromptBanner> {
                       child: Text(
                         '建议登录抖音，可以解析到更高画质',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: textColor,
+                          color: style.text,
                           fontWeight: FontWeight.w500,
                           height: 1.4,
                         ),
@@ -100,9 +80,7 @@ class _LoginPromptBannerState extends State<_LoginPromptBanner> {
                     },
                     style: TextButton.styleFrom(
                       visualDensity: VisualDensity.compact,
-                      foregroundColor: isDark
-                          ? const Color(0xFFD4C2C6)
-                          : theme.colorScheme.onSurfaceVariant,
+                      foregroundColor: style.secondaryText,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
                         vertical: 4,
@@ -118,7 +96,7 @@ class _LoginPromptBannerState extends State<_LoginPromptBanner> {
                     },
                     style: TextButton.styleFrom(
                       visualDensity: VisualDensity.compact,
-                      foregroundColor: isDark
+                      foregroundColor: style.isDark
                           ? const Color(0xFFFFB0C8)
                           : theme.colorScheme.primary,
                       padding: const EdgeInsets.symmetric(
@@ -137,5 +115,3 @@ class _LoginPromptBannerState extends State<_LoginPromptBanner> {
     );
   }
 }
-
-/// 主页作品补抓代理：把解析页的补抓逻辑注入顶层保存器

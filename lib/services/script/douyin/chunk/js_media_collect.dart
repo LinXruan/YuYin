@@ -83,7 +83,6 @@ const String jsMediaCollect = r'''  // 普通视频：同时兼容 bit_rate（�
         });
       }
     }
-    if (items.length) log('图集解析: ' + images.length + ' 项, 产出 ' + items.length + ' 个资源');
     return items;
   }
   // 提取图文配乐音频：优先从 music 对象，其次从顶层伪装 video.play_addr 提取

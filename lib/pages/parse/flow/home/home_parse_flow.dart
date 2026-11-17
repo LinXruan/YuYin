@@ -102,7 +102,9 @@ extension _ParseHomeParseFlow on _ParsePageState {
       }
       if (!mounted) return;
 
-      widget.logs.add('[主页] 成功捕获 ${profiles.length} 位作者信息，正在打开顶层保存页');
+      widget.logs.add(
+        '成功捕获 ${profiles.length} 位作者信息，正在打开顶层保存页',
+      );
       widget.onRequestParseTab();
 
       final session = SaveSelectionSession.home(
@@ -112,81 +114,90 @@ extension _ParseHomeParseFlow on _ParsePageState {
       );
       SelectionDebugBridge.attach(session);
 
-      final confirmed = await MultiHomePreviewSheet.show(
-        context,
-        session: session,
-        headers: _ParsePageState._mediaHeaders,
-        onOpenAuthor: (secUid, index) => _openAuthorWorks(session, secUid),
-      );
-      if (!mounted) {
-        SelectionDebugBridge.detach(session);
-        session.close();
-        return;
-      }
-      if (confirmed != true) {
-        SelectionDebugBridge.detach(session);
-        session.close();
-        widget.logs.add('已取消多主页保存');
-        return;
-      }
-
-      final selectedAuthors = session.authors
-          .where((author) => author.selection.isSelected)
-          .toList();
-      if (selectedAuthors.isEmpty) {
-        SelectionDebugBridge.detach(session);
-        session.close();
-        widget.logs.add('未选择任何作者');
-        return;
-      }
-
-      final prepared = await _prepareByAuthor(session, selectedAuthors);
-      if (!mounted) {
-        SelectionDebugBridge.detach(session);
-        session.close();
-        return;
-      }
-
-      final qualityMode =
-          session.terminal.quality.mode ?? BatchVideoQualityMode.highest;
-      final homeSaver = UserHomeBatchSaver(workSaver: _workBatchSaver);
-      widget.busy.value = true;
-      _downloadCancelToken = CancelToken();
-      DownloadCancelRegistry.attach(
-        () => _downloadCancelToken?.cancel('用户取消下载'),
-      );
-      widget.logs.add(
-        '开始保存 ${selectedAuthors.length} 位作者（${_qualityLabel(qualityMode)}）...',
-      );
-
-      final result = await homeSaver.saveAuthors(
-        authors: selectedAuthors.map((author) => author.profile).toList(),
-        worksBySecUid: prepared,
-        qualityMode: qualityMode,
-        cancelToken: _downloadCancelToken,
-        onProgress: _updateBatchSaveProgress,
-        onLog: (message) {
-          if (mounted) widget.logs.add(message);
-        },
-      );
-      SelectionDebugBridge.detach(session);
-      session.close();
-      if (!mounted) return;
-
-      for (final author in result.authors) {
-        if (author.success) {
-          await HistoryStore.markSaved('home:${author.secUid}', true);
+      try {
+        final confirmed = await MultiHomePreviewSheet.show(
+          context,
+          session: session,
+          headers: _ParsePageState._mediaHeaders,
+          onOpenAuthor: (secUid, index) => _openAuthorWorks(session, secUid),
+        );
+        if (!mounted) return;
+        if (confirmed != true) {
+          widget.logs.add('已取消多主页保存');
+          return;
         }
-      }
 
-      final successCount = result.authors.where((a) => a.success).length;
-      widget.logs.add(
-        '主页批量保存完成：成功 $successCount/${result.authors.length} 位作者，共 ${result.totalSaved} 项资源',
-      );
+        final selectedAuthors = session.authors
+            .where((author) => author.selection.isSelected)
+            .toList();
+        if (selectedAuthors.isEmpty) {
+          widget.logs.add('未选择任何作者');
+          return;
+        }
+
+        final qualityMode =
+            session.terminal.quality.mode ?? BatchVideoQualityMode.highest;
+        widget.busy.value = true;
+        _downloadCancelToken = CancelToken();
+        DownloadCancelRegistry.attach(
+          () => _downloadCancelToken?.cancel('用户取消保存'),
+        );
+        widget.logs.add('正在准备保存 ${selectedAuthors.length} 位作者...');
+
+        final prepared = await _prepareByAuthor(
+          session,
+          selectedAuthors,
+          isCancelled: () => _downloadCancelToken?.isCancelled ?? false,
+          onProgress: (nickname, current, total) => _updateBatchSaveProgress(
+            current,
+            total,
+            '正在准备保存：$nickname $current/$total',
+          ),
+        );
+        if (!mounted) return;
+        if (_downloadCancelToken?.isCancelled ?? false) {
+          throw const DouyinDownloadCancelledException();
+        }
+
+        final homeSaver = UserHomeBatchSaver(workSaver: _workBatchSaver);
+        widget.logs.add(
+          '开始保存 ${selectedAuthors.length} 位作者（${_qualityLabel(qualityMode)}）...',
+        );
+
+        final result = await homeSaver.saveAuthors(
+          authors: selectedAuthors.map((author) => author.profile).toList(),
+          worksBySecUid: prepared,
+          qualityMode: qualityMode,
+          cancelToken: _downloadCancelToken,
+          onProgress: _updateBatchSaveProgress,
+          onLog: (message) {
+            if (mounted) widget.logs.add(message);
+          },
+        );
+        if (!mounted) return;
+
+        for (final author in result.authors) {
+          if (author.success) {
+            await HistoryStore.markSaved('home:${author.secUid}', true);
+          }
+        }
+
+        final successCount = result.authors.where((a) => a.success).length;
+        widget.logs.add(
+          '主页批量保存完成：成功 $successCount/${result.authors.length} 位作者，共 ${result.totalSaved} 项资源',
+        );
+      } finally {
+        SelectionDebugBridge.detach(session);
+        session.close();
+      }
     } on DouyinDownloadCancelledException {
       if (mounted) widget.logs.add('已取消主页批量保存');
     } on SniffCancelledException {
-      if (mounted) widget.logs.add('已取消解析');
+      if (mounted) {
+        widget.logs.add(
+          _downloadCancelToken?.isCancelled == true ? '已取消主页批量保存' : '已取消解析',
+        );
+      }
     } finally {
       DownloadCancelRegistry.detach();
       _downloadCancelToken = null;

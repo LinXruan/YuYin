@@ -16,7 +16,7 @@ extension SnifferShareFallbackFlowFlow on DouyinSniffer {
   /// 并行请求 iesdouyin 分享页；图片提前完成，视频只缓存
 
   Future<void> _runShareFallback(String awemeId, int taskId) async {
-    _log('分享页兜底启动: awemeId=$awemeId（page=${_lastPageUrl ?? ''}）');
+    _log('分享页兜底启动');
 
     try {
       final result = await _shareApi.fetchShareItem(
@@ -29,15 +29,10 @@ extension SnifferShareFallbackFlowFlow on DouyinSniffer {
       if (_targetAwemeId != null && _targetAwemeId != awemeId) return;
 
       if (result.isImagePost && result.items.isNotEmpty) {
-        _log('分享页兜底命中（等待实况补充）: ${result.items.length} 个资源');
+        _log('分享页兜底命中，等待实况补充');
         _scheduleImageFallback(result, taskId);
       } else if (result.items.isNotEmpty) {
         if (!_isLoggedIn) {
-          if (kDebugMode) {
-            _log('未登录状态：分享页已获取无水印视频，极速完成解析');
-          } else {
-            _log('分享页已获取无水印视频，完成解析');
-          }
           unawaited(
             _finishWithItems(
               result.items,
@@ -51,7 +46,6 @@ extension SnifferShareFallbackFlowFlow on DouyinSniffer {
           );
         } else {
           _shareVideoFallback = result;
-          _log('分享页已取到 ${result.items.length} 个视频档位，已登录状态等待主 WebView 完整画质');
         }
       }
     } on DouyinShareCancelledException {
@@ -105,15 +99,14 @@ extension SnifferShareFallbackFlowFlow on DouyinSniffer {
     String message,
   ) {
     _shareFallbackFailed = true;
+    _log('分享页兜底失败: $message');
     if (_isNotePage || !_isLoggedIn) {
-      _log('分享页兜底失败: $message（3 秒后切换 WebView 兜底）');
       _scheduleWebViewShareFallback(
         awemeId,
         taskId,
         DouyinSniffer._kNoteFallbackDelay,
       );
     } else {
-      _log('视频页分享页兜底不可用，继续等待主 WebView');
       _scheduleWebViewShareFallback(
         awemeId,
         taskId,

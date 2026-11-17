@@ -34,10 +34,22 @@ class MultiWorkExtractor implements IMultiWorkExtractor {
     for (var i = 0; i < total; i++) {
       final workUrl = workUrls[i];
       final label = '${i + 1}/$total';
+
+      void report(String title) {
+        final text = title.trim();
+        final short = text.length > 18 ? '${text.substring(0, 18)}…' : text;
+        onProgress?.call(
+          i + 1,
+          total,
+          '正在抓取作品 ${i + 1}/$total'
+              '（成功 ${works.length}，失败 ${failedUrls.length}）：$short',
+        );
+      }
+
       if (UrlParser.isArticleUrl(workUrl)) {
         filteredArticleCount++;
         onLog?.call('已过滤文章作品: $workUrl');
-        onProgress?.call(i + 1, total, '已过滤文章作品 ($i/$total)');
+        report('已过滤文章');
         continue;
       }
 
@@ -45,17 +57,18 @@ class MultiWorkExtractor implements IMultiWorkExtractor {
       if (explicitAwemeId != null &&
           indexByAwemeId.containsKey(explicitAwemeId)) {
         onLog?.call('重复作品已去重（保留网址形式）: $workUrl');
-        onProgress?.call(i + 1, total, '已去重重复作品 ($label)');
+        report('已去重');
         continue;
       }
 
-      onProgress?.call(i + 1, total, '正在捕获作品封面 ($label)...');
+      report('正在捕获...');
 
       try {
         final result =
             await _sniffWithRetry(workUrl, explicitAwemeId, label, onLog);
         if (result == null) {
           failedUrls.add(workUrl);
+          report(workUrl);
           continue;
         }
 
@@ -63,7 +76,7 @@ class MultiWorkExtractor implements IMultiWorkExtractor {
         if (resolvedAwemeId != null &&
             indexByAwemeId.containsKey(resolvedAwemeId)) {
           onLog?.call('重复作品已去重（同一作品的口令与网址）: $workUrl');
-          onProgress?.call(i + 1, total, '已去重重复作品 ($label)');
+          report('已去重');
           continue;
         }
 
@@ -84,15 +97,17 @@ class MultiWorkExtractor implements IMultiWorkExtractor {
         if (resolvedAwemeId != null) {
           indexByAwemeId[resolvedAwemeId] = works.length - 1;
         }
-        onLog?.call(_successLog(i + 1, total, kind, result));
+        report(result.displayTitle.isEmpty ? workUrl : result.displayTitle);
       } on ArticleWorkException catch (e) {
         filteredArticleCount++;
         onLog?.call('已过滤文章作品: ${e.message}');
+        report('已过滤文章');
       } on SniffCancelledException {
         rethrow;
       } catch (e) {
         failedUrls.add(workUrl);
         onLog?.call('第 $label 条作品解析失败: $e');
+        report(workUrl);
       }
     }
 
@@ -169,18 +184,5 @@ class MultiWorkExtractor implements IMultiWorkExtractor {
       }
     }
     return '';
-  }
-
-  String _successLog(
-    int current,
-    int total,
-    WorkMediaKind kind,
-    SingleWorkResult result,
-  ) {
-    final typeLabel = kind.label;
-    final title = result.displayTitle;
-    final titleText = title.isEmpty ? '' : '《$title》';
-    return '已捕获第 $current/$total 条$typeLabel作品$titleText'
-        '（${result.items.length} 个资源，封面${result.coverUrl?.isNotEmpty == true ? '已关联' : '缺失'}）';
   }
 }

@@ -89,7 +89,6 @@ const String jsProfileExtract = r'''  // 从用户信息接口（如 /aweme/v1/w
       var m = location.pathname.match(/\/user\/([^\/?#]+)/);
       if (m && m[1]) secUid = m[1];
       if (window.DouyinChannel && window.DouyinChannel.postMessage) {
-        log('上报主页作者信息: 【' + S.authorNickname + '】(avatar=' + (S.authorAvatar ? 'yes' : 'no') + ')');
         window.DouyinChannel.postMessage(JSON.stringify({
           type: 'user_profile_result',
           task: S.nonce,

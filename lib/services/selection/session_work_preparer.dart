@@ -10,13 +10,23 @@ class SessionWorkPreparer {
   static Future<List<SelectedWork>> prepare(
     SaveSelectionSession session,
     Iterable<String> workUrls,
-    Future<SingleWorkResult> Function(String url) parser,
-  ) async {
+    Future<SingleWorkResult> Function(String url) parser, {
+    bool Function()? isCancelled,
+    void Function(int current, int total, String label)? onProgress,
+  }) async {
+    final urls =
+        workUrls.where((url) => session.workState(url).isSelected).toList();
     final result = <SelectedWork>[];
-    for (final url in workUrls) {
-      if (!session.workState(url).isSelected) continue;
+
+    for (var index = 0; index < urls.length; index++) {
+      if (isCancelled?.call() ?? false) break;
+      final url = urls[index];
+      final title = session.workOf(url)?.work.title.trim() ?? '';
+      onProgress?.call(index + 1, urls.length, title.isEmpty ? url : title);
+
       final ok = await session.ensureParsed(url, () => parser(url));
       if (!ok) continue;
+
       final work = session.buildSelectedWork(url);
       if (work != null) result.add(work);
     }

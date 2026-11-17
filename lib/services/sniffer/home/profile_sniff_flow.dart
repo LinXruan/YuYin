@@ -32,6 +32,7 @@ extension SnifferProfileSniffFlowFlow on DouyinSniffer {
     _taskPageStarted = false;
     _blockedSchemes.clear();
     _lastWebResourceError = null;
+    _loggedWebResourceError = false;
     _loggedNonWebPage = false;
     _loggedInjectFailure = false;
     _loggedCaptchaFailure = false;
@@ -49,12 +50,6 @@ extension SnifferProfileSniffFlowFlow on DouyinSniffer {
         _isLoggedIn = false;
       }
     }
-
-    if (!_isLoggedIn) {
-      _log('未登录模式：可捕获主页作者信息');
-    }
-
-    _log('开始捕获主页作者信息: $homeUrl');
 
     _timeoutTimer?.cancel();
     _timeoutTimer = Timer(const Duration(seconds: 15), () {

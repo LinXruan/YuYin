@@ -33,6 +33,7 @@ extension SnifferSniffStartFlowFlow on DouyinSniffer {
     _taskPageStarted = false;
     _blockedSchemes.clear();
     _lastWebResourceError = null;
+    _loggedWebResourceError = false;
     _loggedNonWebPage = false;
     _loggedInjectFailure = false;
     _loggedCaptchaFailure = false;
@@ -50,12 +51,7 @@ extension SnifferSniffStartFlowFlow on DouyinSniffer {
         _isLoggedIn = false;
       }
     }
-    if (kDebugMode) {
-      _log('开始解析 (task#$taskId, 登录状态: ${_isLoggedIn ? '已登录' : '未登录'}): $shareUrl');
-    } else {
-      final loginTag = _isLoggedIn ? ' (已登录)' : '';
-      _log('开始解析$loginTag: $shareUrl');
-    }
+    _log('开始解析作品（${_isLoggedIn ? '已登录' : '未登录'}）');
 
     _timeoutTimer?.cancel();
     _timeoutTimer = Timer(DouyinSniffer._kTaskTimeout, () {

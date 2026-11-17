@@ -63,23 +63,15 @@ extension SnifferWebviewFallbackFlowFlow on DouyinSniffer {
 
     // 已登录且确认是视频作品时，普通 C 不启动（等待主 WebView 提取全码率），只有迟到兜底才允许
     if (_isLoggedIn && !_isNotePage && _degradedVideoSeen && !lateFallback) {
-      _log('已确认视频作品且处于登录状态，保留主 WebView 提取完整画质');
       return;
     }
 
     // 时间预算：C 必须在主 30 秒超时前结束
     final elapsed = DateTime.now().difference(_taskStartedAt);
     final timeout = DouyinSniffer.webViewFallbackTimeoutFor(elapsed);
-    if (timeout == null) {
-      _log('任务剩余时间不足，跳过分享页兜底');
-      return;
-    }
+    if (timeout == null) return;
 
     _webviewShareFallback = true;
-    final kindLabel = lateFallback
-        ? '视频最后兜底'
-        : (_isNotePage ? '图文页' : '非图文页');
-    _log('分享页兜底切换到 WebView（$kindLabel）: awemeId=$awemeId');
 
     try {
       await _controller.setUserAgent(DouyinShareApi.iphoneUserAgent);

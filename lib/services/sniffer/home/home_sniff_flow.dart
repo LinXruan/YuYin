@@ -32,6 +32,7 @@ extension SnifferHomeSniffFlowFlow on DouyinSniffer {
     _taskPageStarted = false;
     _blockedSchemes.clear();
     _lastWebResourceError = null;
+    _loggedWebResourceError = false;
     _loggedNonWebPage = false;
     _loggedInjectFailure = false;
     _loggedCaptchaFailure = false;
@@ -49,12 +50,6 @@ extension SnifferHomeSniffFlowFlow on DouyinSniffer {
         _isLoggedIn = false;
       }
     }
-
-    if (!_isLoggedIn) {
-      _log('未登录模式：仅解析首屏作品');
-    }
-
-    _log('开始解析主页: $homeUrl');
 
     _timeoutTimer?.cancel();
     _timeoutTimer = Timer(DouyinSniffer._kHomeInitialTimeout, () {

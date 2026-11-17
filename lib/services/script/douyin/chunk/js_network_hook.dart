@@ -9,7 +9,7 @@ const String jsNetworkHook = r'''  // 网络钩子：确保即使被外部 SecSD
           var input = args[0];
           var url = typeof input === 'string' ? input : (input && input.url) || '';
           try {
-            if (isMediaUrl(url)) { log('捕获 fetch 媒体请求'); reportSingle(url, false); }
+            if (isMediaUrl(url)) { reportSingle(url, false); }
           } catch (e) {}
           var promise = rawFetch.apply(this, args);
           try {
@@ -29,7 +29,6 @@ const String jsNetworkHook = r'''  // 网络钩子：确保即使被外部 SecSD
                     try {
                       if (S.sent) return;
                       var json = JSON.parse(text);
-                      log('命中作品接口(fetch): ' + String(url).split('?')[0]);
                       if (isUserPage()) {
                         if (String(url).indexOf('/aweme/v1/web/aweme/post/') !== -1) {
                           tryExtractFromAwemePostJson(json);
@@ -57,7 +56,7 @@ const String jsNetworkHook = r'''  // 网络钩子：确保即使被外部 SecSD
         var hookedOpen = function (method, url) {
           try {
             var strUrl = String(url || '');
-            if (isMediaUrl(strUrl)) { log('捕获 XHR 媒体请求'); reportSingle(strUrl, false); }
+            if (isMediaUrl(strUrl)) { reportSingle(strUrl, false); }
             if (isAwemeApiUrl(strUrl)) {
               var xhr = this; xhr.addEventListener('load', function () {
                 try {
@@ -72,7 +71,6 @@ const String jsNetworkHook = r'''  // 网络钩子：确保即使被外部 SecSD
                     if (rawText) json = JSON.parse(rawText);
                   }
                   if (json) {
-                    log('命中作品接口(XHR): ' + strUrl.split('?')[0]);
                     if (isUserPage()) {
                       if (strUrl.indexOf('/aweme/v1/web/aweme/post/') !== -1) {
                         tryExtractFromAwemePostJson(json);

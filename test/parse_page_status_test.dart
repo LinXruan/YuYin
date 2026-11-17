@@ -127,10 +127,10 @@ void main() {
       expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
       expect(find.byIcon(Icons.info_outline), findsNothing);
 
-      // 5. 取消态验证（已取消下载 与 已取消解析 均显示单行且渲染 Info 图标）
-      logs.add('已取消下载');
+      // 5. 取消态验证（已取消保存 与 已取消解析 均显示单行且渲染 Info 图标）
+      logs.add('已取消保存');
       await tester.pumpAndSettle();
-      expect(find.text('已取消下载'), findsOneWidget);
+      expect(find.text('已取消保存'), findsOneWidget);
       expect(find.byIcon(Icons.info_outline), findsOneWidget);
       expect(find.byIcon(Icons.check_circle_outline), findsNothing);
 

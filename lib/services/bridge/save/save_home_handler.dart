@@ -22,7 +22,7 @@ extension AgentSaveHomeHandlers on AgentAutomationServer {
 
     busy.value = true;
     try {
-      logs.add('[AgentBridge] 主页批量保存：$url');
+      logs.add('主页批量保存：$url');
       final home = await sniffer.userHome.extractAllWorks(url);
       final works = <SaveWorkItem>[];
       for (final workUrl in home.workUrls) {

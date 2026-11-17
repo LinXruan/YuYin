@@ -25,9 +25,6 @@ const String jsReport = r'''  }
           if (unique[k].mediaType === 'image') { finalCover = unique[k].url; break; }
         }
       }
-      if (finalDesc) {
-        log('捕获作品文案: ' + (finalDesc.length > 25 ? finalDesc.substring(0, 25) + '...' : finalDesc));
-      }
       // 先发日志再发结果，确保 Dart 在关闭日志接收前能看到收尾信息
       log('解析完成: 共 ' + unique.length + ' 个资源');
       window.DouyinChannel.postMessage(JSON.stringify({
@@ -77,10 +74,8 @@ const String jsReport = r'''  }
     // 主页面降级等待 12 秒；与 Dart 侧 18 秒迟到兜底、30 秒主超时独立，修改需同步检查
     // 若已确定远端未登录，无需死等完整画质列表，直接回传基础视频流！
     if (!sharePage && S.loginReported !== false && Date.now() - (window.__dyStartTime || 0) < 12000) {
-      log('已发现基础视频流，正在等待完整画质列表(bit_rate)...');
       return false;
     }
-    if (sharePage) log('分享页发现基础视频流，立即回传');
     return sendItems(items, false, customDesc, customCover);
   }
   // 单地址兜底：图文页不启用，避免误抓实况视频或背景音乐

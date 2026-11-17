@@ -126,16 +126,26 @@ extension _ParseSavePageFlow on _ParsePageState {
   /// 按作者补解析并解算为可落盘对象
   Future<Map<String, List<SelectedWork>>> _prepareByAuthor(
     SaveSelectionSession session,
-    Iterable<AuthorSelectionView> authors,
-  ) async {
+    Iterable<AuthorSelectionView> authors, {
+    bool Function()? isCancelled,
+    void Function(String nickname, int current, int total)? onProgress,
+  }) async {
     final result = <String, List<SelectedWork>>{};
     for (final author in authors) {
+      if (isCancelled?.call() ?? false) break;
       final urls = session.workUrlsOf(author.secUid);
+      final nickname = author.profile.nickname.trim().isNotEmpty
+          ? author.profile.nickname.trim()
+          : '未知作者';
       result[author.secUid] = await SessionWorkPreparer.prepare(
         session,
         urls,
         widget.sniffer.sniffVideoUrl,
+        isCancelled: isCancelled,
+        onProgress: (current, total, label) =>
+            onProgress?.call(nickname, current, total),
       );
+      if (isCancelled?.call() ?? false) break;
     }
     return result;
   }

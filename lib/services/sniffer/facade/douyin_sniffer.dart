@@ -9,6 +9,7 @@ import '../../../utils/login_state_store.dart';
 import '../../../utils/url_parser.dart';
 import '../../share/client/douyin_share_api.dart';
 import '../channel/sniffer_channel_parser.dart';
+import '../common/log_message_policy.dart';
 import '../lifecycle/sniff_cancelled_exception.dart';
 import '../../script/douyin/douyin_sniff_script.dart';
 import '../../multi_work/article_work_exception.dart';
@@ -133,6 +134,7 @@ class DouyinSniffer
   DateTime _taskStartedAt = DateTime.now();
   final Set<String> _blockedSchemes = <String>{};
   String? _lastWebResourceError;
+  bool _loggedWebResourceError = false;
   bool _loggedNonWebPage = false;
   bool _loggedInjectFailure = false;
   bool _loggedCaptchaFailure = false;
@@ -151,8 +153,11 @@ class DouyinSniffer
     return false;
   }
 
-  /// JS 调试日志回调，由主界面设置
+  /// 内部诊断日志回调：仅 debug 版写入界面日志
   void Function(String message)? onLog;
+
+  /// 用户可见日志回调：正式版与 debug 版都写入界面日志
+  void Function(String message)? onUserLog;
 
   /// 登录状态回调，由主界面设置
   bool Function()? isLoggedIn;
@@ -165,13 +170,17 @@ class DouyinSniffer
   /// 当前捕获任务执行时检测到的登录状态
   bool get isUserLoggedIn => _isLoggedIn;
 
-  /// 写入终端调试日志与界面共享日志（界面日志保持纯净，终端 Debug 模式保留耗时标记）
+  /// 内部诊断日志：仅 debug 版输出，正式版不进入界面日志
   void _log(String message) {
-    if (kDebugMode) {
-      final ms = DateTime.now().difference(_taskStartedAt).inMilliseconds;
-      debugPrint('[JS-Sniffer] [+${(ms / 1000).toStringAsFixed(2)}s] $message');
-    }
+    if (!kDebugMode) return;
+    final ms = DateTime.now().difference(_taskStartedAt).inMilliseconds;
+    debugPrint('[JS-Sniffer] [+${(ms / 1000).toStringAsFixed(2)}s] $message');
     onLog?.call(message);
+  }
+
+  /// 用户可见日志：正式版与 debug 版都输出
+  void _report(String message) {
+    onUserLog?.call(message);
   }
 
   DouyinSniffer() {

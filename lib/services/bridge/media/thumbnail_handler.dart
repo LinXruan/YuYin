@@ -14,7 +14,7 @@ extension AgentThumbnailHandlers on AgentAutomationServer {
   /// POST /api/thumbnails/clear：清空本地缩略图缓存
   Future<void> _handleClearThumbnails(HttpRequest request) async {
     await HistoryThumbnailCache.clearCache();
-    logs.add('[缩略图] 本地缩略图离线缓存已完全清空');
+    logs.add('本地缩略图离线缓存已完全清空');
     _sendJson(request, HttpStatus.ok, {
       'status': 'ok',
       'message': '缩略图缓存已清空',
@@ -33,7 +33,7 @@ extension AgentThumbnailHandlers on AgentAutomationServer {
         }
       }
     }
-    logs.add('[缩略图] 已触发 $triggered 条历史记录的本地离线缓存预热');
+    logs.add('已触发 $triggered 条历史记录的本地离线缓存预热');
     _sendJson(request, HttpStatus.ok, {
       'status': 'ok',
       'triggeredCount': triggered,

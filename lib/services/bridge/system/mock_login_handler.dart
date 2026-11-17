@@ -9,11 +9,11 @@ extension AgentMockLoginHandlers on AgentAutomationServer {
     if (mockLoggedIn) {
       await LoginStateStore.markLoggedIn();
       loggedIn.value = true;
-      logs.add('[AgentBridge] 已模拟设置为登录状态 (loggedIn=true)');
+      logs.add('已模拟设置为登录状态 (loggedIn=true)');
     } else {
       await LoginStateStore.clearLogin();
       loggedIn.value = false;
-      logs.add('[AgentBridge] 已清除登录状态 (loggedIn=false)');
+      logs.add('已清除登录状态 (loggedIn=false)');
     }
     _sendJson(request, HttpStatus.ok, {
       'success': true,

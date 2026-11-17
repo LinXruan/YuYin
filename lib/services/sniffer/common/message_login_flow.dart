@@ -12,9 +12,7 @@ extension SnifferMessageLoginFlow on DouyinSniffer {
     if (taskId != _taskId || !_isTaskActive) return;
 
     if (!remoteLoggedIn) {
-      if (kDebugMode) {
-        _log('检测到远端登录状态: 未登录 (原因: $reason)');
-      }
+      _log('检测到远端登录状态: 未登录 (原因: $reason)');
       final wasLoggedIn = _isLoggedIn;
       _isLoggedIn = false;
 
@@ -23,11 +21,6 @@ extension SnifferMessageLoginFlow on DouyinSniffer {
         // 若之前分享页兜底已经拿到了无水印视频（此前被暂存等待完整画质），立即结束解析！
         final cached = _shareVideoFallback;
         if (cached != null && cached.items.isNotEmpty) {
-          if (kDebugMode) {
-            _log('远端未登录：立即使用已就绪的分享页视频极速完成解析');
-          } else {
-            _log('分享页已获取无水印视频，完成解析');
-          }
           unawaited(
             _finishWithItems(
               cached.items,
@@ -42,9 +35,7 @@ extension SnifferMessageLoginFlow on DouyinSniffer {
         }
       }
     } else {
-      if (kDebugMode) {
-        _log('检测到远端登录状态: 已登录 (原因: $reason)');
-      }
+      _log('检测到远端登录状态: 已登录 (原因: $reason)');
       _isLoggedIn = true;
       onLoginStateDetected?.call(true);
     }

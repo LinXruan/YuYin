@@ -66,11 +66,7 @@ extension SnifferMessageResultFlow on DouyinSniffer {
     final summary = isImagePost
         ? '解析成功：共发现 ${result.imageCount} 张图片、${result.videoCount} 个视频$audioPart'
         : '解析成功：共发现 ${result.items.length} 个清晰度档位';
-    _log(summary);
-    if (desc != null && desc.isNotEmpty) {
-      final shortDesc = desc.length > 30 ? '${desc.substring(0, 30)}...' : desc;
-      _log('作品文案: $shortDesc');
-    }
+    _report(summary);
     completer.complete(result);
     if (identical(_completer, completer)) _completer = null;
 

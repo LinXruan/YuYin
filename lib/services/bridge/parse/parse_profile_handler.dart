@@ -48,7 +48,7 @@ extension AgentParseProfileHandlers on AgentAutomationServer {
       _lastParsedUrl = url;
       final author = profile.nickname.isNotEmpty ? profile.nickname : '未知作者';
       final hasAvatar = profile.avatarUrl.isNotEmpty;
-      logs.add('[主页] 成功捕获作者【$author】基础资料（${hasAvatar ? "已获取头像" : "未获取头像"}）');
+      logs.add('成功捕获作者【$author】基础资料（${hasAvatar ? "已获取头像" : "未获取头像"}）');
       _sendJson(request, HttpStatus.ok, {
         'status': 'ok',
         'type': 'user_profile',

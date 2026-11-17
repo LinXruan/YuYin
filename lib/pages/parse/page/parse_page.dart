@@ -19,6 +19,7 @@ import '../../../utils/network_detector.dart';
 import '../../../utils/savelocation/save_location_store.dart';
 import '../../../utils/memory/terminal_memory_store.dart';
 import '../../../utils/url_parser.dart';
+import '../../../utils/settings/parse_hint_store.dart';
 import '../../../utils/settings/video_quality_utils.dart';
 import '../../../models/history_item.dart';
 import '../../../models/parse/parse_action_state.dart';
@@ -41,8 +42,14 @@ part '../flow/multi/multi_parse_flow.dart';
 
 part '../flow/common/parse_progress_flow.dart';
 part '../widget/status/status_card.dart';
+part '../widget/banner/prompt_surface.dart';
+
 part '../widget/banner/login_prompt_banner.dart';
+
+part '../widget/banner/batch_support_banner.dart';
 part '../flow/common/save_page_flow.dart';
+
+part '../widget/frame/parse_action_button.dart';
 
 part '../widget/frame/parse_frame.dart';
 
@@ -78,8 +85,17 @@ class _ParsePageState extends State<ParsePage>
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _inputScrollController = ScrollController();
   final ValueNotifier<double?> _downloadProgress = ValueNotifier(null);
-  CancelToken? _downloadCancelToken;
+  final ValueNotifier<CancelToken?> _downloadToken = ValueNotifier(null);
+  bool _downloadTokenDisposed = false;
   String _lastProgressKey = '';
+
+  /// 下载/保存中的取消令牌：由 notifier 承载，变化即触发按钮重建
+  CancelToken? get _downloadCancelToken => _downloadToken.value;
+
+  set _downloadCancelToken(CancelToken? token) {
+    if (_downloadTokenDisposed) return;
+    _downloadToken.value = token;
+  }
 
   Timer? _hideScrollTimer;
   bool _showScrollIndicator = false;
@@ -87,9 +103,6 @@ class _ParsePageState extends State<ParsePage>
   double _thumbHeight = 40.0;
   bool _isParsing = false;
   bool _cancelLogged = false;
-
-  /// 下载中：由活动取消令牌派生，不新增第二份布尔状态
-  bool get _isDownloading => _downloadCancelToken != null;
 
   /// 加载封面/头像所需的统一请求头
   static const Map<String, String> _mediaHeaders = {
@@ -156,7 +169,8 @@ class _ParsePageState extends State<ParsePage>
       widget.sniffer.cancelActiveTask();
     }
     _downloadCancelToken?.cancel('页面已销毁');
-    _downloadCancelToken = null;
+    _downloadTokenDisposed = true;
+    _downloadToken.dispose();
     _downloadProgress.dispose();
     _inputController.dispose();
     _inputScrollController.dispose();

@@ -9,7 +9,7 @@ extension AgentCancelHandlers on AgentAutomationServer {
     _activeDownloadToken?.cancel('Agent 指令取消');
     _activeDownloadToken = null;
     busy.value = false;
-    logs.add(downloadCancelled ? '已取消下载' : '已取消解析');
+    logs.add(downloadCancelled ? '已取消保存' : '已取消解析');
     _sendJson(request, HttpStatus.ok, {
       'success': true,
       'downloadCancelled': downloadCancelled,

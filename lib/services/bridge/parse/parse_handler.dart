@@ -85,8 +85,7 @@ extension AgentParseHandlers on AgentAutomationServer {
         final coverText = homeResult.coversCount > 0
             ? ' (已关联封面: ${homeResult.coversCount} 条)'
             : '';
-        logs.add('[主页] 成功捕获作者【$author】全部作品链接共 ${homeResult.count} 条$tagText$coverText');
-        logs.add('主页作品捕获完成');
+        logs.add('成功捕获作者【$author】主页作品 ${homeResult.count} 条$tagText$coverText');
         _sendJson(request, HttpStatus.ok, {
           'type': 'user_home',
           'result': homeResult.toMap(),

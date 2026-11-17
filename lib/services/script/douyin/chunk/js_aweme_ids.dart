@@ -45,6 +45,5 @@ const String jsAwemeIds = r'''  // 当前页面目标作品 ID（/video、/note�
     } catch (e) { return ''; }
   }
   S.targetId = getTargetAwemeId();
-  if (S.targetId) log('目标作品: ' + S.targetId);
-  if (!S.injected) { S.injected = true; log('脚本已注入: ' + location.href); }
+  if (!S.injected) { S.injected = true; }
 ''';

@@ -7,12 +7,7 @@ extension SnifferNavigationFlowFlow on DouyinSniffer {
     if (UrlParser.isAllowedNavigationUrl(url)) {
       return NavigationDecision.navigate;
     }
-    final scheme = _schemeOf(url);
-    if (_blockedSchemes.add(scheme) && _isTaskActive) {
-      final shortUrl =
-          url.length > 120 ? '${url.substring(0, 120)}...' : url;
-      _log('已拦截外部跳转(scheme=$scheme): $shortUrl');
-    }
+    _blockedSchemes.add(_schemeOf(url));
     return NavigationDecision.prevent;
   }
 
@@ -23,10 +18,13 @@ extension SnifferNavigationFlowFlow on DouyinSniffer {
     if (error.isForMainFrame == false) return;
     if (error.description.contains('ERR_ABORTED')) return;
     final text = '${error.errorCode} ${error.description}';
-    if (_lastWebResourceError == text) return;
-    _lastWebResourceError = text;
-    final urlText = (error.url ?? '').isEmpty ? '' : ' url=${error.url}';
-    _log('网页加载错误(${error.errorCode}): ${error.description}$urlText');
+    if (_lastWebResourceError != text) {
+      _lastWebResourceError = text;
+      _log('网页加载错误(${error.errorCode}): ${error.description}');
+    }
+    if (_loggedWebResourceError) return;
+    _loggedWebResourceError = true;
+    _report('网页加载失败，请检查网络后重试');
   }
 
   /// 记录最终页面 URL，并在拿到 awemeId 后启动分享页并行兜底
@@ -50,7 +48,7 @@ extension SnifferNavigationFlowFlow on DouyinSniffer {
         UrlParser.isArticleUrl(url) &&
         _completer != null &&
         !_completer!.isCompleted) {
-      _log('检测到文章作品链接，已自动过滤');
+      _report('检测到文章作品链接，已自动过滤');
       _finishWithError(const ArticleWorkException(), taskId: taskId);
       return;
     }
@@ -67,7 +65,7 @@ extension SnifferNavigationFlowFlow on DouyinSniffer {
       if (_completer != null &&
           !_completer!.isCompleted &&
           kind == DouyinWorkPage.userHome) {
-        _log('检测到页面已重定向至作者主页，终止单作品解析');
+        _report('检测到页面已重定向至作者主页，终止单作品解析');
         _finishWithError(
           const FormatException('检测到当前链接为作者主页，非单作品链接。请使用主页批量解析'),
           taskId: taskId,

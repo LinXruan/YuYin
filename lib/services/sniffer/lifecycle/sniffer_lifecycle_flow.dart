@@ -15,7 +15,7 @@ extension SnifferLifecycleFlow on DouyinSniffer {
   void _logNonWebPage(String url) {
     if (_loggedNonWebPage) return;
     _loggedNonWebPage = true;
-    _log('页面已变为非网页地址(scheme=${_schemeOf(url)})，停止注入');
+    _log('页面不是网页地址，已停止注入');
   }
 
   String _schemeOf(String url) {
