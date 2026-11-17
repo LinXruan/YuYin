@@ -88,6 +88,8 @@ Debug 包内置轻量 HTTP 服务，用于替代坐标点击与 XML Dump；Relea
 
 `/api/selection/*` 对应保存页选择命令，`/api/thumbnails*`、`/api/verify/*` 为缓存与校验接口；需要时再查对应 handler。
 
+> 未登录主页解析：捕获脚本会先注入 `chunk/js_platform_patch.dart`（`navigator.platform` 对齐 Win32），否则作品接口返回 200 空响应。未登录只解析首屏，结果带 `partial: true`。
+
 ---
 
 ## 3. 标准验证流程

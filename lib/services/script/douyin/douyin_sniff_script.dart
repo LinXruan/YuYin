@@ -4,6 +4,7 @@ library;
 ///
 /// 脚本按职责切片存放在 script/douyin/chunk，此处仅按原始顺序拼接；
 /// 切片必须逐字节等价，任何顺序或空白改动都会改变注入行为。
+import 'chunk/js_platform_patch.dart';
 import 'chunk/js_state_header.dart';
 import 'chunk/js_logging.dart';
 import 'chunk/js_login_probe.dart';
@@ -22,6 +23,7 @@ import 'chunk/js_bootstrap.dart';
 
 /// 拼接后的完整注入脚本。
 const String kDouyinSniffJs =
+    '$jsPlatformPatch'
     '$jsStateHeader'
     '$jsLogging'
     '$jsLoginProbe'

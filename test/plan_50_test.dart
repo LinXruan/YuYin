@@ -1,11 +1,7 @@
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
-import 'package:yuyin/services/bridge/server/agent_automation_server.dart';
-import 'package:yuyin/utils/debug/log_controller.dart';
 import 'package:yuyin/utils/url_parser.dart';
 
 void main() {
@@ -113,49 +109,6 @@ void main() {
           isTrue,
         );
       }
-    });
-
-    group('AgentAutomationServer 未登录守卫拦截验证', () {
-      late AgentAutomationServer server;
-      late LogController logs;
-      late HttpClient client;
-      final int port = 9889;
-
-      setUp(() async {
-        client = HttpClient();
-        logs = LogController();
-        server = AgentAutomationServer(
-          logs: logs,
-          busy: ValueNotifier<bool>(false),
-          loggedIn: ValueNotifier<bool>(false), // 未登录状态
-          port: port,
-        );
-        await server.start();
-      });
-
-      tearDown(() async {
-        await server.stop();
-        client.close(force: true);
-      });
-
-      test('未登录时传入主页链接，返回 403 并且日志输出【请登录再进行主页链接解析】', () async {
-        final req = await client
-            .postUrl(Uri.parse('http://127.0.0.1:$port/api/parse'));
-        req.headers.contentType = ContentType.json;
-        req.write(jsonEncode({'url': sampleHomeUrl}));
-        final resp = await req.close();
-
-        expect(resp.statusCode, HttpStatus.forbidden);
-        final bodyStr = await utf8.decodeStream(resp);
-        final json = jsonDecode(bodyStr) as Map<String, dynamic>;
-
-        expect(json['code'], 403);
-        expect(json['error'], '请登录再进行主页链接解析');
-        expect(json['isUserHome'], isTrue);
-
-        // 验证日志中包含明确提示
-        expect(logs.logs.contains('请登录再进行主页链接解析'), isTrue);
-      });
     });
   });
 }

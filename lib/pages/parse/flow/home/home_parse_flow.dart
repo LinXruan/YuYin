@@ -13,11 +13,7 @@ extension _ParseHomeParseFlow on _ParsePageState {
     }
 
     if (!isLogged) {
-      widget.logs.add('请登录再进行主页链接解析');
-      widget.busy.value = false;
-      _isParsing = false;
-      if (mounted) _refresh(() {});
-      return;
+      widget.logs.add('未登录模式：仅解析首屏作品');
     }
 
     final profiles = <UserHomeProfile>[];
@@ -50,6 +46,12 @@ extension _ParseHomeParseFlow on _ParsePageState {
               '重复主页已去重（同一作者的口令与网址）: ${homeResult.nickname}',
             );
             continue;
+          }
+
+          if (homeResult.partial) {
+            widget.logs.add(
+              '未登录仅获取首屏 ${homeResult.count} 条（主页标注 ${homeResult.worksTotalTag} 条），登录后可获取全部',
+            );
           }
 
           final works = _buildHomeWorks(homeResult);

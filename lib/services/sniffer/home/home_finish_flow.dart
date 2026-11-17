@@ -28,7 +28,10 @@ extension SnifferHomeFinishFlowFlow on DouyinSniffer {
             articleText.isNotEmpty)
         ? '（$avatarText$coverText$titleText$articleText）'
         : '';
-    _log('主页捕获成功：作者【$author】，共 ${result.count} 条作品$metaText');
+    final modeText = result.partial
+        ? '（未登录首屏，主页标注 ${result.worksTotalTag > 0 ? result.worksTotalTag : '未知'} 条）'
+        : '';
+    _log('主页捕获成功$modeText：作者【$author】，共 ${result.count} 条作品$metaText');
     if (_profileCompleter != null && !_profileCompleter!.isCompleted) {
       _profileCompleter!.complete(result.profile);
       _profileCompleter = null;

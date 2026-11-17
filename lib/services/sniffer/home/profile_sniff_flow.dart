@@ -51,10 +51,7 @@ extension SnifferProfileSniffFlowFlow on DouyinSniffer {
     }
 
     if (!_isLoggedIn) {
-      _log('请登录再进行主页链接解析');
-      final err = StateError('请登录再进行主页链接解析');
-      completer.completeError(err);
-      return completer.future;
+      _log('未登录模式：可捕获主页作者信息');
     }
 
     _log('开始捕获主页作者信息: $homeUrl');

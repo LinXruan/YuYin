@@ -34,17 +34,6 @@ extension AgentParseProfileHandlers on AgentAutomationServer {
       return;
     }
 
-    if (!loggedIn.value) {
-      logs.reset('正在提取短链...');
-      logs.add('请登录再进行主页链接解析');
-      _sendJson(
-        request,
-        HttpStatus.forbidden,
-        {'error': '请登录再进行主页链接解析', 'code': 403, 'isUserHome': true},
-      );
-      return;
-    }
-
     busy.value = true;
     logs.reset('正在提取短链...');
     logs.add('正在捕获主页作者信息（头像与昵称）...');

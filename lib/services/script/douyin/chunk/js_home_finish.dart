@@ -40,9 +40,10 @@ const String jsHomeFinish = r'''  // 作品总数只增不减，避免被瞬时�
         shouldFinish = true;
         finishReason = finishReason || '接口确认全部作品加载完成(has_more=0)';
       }
-    } else if (S.homeIdleScrolls >= 12 && current > 0) {
+    } else if (S.homeIdleScrolls >= (S.loginReported === false ? 4 : 12) && current > 0) {
+      // 未登录时抖音只给受限匿名版页面：首屏之后不再翻页，提前收尾避免空等
       shouldFinish = true;
-      finishReason = finishReason || '已滚动到底部';
+      finishReason = finishReason || (S.loginReported === false ? '未登录仅首屏，已停止翻页' : '已滚动到底部');
     }
 
     if (shouldFinish) {
@@ -82,7 +83,8 @@ const String jsHomeFinish = r'''  // 作品总数只增不减，避免被瞬时�
           workTitles: S.homeWorkTitles || {},
           titlesCount: titlesCount,
           tabCount: target || current,
-          count: current
+          count: current,
+          partial: S.loginReported === false
         }));
       }
     }

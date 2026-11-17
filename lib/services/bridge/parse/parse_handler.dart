@@ -64,17 +64,6 @@ extension AgentParseHandlers on AgentAutomationServer {
     }
 
     if (UrlParser.isUserHomeUrl(url)) {
-      if (!loggedIn.value) {
-        logs.reset('正在提取短链...');
-        logs.add('请登录再进行主页链接解析');
-        _sendJson(
-          request,
-          HttpStatus.forbidden,
-          {'error': '请登录再进行主页链接解析', 'code': 403, 'isUserHome': true},
-        );
-        return;
-      }
-
       busy.value = true;
       logs.reset('正在提取短链...');
       logs.add('正在捕获作者主页作品链接...');

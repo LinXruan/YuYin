@@ -22,14 +22,6 @@ extension AgentParseHomesHandlers on AgentAutomationServer {
       });
       return;
     }
-    if (!loggedIn.value) {
-      _sendJson(request, HttpStatus.forbidden, {
-        'error': '请登录再进行主页链接解析',
-        'code': 403,
-      });
-      return;
-    }
-
     busy.value = true;
     logs.reset('正在提取短链...');
     logs.add('正在逐条捕获主页...');

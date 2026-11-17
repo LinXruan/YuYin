@@ -109,6 +109,7 @@ extension SnifferMessageFlowFlow on DouyinSniffer {
           workTitles: workTitles,
           tabCount: tabCount,
           filteredArticleCount: articleUrls.length,
+          partial: data['partial'] == true,
         );
         if (_profileCompleter != null && !_profileCompleter!.isCompleted) {
           _finishProfileWithResult(homeResult.profile, _taskId);

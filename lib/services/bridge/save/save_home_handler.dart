@@ -4,14 +4,6 @@ part of '../server/agent_automation_server.dart';
 extension AgentSaveHomeHandlers on AgentAutomationServer {
   /// POST /api/save/home：解析主页并批量保存到作者分类目录
   Future<void> _handleSaveHome(HttpRequest request) async {
-    if (!loggedIn.value) {
-      _sendJson(request, HttpStatus.forbidden, {
-        'error': '请登录再进行主页链接解析',
-        'code': 403,
-      });
-      return;
-    }
-
     final sniffer = this.sniffer;
     final downloader = this.downloader;
     if (sniffer == null || downloader == null) {

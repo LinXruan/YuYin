@@ -1,11 +1,7 @@
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
-import 'package:yuyin/services/bridge/server/agent_automation_server.dart';
-import 'package:yuyin/utils/debug/log_controller.dart';
 import 'package:yuyin/utils/url_parser.dart';
 
 void main() {
@@ -71,44 +67,6 @@ void main() {
       );
       expect(rEmpty.tabCount, isNull);
       expect(rEmpty.worksTotalTag, 0);
-    });
-
-    group('AgentAutomationServer 接口对 worksTotalTag 的支持验证', () {
-      late AgentAutomationServer server;
-      late LogController logs;
-      late HttpClient client;
-      final int port = 9892;
-
-      setUp(() async {
-        client = HttpClient();
-        logs = LogController();
-        server = AgentAutomationServer(
-          logs: logs,
-          busy: ValueNotifier<bool>(false),
-          loggedIn: ValueNotifier<bool>(false),
-          port: port,
-        );
-        await server.start();
-      });
-
-      tearDown(() async {
-        await server.stop();
-        client.close(force: true);
-      });
-
-      test('未登录时请求主页链接安全拦截', () async {
-        final req = await client.postUrl(Uri.parse('http://127.0.0.1:$port/api/parse'));
-        req.headers.contentType = ContentType.json;
-        req.write(jsonEncode({
-          'url': 'https://www.douyin.com/user/MS4wLjABAAAAeBMbdyCfKJbCWbdWN9toLwnJhgkUU4ydTGkOvsRx9v5CWG6uRYQpFqXrxmWF2QFV'
-        }));
-        final resp = await req.close();
-        expect(resp.statusCode, HttpStatus.forbidden);
-        final bodyStr = await utf8.decodeStream(resp);
-        final json = jsonDecode(bodyStr) as Map<String, dynamic>;
-        expect(json['error'], '请登录再进行主页链接解析');
-        expect(logs.logs.contains('请登录再进行主页链接解析'), isTrue);
-      });
     });
   });
 }

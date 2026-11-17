@@ -11,6 +11,7 @@ class UserHomeResult {
     this.workTitles = const {},
     this.tabCount,
     this.filteredArticleCount = 0,
+    this.partial = false,
   });
 
   /// 用户的 sec_uid 唯一标识
@@ -43,6 +44,9 @@ class UserHomeResult {
 
   /// 已过滤的纯文章作品数量
   final int filteredArticleCount;
+
+  /// 是否只拿到首屏（未登录时抖音限制翻页，结果为部分作品）
+  final bool partial;
 
   /// 作品数量 Tag 标注总数（若为空则为 0）
   int get worksTotalTag => tabCount ?? 0;
@@ -83,5 +87,6 @@ class UserHomeResult {
         'workTitles': workTitles,
         'titlesCount': titlesCount,
         'filteredArticleCount': filteredArticleCount,
+        'partial': partial,
       };
 }
