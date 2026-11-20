@@ -8,7 +8,6 @@ import '../../../models/media_item.dart';
 import '../../../services/batch_work/work_batch_saver.dart';
 import '../../../services/sniffer/facade/douyin_sniffer.dart';
 import '../../../services/sniffer/lifecycle/sniff_cancelled_exception.dart';
-import '../../../services/multi_work/article_work_exception.dart';
 import '../../../services/user_home/user_home_batch_saver.dart';
 import '../../../services/download/download_cancel_registry.dart';
 import '../../../services/media/video_downloader.dart';
@@ -19,7 +18,6 @@ import '../../../utils/network_detector.dart';
 import '../../../utils/savelocation/save_location_store.dart';
 import '../../../utils/memory/terminal_memory_store.dart';
 import '../../../utils/url_parser.dart';
-import '../../../utils/settings/video_quality_utils.dart';
 import '../../../models/history_item.dart';
 import '../../../utils/history/history_store.dart';
 import '../../../services/selection/debug/selection_debug_bridge.dart';
@@ -28,7 +26,8 @@ import '../../../services/selection/session_work_preparer.dart';
 import '../../../widgets/save_page/bottom_media_sheet.dart';
 import '../../../widgets/save_page/middle_multi_work_sheet.dart';
 import '../../../widgets/save_page/top_multi_home_sheet.dart';
-import '../../../widgets/save_page/bottom/widget/video_tier_picker_sheet.dart';
+import '../flow/common/parse_flow_helper.dart';
+import '../flow/common/parse_save_coordinator.dart';
 import '../widget/banner/batch_support_banner.dart';
 import '../widget/banner/login_prompt_banner.dart';
 import '../widget/frame/parse_action_button.dart';
@@ -41,9 +40,6 @@ part '../flow/single/single_parse_flow.dart';
 part '../flow/home/home_parse_flow.dart';
 
 part '../flow/multi/multi_parse_flow.dart';
-
-part '../flow/common/parse_progress_flow.dart';
-part '../flow/common/save_page_flow.dart';
 
 part '../widget/frame/parse_frame.dart';
 
@@ -154,6 +150,53 @@ class _ParsePageState extends State<ParsePage>
 
   /// 供流程分片调用的状态刷新入口（setState 受保护，扩展无法直接调用）
   void _refresh(VoidCallback fn) => setState(fn);
+
+  ParseSaveCoordinator get _saveCoordinator =>
+      ParseSaveCoordinator(sniffer: widget.sniffer, logs: widget.logs);
+
+  Future<void> _openWorkDetail(SaveSelectionSession session, String workUrl) =>
+      _saveCoordinator.openWorkDetail(context, session, workUrl);
+
+  Future<bool> _pickSingleTier(SaveSelectionSession session, String workUrl) =>
+      _saveCoordinator.pickSingleTier(context, session, workUrl);
+
+  Future<Map<String, List<SelectedWork>>> _prepareByAuthor(
+    SaveSelectionSession session,
+    Iterable<AuthorSelectionView> authors, {
+    bool Function()? isCancelled,
+    void Function(String nickname, int current, int total)? onProgress,
+  }) =>
+      _saveCoordinator.prepareByAuthor(
+        session,
+        authors,
+        isCancelled: isCancelled,
+        onProgress: onProgress,
+      );
+
+  String _friendlyError(Object error) => ParseFlowHelper.friendlyError(error);
+  String _mediaSummaryFor(SingleWorkResult? parsed, WorkMediaKind kind) =>
+      ParseFlowHelper.mediaSummaryFor(parsed, kind);
+  String _qualityLabel(BatchVideoQualityMode mode) =>
+      ParseFlowHelper.qualityLabel(mode);
+
+  void _updateBatchSaveProgress(int current, int total, String message) {
+    if (!mounted) return;
+    final prefix = message.startsWith('正在准备') ? '正在准备' : '正在保存';
+    widget.logs.upsertLast(prefix, message);
+    final overall = total == 0 ? 0.0 : current / total;
+    _downloadProgress.value = overall.clamp(0.0, 1.0).toDouble();
+  }
+
+  void _updateBatchProgress(int current, int total, double itemProgress) {
+    final percent = (itemProgress * 100).round();
+    final key = '$current/$total/$percent';
+    if (!mounted || key == _lastProgressKey) return;
+    _lastProgressKey = key;
+
+    final overall = total == 0 ? 0.0 : ((current - 1) + itemProgress) / total;
+    widget.logs.upsertLast('正在下载第', '正在下载第 $current/$total 个资源（$percent%）...');
+    _downloadProgress.value = overall.clamp(0.0, 1.0).toDouble();
+  }
 
   @override
   void dispose() {

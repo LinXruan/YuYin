@@ -1,9 +1,37 @@
-part of '../../page/parse_page.dart';
+import 'dart:async';
 
-/// 保存页共用流程：打开底层、补解析、按作者解算
-extension _ParseSavePageFlow on _ParsePageState {
+import 'package:flutter/material.dart';
+
+import '../../../../models/media_item.dart';
+import '../../../../services/multi_work/article_work_exception.dart';
+import '../../../../services/selection/save_selection_session.dart';
+import '../../../../services/selection/session_work_preparer.dart';
+import '../../../../services/sniffer/facade/douyin_sniffer.dart';
+import '../../../../utils/debug/log_controller.dart';
+import '../../../../utils/settings/video_quality_utils.dart';
+import '../../../../widgets/save_page/bottom/widget/video_tier_picker_sheet.dart';
+import '../../../../widgets/save_page/bottom_media_sheet.dart';
+import 'parse_flow_helper.dart';
+
+/// 保存页流程协调器：管理图文资源网格、画质档位选择与按作者补解析解算
+class ParseSaveCoordinator {
+  const ParseSaveCoordinator({
+    required this.sniffer,
+    required this.logs,
+  });
+
+  final DouyinSniffer sniffer;
+  final LogController logs;
+
+  /// 加载封面/头像所需的统一请求头
+  static const Map<String, String> mediaHeaders = {
+    'User-Agent': DouyinSniffer.desktopUserAgent,
+    'Referer': 'https://www.douyin.com/',
+  };
+
   /// 进入 resource 层：只等待解析准备，子页面压栈后立即返回
-  Future<void> _openWorkDetail(
+  Future<void> openWorkDetail(
+    BuildContext context,
     SaveSelectionSession session,
     String workUrl,
   ) async {
@@ -14,35 +42,41 @@ extension _ParseSavePageFlow on _ParsePageState {
       final title = row.work.title.trim().isNotEmpty
           ? row.work.title.trim()
           : workUrl;
-      widget.logs.add('正在解析作品：$title');
+      logs.add('正在解析作品：$title');
       try {
-        final parsed = await widget.sniffer.sniffVideoUrl(workUrl);
-        if (!mounted) return;
+        final parsed = await sniffer.sniffVideoUrl(workUrl);
+        if (!context.mounted) return;
         session.ingest(workUrl, parsed);
       } on ArticleWorkException catch (e) {
-        if (mounted) widget.logs.add('已过滤文章作品：${e.message}');
+        if (context.mounted) logs.add('已过滤文章作品：${e.message}');
         return;
       } catch (e) {
-        if (mounted) widget.logs.add('作品解析失败：${_friendlyError(e)}');
+        if (context.mounted) {
+          logs.add('作品解析失败：${ParseFlowHelper.friendlyError(e)}');
+        }
         return;
       }
     }
-    if (!mounted) return;
+    if (!context.mounted) return;
 
     final parsed = session.workOf(workUrl)?.work.parsedResult;
     if (parsed == null || parsed.items.isEmpty) {
-      widget.logs.add('该作品未捕获到可下载资源');
+      logs.add('该作品未捕获到可下载资源');
       return;
     }
     if (row.behavesAsVideo) {
-      _presentWorkTier(session, workUrl);
+      presentWorkTier(context, session, workUrl);
       return;
     }
-    _presentWorkMedia(session, workUrl, parsed.items);
+    presentWorkMedia(context, session, workUrl, parsed.items);
   }
 
   /// 主页/多作品：视频档位面板压栈后立即返回
-  void _presentWorkTier(SaveSelectionSession session, String workUrl) {
+  void presentWorkTier(
+    BuildContext context,
+    SaveSelectionSession session,
+    String workUrl,
+  ) {
     final row = session.workOf(workUrl);
     if (row == null || !row.behavesAsVideo) return;
     final tiers = VideoQualityUtils.displayTiers(row.tiers);
@@ -56,18 +90,19 @@ extension _ParseSavePageFlow on _ParsePageState {
         tiers: tiers,
         nested: true,
       ).then((_) {
-        if (!mounted) return;
+        if (!context.mounted) return;
         final tier = session.workOf(workUrl)?.selectedTier;
         if (tier == null) return;
-        widget.logs.add(
-          '当前画质：${_tierLabel(tier)}（${tier.formattedSize}）',
+        logs.add(
+          '当前画质：${tierLabel(tier)}（${tier.formattedSize}）',
         );
       }),
     );
   }
 
   /// 图文作品：资源网格压栈后立即返回
-  void _presentWorkMedia(
+  void presentWorkMedia(
+    BuildContext context,
     SaveSelectionSession session,
     String workUrl,
     List<MediaItem> items,
@@ -78,18 +113,19 @@ extension _ParseSavePageFlow on _ParsePageState {
         session: session,
         workUrl: workUrl,
         items: items,
-        headers: _ParsePageState._mediaHeaders,
+        headers: mediaHeaders,
         nested: true,
       ).then((_) {
-        if (!mounted) return;
+        if (!context.mounted) return;
         final selected = session.selectedResourceCount(workUrl);
-        widget.logs.add('已选择 $selected/${items.length} 个资源');
+        logs.add('已选择 $selected/${items.length} 个资源');
       }),
     );
   }
 
   /// 单作品视频：底部按钮即确认，返回 true 表示用户完成选择
-  Future<bool> _pickSingleTier(
+  Future<bool> pickSingleTier(
+    BuildContext context,
     SaveSelectionSession session,
     String workUrl,
   ) async {
@@ -104,24 +140,24 @@ extension _ParseSavePageFlow on _ParsePageState {
       workUrl: workUrl,
       tiers: tiers,
     );
-    if (!mounted || confirmed != true) return false;
+    if (!context.mounted || confirmed != true) return false;
 
     final tier = session.workOf(workUrl)?.selectedTier;
     if (tier != null) {
-      widget.logs.add(
-        '已选择 ${_tierLabel(tier)}（${tier.formattedSize}）',
+      logs.add(
+        '已选择 ${tierLabel(tier)}（${tier.formattedSize}）',
       );
     }
     return true;
   }
 
-  String _tierLabel(MediaItem tier) {
+  static String tierLabel(MediaItem tier) {
     if (tier.resolutionLabel.isNotEmpty) return tier.resolutionLabel;
     return tier.resolution ?? tier.gearName ?? '默认画质';
   }
 
   /// 按作者补解析并解算为可落盘对象
-  Future<Map<String, List<SelectedWork>>> _prepareByAuthor(
+  Future<Map<String, List<SelectedWork>>> prepareByAuthor(
     SaveSelectionSession session,
     Iterable<AuthorSelectionView> authors, {
     bool Function()? isCancelled,
@@ -137,7 +173,7 @@ extension _ParseSavePageFlow on _ParsePageState {
       result[author.secUid] = await SessionWorkPreparer.prepare(
         session,
         urls,
-        widget.sniffer.sniffVideoUrl,
+        sniffer.sniffVideoUrl,
         isCancelled: isCancelled,
         onProgress: (current, total, label) =>
             onProgress?.call(nickname, current, total),
