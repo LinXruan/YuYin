@@ -1,11 +1,10 @@
-import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
-import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
 import 'package:yuyin/services/share/client/douyin_share_api.dart';
+
+import 'share_api_fixtures.dart';
 
 void main() {
   group('DouyinShareApi.extractRouterDataJson', () {
@@ -49,7 +48,7 @@ void main() {
   group('DouyinShareApi.parseShareHtml', () {
     test('图片与实况图解析', () {
       final result =
-          DouyinShareApi.parseShareHtml(_htmlFor(_imagePostRoot()), '123');
+          DouyinShareApi.parseShareHtml(htmlFor(imagePostRoot()), '123');
       expect(result, isNotNull);
       expect(result!.isImagePost, isTrue);
       expect(result.items.length, 3);
@@ -93,7 +92,7 @@ void main() {
       };
 
       final result1 =
-          DouyinShareApi.parseShareHtml(_htmlFor(rootWithMusic), '789');
+          DouyinShareApi.parseShareHtml(htmlFor(rootWithMusic), '789');
       expect(result1, isNotNull);
       expect(result1!.isImagePost, isTrue);
       expect(result1.imageCount, 1);
@@ -127,7 +126,7 @@ void main() {
       };
 
       final result2 =
-          DouyinShareApi.parseShareHtml(_htmlFor(rootWithVideoBgm), '790');
+          DouyinShareApi.parseShareHtml(htmlFor(rootWithVideoBgm), '790');
       expect(result2, isNotNull);
       expect(result2!.isImagePost, isTrue);
       expect(result2.imageCount, 1);
@@ -138,7 +137,7 @@ void main() {
 
     test('视频多档位排序、跳过 dash、按档位名去重', () {
       final result =
-          DouyinShareApi.parseShareHtml(_htmlFor(_videoRoot()), '456');
+          DouyinShareApi.parseShareHtml(htmlFor(videoRoot()), '456');
       expect(result, isNotNull);
       expect(result!.isImagePost, isFalse);
       expect(result.items.length, 2);
@@ -173,7 +172,7 @@ void main() {
           },
         },
       };
-      final result = DouyinShareApi.parseShareHtml(_htmlFor(root), '123');
+      final result = DouyinShareApi.parseShareHtml(htmlFor(root), '123');
       expect(result, isNotNull);
       expect(result!.isImagePost, isTrue);
       expect(result.items.single.url, contains('a.jpeg'));
@@ -199,7 +198,7 @@ void main() {
           },
         },
       };
-      final result = DouyinShareApi.parseShareHtml(_htmlFor(root), '789');
+      final result = DouyinShareApi.parseShareHtml(htmlFor(root), '789');
       expect(result, isNotNull);
       expect(result!.desc, '这是作品文案内容');
     });
@@ -229,7 +228,7 @@ void main() {
           },
         },
       };
-      final result = DouyinShareApi.parseShareHtml(_htmlFor(root), '888');
+      final result = DouyinShareApi.parseShareHtml(htmlFor(root), '888');
       expect(result, isNotNull);
       expect(result!.isImagePost, isFalse);
       expect(result.coverUrl, 'https://p3-pc.douyinpic.com/tos-cn-p-0015/cover1.jpeg');
@@ -265,7 +264,7 @@ void main() {
           },
         },
       };
-      final result = DouyinShareApi.parseShareHtml(_htmlFor(root), '889');
+      final result = DouyinShareApi.parseShareHtml(htmlFor(root), '889');
       expect(result, isNotNull);
       expect(
         result!.coverUrl,
@@ -300,7 +299,7 @@ void main() {
           },
         },
       };
-      final result = DouyinShareApi.parseShareHtml(_htmlFor(root), '456');
+      final result = DouyinShareApi.parseShareHtml(htmlFor(root), '456');
       expect(result, isNotNull);
       expect(result!.items.single.url, contains('target.mp4'));
     });
@@ -308,7 +307,7 @@ void main() {
     test('风控页/空 item_list/无媒体返回 null', () {
       expect(
         DouyinShareApi.parseShareHtml(
-          _htmlFor({
+          htmlFor({
             'loaderData': {
               'video_(id)/page': {'video_layout': {}},
             },
@@ -319,7 +318,7 @@ void main() {
       );
       expect(
         DouyinShareApi.parseShareHtml(
-          _htmlFor({
+          htmlFor({
             'loaderData': {
               'video_(id)/page': {
                 'videoInfoRes': {'item_list': []},
@@ -332,7 +331,7 @@ void main() {
       );
       expect(
         DouyinShareApi.parseShareHtml(
-          _htmlFor({
+          htmlFor({
             'loaderData': {
               'video_(id)/page': {
                 'videoInfoRes': {
@@ -350,328 +349,4 @@ void main() {
     });
   });
 
-  group('DouyinShareApi.pickImageUrl', () {
-    test('优先 jpeg/jpg，否则取最后一项', () {
-      expect(
-        DouyinShareApi.pickImageUrl({
-          'url_list': ['https://a.webp', 'https://a.jpeg'],
-        }),
-        'https://a.jpeg',
-      );
-      expect(
-        DouyinShareApi.pickImageUrl({
-          'url_list': ['https://a.webp', 'https://b.webp'],
-        }),
-        'https://b.webp',
-      );
-    });
-  });
-
-  group('DouyinShareApi Cookie 重试', () {
-    test('首次无 Cookie 拿到 ttwid 后重试成功', () async {
-      final adapter = _FakeAdapter([
-        _response('<html>verify</html>', setCookies: ['ttwid=abc; Path=/']),
-        _response(_htmlFor(_imagePostRoot())),
-      ]);
-      final dio = Dio()..httpClientAdapter = adapter;
-      final api = DouyinShareApi(dio: dio);
-
-      final result = await api.fetchShareItem('123');
-
-      expect(result, isNotNull);
-      expect(result.items, isNotEmpty);
-      expect(adapter.requests, hasLength(2));
-      expect(_headerValue(adapter.requests[0], 'Cookie'), isNull);
-      expect(_headerValue(adapter.requests[1], 'Cookie'), 'ttwid=abc');
-    });
-
-    test('缓存 Cookie 跨调用复用', () async {
-      final adapter = _FakeAdapter([
-        _response('<html>verify</html>', setCookies: ['ttwid=abc; Path=/']),
-        _response(_htmlFor(_imagePostRoot())),
-        _response(_htmlFor(_imagePostRoot())),
-      ]);
-      final dio = Dio()..httpClientAdapter = adapter;
-      final api = DouyinShareApi(dio: dio);
-
-      await api.fetchShareItem('123');
-      await api.fetchShareItem('123');
-
-      expect(adapter.requests, hasLength(3));
-      expect(_headerValue(adapter.requests[2], 'Cookie'), 'ttwid=abc');
-    });
-
-    test('没有新 Cookie 时不重试', () async {
-      final adapter = _FakeAdapter([_response('<html>verify</html>')]);
-      final dio = Dio()..httpClientAdapter = adapter;
-      final api = DouyinShareApi(dio: dio);
-
-      await expectLater(
-        api.fetchShareItem('123'),
-        throwsA(isA<DouyinShareException>()),
-      );
-      expect(adapter.requests, hasLength(1));
-    });
-
-    test('4xx 响应也读取 Set-Cookie 并重试', () async {
-      final adapter = _FakeAdapter([
-        _response(
-          '<html>blocked</html>',
-          statusCode: 403,
-          setCookies: ['ttwid=abc'],
-        ),
-        _response(_htmlFor(_imagePostRoot())),
-      ]);
-      final dio = Dio()..httpClientAdapter = adapter;
-      final api = DouyinShareApi(dio: dio);
-
-      final result = await api.fetchShareItem('123');
-
-      expect(result, isNotNull);
-      expect(adapter.requests, hasLength(2));
-      expect(_headerValue(adapter.requests[1], 'Cookie'), 'ttwid=abc');
-    });
-
-    test('超过总预算抛分享页异常', () async {
-      final dio = Dio()..httpClientAdapter = _HangingAdapter();
-      final api = DouyinShareApi(dio: dio);
-
-      await expectLater(
-        api.fetchShareItem(
-          '123',
-          totalTimeout: const Duration(milliseconds: 50),
-        ),
-        throwsA(isA<DouyinShareException>()),
-      );
-    });
-
-    test('外部取消映射为取消异常', () async {
-      final dio = Dio()..httpClientAdapter = _CancelableAdapter();
-      final api = DouyinShareApi(dio: dio);
-      final token = CancelToken();
-
-      final future = api.fetchShareItem('123', cancelToken: token);
-      token.cancel('test');
-
-      await expectLater(
-        future,
-        throwsA(isA<DouyinShareCancelledException>()),
-      );
-    });
-
-    test('解析 Set-Cookie 与合并 Cookie', () {
-      expect(
-        DouyinShareApi.parseSetCookies([
-          'ttwid=abc; Path=/; HttpOnly',
-          'a=b=c; Max-Age=0',
-          'bad',
-        ]),
-        ['ttwid=abc'],
-      );
-      expect(
-        DouyinShareApi.mergeCookieHeader('ttwid=old; x=1', [
-          'TTWID=new',
-          'y=2',
-        ]),
-        'TTWID=new; x=1; y=2',
-      );
-    });
-
-    test('sharePageUrl 与 pickBestVideo 顶层回退', () {
-      expect(
-        DouyinShareApi.sharePageUrl('123'),
-        'https://www.iesdouyin.com/share/video/123/',
-      );
-
-      final item = DouyinShareApi.pickBestVideo({
-        'play_addr': {
-          'url_list': ['https://cdn.example.com/top.mp4'],
-          'width': 1080,
-          'height': 1920,
-          'data_size': 100,
-        },
-      });
-      expect(item, isNotNull);
-      expect(item!.url, contains('top.mp4'));
-      expect(item.dataSize, 100);
-    });
-  });
 }
-
-ResponseBody _response(
-  String body, {
-  int statusCode = 200,
-  List<String>? setCookies,
-}) {
-  final headers = <String, List<String>>{
-    Headers.contentTypeHeader: ['text/html; charset=utf-8'],
-  };
-  if (setCookies != null) headers['set-cookie'] = setCookies;
-  return ResponseBody.fromString(body, statusCode, headers: headers);
-}
-
-String? _headerValue(RequestOptions options, String name) {
-  for (final entry in options.headers.entries) {
-    if (entry.key.toLowerCase() == name.toLowerCase()) {
-      return entry.value?.toString();
-    }
-  }
-  return null;
-}
-
-class _FakeAdapter implements HttpClientAdapter {
-  _FakeAdapter(this.responses);
-
-  final List<ResponseBody> responses;
-  final List<RequestOptions> requests = [];
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    requests.add(options);
-    if (responses.isEmpty) {
-      throw StateError('没有更多伪造响应');
-    }
-    return responses.removeAt(0);
-  }
-
-  @override
-  void close({bool force = false}) {}
-}
-
-class _HangingAdapter implements HttpClientAdapter {
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) {
-    return Completer<ResponseBody>().future;
-  }
-
-  @override
-  void close({bool force = false}) {}
-}
-
-class _CancelableAdapter implements HttpClientAdapter {
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) {
-    final completer = Completer<ResponseBody>();
-    cancelFuture?.whenComplete(() {
-      if (completer.isCompleted) return;
-      completer.completeError(
-        DioException.requestCancelled(
-          requestOptions: options,
-          reason: 'test cancel',
-        ),
-      );
-    });
-    return completer.future;
-  }
-
-  @override
-  void close({bool force = false}) {}
-}
-
-String _htmlFor(Map<String, dynamic> root) =>
-    '<script>window._ROUTER_DATA = ${jsonEncode(root)};</script>';
-
-Map<String, dynamic> _imagePostRoot() => {
-      'loaderData': {
-        'note_(id)/page': {
-          'videoInfoRes': {
-            'item_list': [
-              {
-                'aweme_id': '123',
-                'images': [
-                  {
-                    'url_list': [
-                      'https://p3.douyinpic.com/a.webp',
-                      'https://p3.douyinpic.com/a.jpeg',
-                    ],
-                    'width': 1080,
-                    'height': 1440,
-                  },
-                  {
-                    'url_list': ['https://p3.douyinpic.com/b.jpeg'],
-                    'width': 1080,
-                    'height': 1440,
-                    'video': {
-                      'play_addr': {
-                        'url_list': ['https://v.douyin.com/live.mp4'],
-                        'width': 1080,
-                        'height': 1920,
-                        'data_size': 12345,
-                      },
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-        },
-      },
-    };
-
-Map<String, dynamic> _videoRoot() => {
-      'loaderData': {
-        'video_(id)/page': {
-          'videoInfoRes': {
-            'item_list': [
-              {
-                'aweme_id': '456',
-                'video': {
-                  'bit_rate': [
-                    {
-                      'bit_rate': 850000,
-                      'gear_name': '720p',
-                      'play_addr': {
-                        'url_list': ['https://cdn.example.com/720.mp4'],
-                        'width': 720,
-                        'height': 1280,
-                        'data_size': 5000000,
-                      },
-                    },
-                    {
-                      'bit_rate': 2800000,
-                      'gear_name': '1080p',
-                      'play_addr': {
-                        'url_list': ['https://cdn.example.com/1080.mp4'],
-                        'width': 1080,
-                        'height': 1920,
-                        'data_size': 14000000,
-                      },
-                    },
-                    {
-                      'bit_rate': 500000,
-                      'gear_name': 'dash',
-                      'format': 'dash',
-                      'play_addr': {
-                        'url_list': ['https://cdn.example.com/dash.mp4'],
-                      },
-                    },
-                    {
-                      'bit_rate': 2800000,
-                      'gear_name': '1080p',
-                      'play_addr': {
-                        'url_list': ['https://cdn.example.com/1080.mp4'],
-                        'width': 1080,
-                        'height': 1920,
-                        'data_size': 14000000,
-                      },
-                    },
-                  ],
-                },
-              },
-            ],
-          },
-        },
-      },
-    };

@@ -34,3 +34,15 @@
 - [ ] `flutter test` 全绿，无固定端口、无外部目录依赖。
 - [ ] `test/` 无 >400 行文件，无 `plan_*编号` 命名。
 - [ ] 结构门禁覆盖 `part` 数与 `test/` 行数。
+---
+
+## 五、落地状态（2026-11-20，1.6.1+196）
+
+已落地：
+- 结构门禁迁移为 `test/structure_gate_test.dart`，同时约束 `lib/` 与 `test/` 的 400 行上限、`test/` 禁用 `part`、`lib` 的 `part` 数量只减不增（上限 192）。
+- 拆分超限测试：`douyin_share_api_test.dart` 677 行 → 解析 350 行 + Cookie 155 行 + 共享夹具 183 行；`history_store_test.dart` 412 → 313 行，搜索组迁至 `history_search_test.dart`。
+
+未落地（顺延）：
+- 36 个 `plan_*` 测试按领域重组改名。
+- 核心页面（ParsePage/AppShell/SettingsPage/LogPanel/MediaAudioPlayerBar）Widget 测试补齐。
+- HTTP 测试固定端口改动态端口。
