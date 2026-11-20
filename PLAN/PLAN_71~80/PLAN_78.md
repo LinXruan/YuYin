@@ -68,6 +68,6 @@
 
 未落地（顺延到后续迭代）：
 - 原生 Cookie 读取替换 `document.cookie`、`about:blank`/UA 冗余 IPC 清理。
-- `StorageBridge` 单次 Cursor 查询与目录缓存、线程池。
+- ~~`StorageBridge` 单次 Cursor 查询~~（1.6.1+210 完成，含空结果回退）；目录缓存与线程池仍待做。
 - `SessionWorkPreparer` 滑动窗口边解析边下载。
 - `js_scan_engine` 去全量 DOM 回流与 `O(N²)` 扫描。

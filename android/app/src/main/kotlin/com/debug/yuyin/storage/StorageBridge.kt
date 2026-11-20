@@ -121,17 +121,14 @@ object StorageBridge {
         }
 
         val prefix = spec.namePrefix
-        val files = dir.listFiles().filter { file ->
-            file.isFile &&
-                matchesType(context, file, spec.type) &&
-                (prefix.isNullOrBlank() || (file.name?.startsWith(prefix) == true))
-        }
-        val first = files.minByOrNull { it.name.orEmpty() }
+        // 单次 Cursor 查询子项：避免 DocumentFile.listFiles() 逐文件 Binder IPC
+        val matched = queryChildren(context, dir, spec, prefix)
+        val first = matched.minByOrNull { it.first }
         return mapOf(
             "type" to spec.type,
-            "found" to files.isNotEmpty(),
-            "count" to files.size,
-            "uri" to first?.uri?.toString(),
+            "found" to matched.isNotEmpty(),
+            "count" to matched.size,
+            "uri" to first?.second?.toString(),
             "folderUri" to dir.uri.toString(),
             "displayPath" to spec.displayPath
         )
@@ -197,6 +194,66 @@ object StorageBridge {
             }
         }
         return notFound(spec)
+    }
+
+    /// 用一次 Cursor 查询目录子项；失败时回退 DocumentFile 逐项列举
+    private fun queryChildren(
+        context: Context,
+        dir: DocumentFile,
+        spec: QuerySpec,
+        prefix: String?
+    ): List<Pair<String, Uri>> {
+        try {
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+                dir.uri,
+                DocumentsContract.getDocumentId(dir.uri)
+            )
+            val projection = arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE
+            )
+            val result = mutableListOf<Pair<String, Uri>>()
+            context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    val docId = cursor.getString(0) ?: continue
+                    val name = cursor.getString(1) ?: continue
+                    val mime = cursor.getString(2) ?: ""
+                    if (mime == DocumentsContract.Document.MIME_TYPE_DIR) continue
+                    if (!matchesTypeName(mime, name, spec.type)) continue
+                    if (!prefix.isNullOrBlank() && !name.startsWith(prefix)) continue
+                    result.add(
+                        name to DocumentsContract.buildDocumentUriUsingTree(dir.uri, docId)
+                    )
+                }
+            }
+            if (result.isNotEmpty()) return result
+            // 空结果可能是目录 URI 解析差异，回退一次逐项列举，避免误报未保存
+        } catch (_: Exception) {
+            // 回退 DocumentFile 列举
+        }
+        return try {
+            dir.listFiles()
+                .filter { file ->
+                    file.isFile &&
+                        matchesType(context, file, spec.type) &&
+                        (prefix.isNullOrBlank() ||
+                            (file.name?.startsWith(prefix) == true))
+                }
+                .mapNotNull { file -> file.name?.let { it to file.uri } }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun matchesTypeName(mime: String, name: String, type: String): Boolean {
+        if (mime.startsWith(mimePrefix(type))) return true
+        val extension = name.substringAfterLast('.', "").lowercase()
+        return when (type) {
+            "image" -> extension in listOf("jpg", "jpeg", "png", "webp", "gif", "heic")
+            "audio" -> extension in listOf("mp3", "m4a", "wav", "aac", "ogg", "flac")
+            else -> extension in listOf("mp4", "mov", "m4v", "flv", "mkv")
+        }
     }
 
     private fun collectionUriFor(type: String, collection: String): Uri {
