@@ -90,7 +90,7 @@ extension SnifferSniffStartFlowFlow on DouyinSniffer {
       if (_completer?.isCompleted ?? true) {
         _stopTimers();
       } else {
-        _injectScript();
+        _tickScript();
       }
     });
 

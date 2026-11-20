@@ -3,6 +3,11 @@ const String jsBootstrap = r'''  }
   hookNetwork();
   tryExtractNow();
   flushPendingVideo();
+  // 轻量 tick：Dart 轮询时只触发扫描，避免每 800ms 重传整段脚本
+  window.__dySniffTick = function () {
+    try { tryExtractNow(); } catch (e) {}
+    try { flushPendingVideo(); } catch (e) {}
+  };
   window.__douyinSnifferReset = function () {
     S.sent = false; S.homeSent = false; S.worksTabCount = 0; S.lastUrl = ''; S.logs = {}; S.targetId = ''; S.desc = ''; S.coverUrl = '';
     S.homeWorks = []; S.homeWorkSet = {}; S.homeWorkCovers = {}; S.homeWorkTitles = {}; S.homeLoggedCount = 0;

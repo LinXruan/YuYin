@@ -69,7 +69,7 @@ extension SnifferHomeSniffFlowFlow on DouyinSniffer {
       if (_homeCompleter?.isCompleted ?? true) {
         _stopTimers();
       } else {
-        _injectScript();
+        _tickScript();
       }
     });
 

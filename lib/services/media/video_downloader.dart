@@ -8,6 +8,7 @@ import '../../models/media_item.dart';
 import '../../utils/save/file_name_formatter.dart';
 import '../../utils/savelocation/save_location_store.dart';
 import '../batch_work/i_work_batch_saver.dart';
+import '../download/bounded_pool.dart';
 import '../sniffer/facade/douyin_sniffer.dart';
 import 'media_saver.dart';
 
@@ -57,6 +58,10 @@ class VideoDownloader implements IWorkDownloadDelegate {
     if (total == 0) {
       throw Exception('没有可下载的资源');
     }
+    // 图片/音频 3 路并发、视频 2 路；单条下载仍是串行网络流，避免触发 CDN 限流
+    final concurrency = total <= 1
+        ? 1
+        : (items.any((item) => item.type == MediaType.video) ? 2 : 3);
 
     // 相册/外部存储权限在批量下载开始前检查一次
     await _ensureGalleryAccess();
@@ -64,7 +69,8 @@ class VideoDownloader implements IWorkDownloadDelegate {
     final batchTag = DateTime.now().millisecondsSinceEpoch;
     final savedTypes = <MediaType>{};
 
-    for (var i = 0; i < total; i++) {
+    var completed = 0;
+    await BoundedPool.forEach(total, concurrency, (i) async {
       if (cancelToken?.isCancelled ?? false) {
         throw const DouyinDownloadCancelledException();
       }
@@ -87,7 +93,8 @@ class VideoDownloader implements IWorkDownloadDelegate {
           tempPath,
           cookie: cookie,
           cancelToken: cancelToken,
-          onProgress: (progress) => onProgress(i + 1, total, progress),
+          // completed 只增不减，保证并发下进度条不回退
+          onProgress: (progress) => onProgress(completed + 1, total, progress),
         );
         if (cancelToken?.isCancelled ?? false) {
           throw const DouyinDownloadCancelledException();
@@ -109,7 +116,8 @@ class VideoDownloader implements IWorkDownloadDelegate {
         savedTypes.add(item.type);
 
         // 确保界面收到当前项 100% 的完成信号
-        onProgress(i + 1, total, 1.0);
+        completed++;
+        onProgress(completed, total, 1.0);
       } on DioException catch (e) {
         if (CancelToken.isCancel(e)) {
           throw const DouyinDownloadCancelledException();
@@ -119,7 +127,7 @@ class VideoDownloader implements IWorkDownloadDelegate {
         // 每保存完一个文件立即删除，避免批量下载撑爆临时目录
         await _deleteIfExists(tempPath);
       }
-    }
+    });
 
     return savedTypes;
   }

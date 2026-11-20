@@ -12,11 +12,14 @@ import 'utils/settings/theme_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await ThemeStore.init();
-  await SaveLocationStore.init();
-  await TerminalMemoryStore.init();
-  await DownloadSettingsStore.init();
-  await HistoryStore.init();
+  // 5 个 Store 互不依赖，并行读取缩短冷启动
+  await Future.wait([
+    ThemeStore.init(),
+    SaveLocationStore.init(),
+    TerminalMemoryStore.init(),
+    DownloadSettingsStore.init(),
+    HistoryStore.init(),
+  ]);
   unawaited(AppUpdateStore.cleanOldApks());
   runApp(const YuYinApp());
 }

@@ -69,7 +69,7 @@ extension SnifferProfileSniffFlowFlow on DouyinSniffer {
       if (_profileCompleter?.isCompleted ?? true) {
         _stopTimers();
       } else {
-        _injectScript();
+        _tickScript();
       }
     });
 

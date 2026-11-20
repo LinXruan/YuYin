@@ -19,46 +19,19 @@ extension _HistoryCardThumbnail on _HistoryCard {
       );
     }
 
-    // 1. 同步内存检查：极速 O(1) 命中已缓存本地文件（0 异步等待、0 闪烁、0 网络）
-    final syncFile = HistoryThumbnailCache.getCachedFileSync(item.id);
-    if (syncFile != null) {
-      return _buildLocalImageThumbnail(theme, syncFile, size);
-    }
-
-    // 2. 内存尚未命中：触发后台异步下载落盘（内置 In-flight 去重），同时在本地寻找
-    // 注意：UI 层绝对不挂载任何 Image.network，100% 由本地离线缓存驱动！
-    HistoryThumbnailCache.cacheThumbnail(item.id, item.coverUrl!);
-
+    // 同步命中优先；未命中由 CachedThumbnailImage 内部发起一次加载，
+    // UI 层不挂载 Image.network，全部由本地离线缓存驱动
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        width: size,
-        height: size,
         color: Colors.black.withValues(alpha: 0.85),
-        child: FutureBuilder<File?>(
-          future: HistoryThumbnailCache.findValidCachedFile(item.id),
-          builder: (context, snapshot) {
-            final cachedFile = snapshot.data;
-            if (cachedFile != null) {
-              return _buildLocalImageStack(theme, cachedFile, size);
-            }
-            // 本地缓存尚未完成或正在静默下载：展示优雅占位图，杜绝任何 Image.network 联网
-            return _buildPlaceholderThumbnail(theme);
-          },
+        child: CachedThumbnailImage(
+          cacheId: item.id,
+          coverUrl: item.coverUrl!,
+          size: size,
+          placeholder: _buildPlaceholderThumbnail(theme),
+          imageBuilder: (file) => _buildLocalImageStack(theme, file, size),
         ),
-      ),
-    );
-  }
-
-  /// 封装带圆角的本地文件缩略图组件
-  Widget _buildLocalImageThumbnail(ThemeData theme, File file, double size) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        width: size,
-        height: size,
-        color: Colors.black.withValues(alpha: 0.85),
-        child: _buildLocalImageStack(theme, file, size),
       ),
     );
   }
