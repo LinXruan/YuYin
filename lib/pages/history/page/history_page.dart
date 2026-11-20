@@ -1,21 +1,15 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../models/history_item.dart';
 import '../../../utils/history/history_store.dart';
 import '../../../utils/thumbnail/history_thumbnail_cache.dart';
+import '../flow/action/history_action_helper.dart';
+import '../flow/search/history_search_coordinator.dart';
+import '../flow/selection/history_selection_coordinator.dart';
 import '../widget/banner/history_prompt_banner.dart';
 import '../widget/card/history_card.dart';
 import '../widget/empty/history_empty_view.dart';
 import '../widget/filter/history_filter_button.dart';
-
-part '../flow/search/history_search_flow.dart';
-
-part '../flow/selection/history_selection_flow.dart';
-
-part '../flow/action/history_action_flow.dart';
 
 part '../widget/frame/history_frame.dart';
 
@@ -29,16 +23,11 @@ class HistoryPage extends StatefulWidget {
 
 class _HistoryPageState extends State<HistoryPage>
     with AutomaticKeepAliveClientMixin {
-  final TextEditingController _searchController = TextEditingController();
-  Timer? _debounceTimer;
+  late final HistorySelectionCoordinator _selection;
+  late final HistorySearchCoordinator _search;
 
-  bool _isSelectionMode = false;
-  final Set<String> _selectedIds = <String>{};
-  bool _filterOnlySaved = false;
   bool _sessionDismissed = false;
   bool _permanentlyDismissed = false;
-
-  String _searchQuery = '';
 
   @override
   bool get wantKeepAlive => true;
@@ -46,6 +35,25 @@ class _HistoryPageState extends State<HistoryPage>
   @override
   void initState() {
     super.initState();
+    _selection = HistorySelectionCoordinator(
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
+    _search = HistorySearchCoordinator(
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+      onFilterSavedChanged: (onlySaved) {
+        if (onlySaved) {
+          final savedIds = HistoryStore.records
+              .where((item) => item.isSaved)
+              .map((item) => item.id)
+              .toSet();
+          _selection.pruneUnsaved(savedIds);
+        }
+      },
+    );
     HistoryThumbnailCache.warmUp();
     HistoryThumbnailCache.cacheUpdateNotifier.addListener(_onCacheUpdated);
     HistoryStore.recordsNotifier.addListener(_onRecordsChanged);
@@ -56,15 +64,14 @@ class _HistoryPageState extends State<HistoryPage>
     });
   }
 
-  /// 供流程分片调用的状态刷新入口（setState 受保护，扩展无法直接调用）
+  /// 供内部调用的状态刷新入口
   void _refresh(VoidCallback fn) => setState(fn);
 
   @override
   void dispose() {
     HistoryThumbnailCache.cacheUpdateNotifier.removeListener(_onCacheUpdated);
     HistoryStore.recordsNotifier.removeListener(_onRecordsChanged);
-    _debounceTimer?.cancel();
-    _searchController.dispose();
+    _search.dispose();
     super.dispose();
   }
 
@@ -76,12 +83,8 @@ class _HistoryPageState extends State<HistoryPage>
   void _onRecordsChanged() {
     if (!mounted) return;
     setState(() {
-      // 移除可能已被删除的选中项
       final currentIds = HistoryStore.records.map((r) => r.id).toSet();
-      _selectedIds.removeWhere((id) => !currentIds.contains(id));
-      if (_selectedIds.isEmpty && _isSelectionMode && HistoryStore.records.isEmpty) {
-        _isSelectionMode = false;
-      }
+      _selection.pruneDeleted(currentIds);
     });
   }
 

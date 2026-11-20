@@ -1,8 +1,11 @@
-part of '../../page/history_page.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-/// history action
-extension _HistoryHistoryActionFlow on _HistoryPageState {
-  void _copyLink(HistoryItem item) {
+import '../../../../models/history_item.dart';
+
+/// 历史记录交互动作辅助类（复制链接及轻量提示）
+abstract final class HistoryActionHelper {
+  static void copyLink(BuildContext context, HistoryItem item) {
     final messenger = ScaffoldMessenger.of(context);
     final text = item.copyText;
     if (text.isEmpty) {
