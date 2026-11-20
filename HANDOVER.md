@@ -1,16 +1,16 @@
-# 余音交接清单（截至 1.6.1+212）
+# 余音交接清单（截至 1.6.1+213）
 
 > 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_81~90/PLAN_82.md`。
-> 工作区干净，最近提交为 212_pl82。
+> 工作区干净，最近提交为 213_pl82。
 
 ---
 
 ## 0. 一句话现状
 
-- 版本：`1.6.1+212`（版本名冻结，只递增 build 号）。
-- 门禁：`flutter analyze` 0 issues；`flutter test` 402 全绿；结构门禁 `part` 上限 **94**。
-- 已完成大重构：**调试桥 0 part、Selection 0 part、Shell 0 part**；Sniffer 已拆出会话、消息路由、脚本注入器、时间预算、单作品策略（Single 0 part）。
-- 未完成大重构：Sniffer 剩余 6 个 part 文件（12 条）、ParsePage（24）、HistoryPage（16）、widgets/save_page（42）。
+- 版本：`1.6.1+213`（版本名冻结，只递增 build 号）。
+- 门禁：`flutter analyze` 0 issues；`flutter test` 402 全绿；结构门禁 `part` 上限 **88**。
+- 已完成大重构：**调试桥 0 part、Selection 0 part、Shell 0 part**；Sniffer 已拆出会话、消息路由、脚本注入器、时间预算、单作品策略（Single 0 part）、主页与资料策略（Home/Profile 0 part）。
+- 未完成大重构：Sniffer 剩余 3 个 part 文件（6 条）、ParsePage（24）、HistoryPage（16）、widgets/save_page（42）。
 
 ---
 
@@ -48,6 +48,7 @@
 | 210 | 78 | SAF 目录单次 Cursor 查询（含空结果回退） |
 | 211 | 82 | `SnifferTimeBudget` 独立，门面 399 → 374 行 |
 | 212 | 82 | 单作品策略独立（SingleSniffStrategy + ShareFallbackStrategy + WebviewFallbackStrategy），删除 4 个 part，门面 344 行 |
+| 213 | 82 | 主页与资料策略独立（HomeSniffStrategy + ProfileSniffStrategy），删除 3 个 part，门面 334 行 |
 
 ---
 
@@ -75,7 +76,7 @@
 - `pages/shell/page/app_shell.dart`：长期服务 + 启动流程（更新检查、登录页、Tab 切换）。
 - `pages/shell/widget/shell_scaffold.dart` / `shell_update_banner.dart`：纯展示组件。
 
-### 3.4 Sniffer（6 个 part 文件 / 12 条）
+### 3.4 Sniffer（3 个 part 文件 / 6 条）
 
 已独立：
 - `session/sniff_session.dart`：33 个任务态字段（全部 `_session.x` 访问）。
@@ -83,16 +84,14 @@
 - `script/sniffer_script_injector.dart`、`script/sniffer_script_host.dart`。
 - `sniffer_time_budget.dart`：13 个时间常量 + C 兜底预算。
 - `single/single_sniff_strategy.dart`、`single/share_fallback_strategy.dart`、`single/webview_fallback_strategy.dart`、`single/sniffer_single_host.dart`（单作品策略 0 part）。
+- `home/home_sniff_strategy.dart`、`home/profile_sniff_strategy.dart`、`home/sniffer_home_host.dart`（主页与资料策略 0 part）。
 
-仍是 `part`（需要阶段 5~6 处理）：
+仍是 `part`（需要阶段 6 处理）：
 - `common/navigation_flow.dart`
-- `home/home_sniff_flow.dart`（114）
-- `home/home_finish_flow.dart`（105）
-- `home/profile_sniff_flow.dart`（114）
 - `lifecycle/sniffer_lifecycle_flow.dart`
 - `lifecycle/page_lifecycle_flow.dart`
 
-门面 `douyin_sniffer.dart` 344 行，硬上限 400。
+门面 `douyin_sniffer.dart` 334 行，硬上限 400。
 
 ### 3.5 原生（Kotlin）
 
@@ -158,14 +157,14 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
   - 目标类：`sniffer/single/single_sniff_strategy.dart`、`share_fallback_strategy.dart`、`webview_fallback_strategy.dart`、`sniffer_single_host.dart`（主流程 + 分享页 Dio 兜底 + C 分享页 + 18 秒迟到兜底）。
   - 已迁移并删除：`sniff_start_flow`、`share_fallback_flow`、`webview_fallback_flow`、`message_result_flow` 4 个 part。
   - 验收：analyze 0 issues / 402 测试全绿 / 真机单视频、图文、未登录主页回归全部通过；门面降至 344 行；part 上限降至 94。
-- [ ] **阶段 5：主页与资料策略**
-  - `sniffer/home/home_sniff_strategy.dart`、`profile_sniff_strategy.dart`。
-  - 迁移 `home_sniff_flow`、`home_finish_flow`、`profile_sniff_flow`。
-  - 验收：已登录主页全量（目标 300+ 条）、未登录首屏、资料页；主页进度日志仍需刷新失活定时器。
+- [x] **阶段 5：主页与资料策略**
+  - 目标类：`sniffer/home/home_sniff_strategy.dart`、`profile_sniff_strategy.dart`、`sniffer_home_host.dart`。
+  - 已迁移并删除：`home_sniff_flow`、`home_finish_flow`、`profile_sniff_flow` 3 个 part。
+  - 验收：analyze 0 issues / 402 测试全绿 / 真机单视频（12档位）、图文（3图+1音频）、作者资料抓取、未登录主页首屏（18条）回归全部通过；门面降至 334 行；part 上限降至 88。
 - [ ] **阶段 6：收尾**
   - 迁移 `navigation_flow`、`page_lifecycle_flow`、`sniffer_lifecycle_flow` 剩余逻辑（UA 恢复、非网页拦截、`_stopTimers`→`SnifferTaskLifecycle`）。
   - 删除 Sniffer 全部 `part`，门面目标 ≤200 行。
-  - 结构门禁上限：`102 → 82`。
+  - 结构门禁上限：`88 → 82`。
 
 ### B. PLAN_80 · 剩余架构债
 

@@ -4,10 +4,12 @@ import 'package:flutter/foundation.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../models/media_item.dart';
-import '../../../utils/login_state_store.dart';
 import '../../../utils/url_parser.dart';
 import '../../share/client/douyin_share_api.dart';
 import '../channel/sniffer_channel_parser.dart';
+import '../home/home_sniff_strategy.dart';
+import '../home/profile_sniff_strategy.dart';
+import '../home/sniffer_home_host.dart';
 import '../message/sniffer_message_host.dart';
 import '../message/sniffer_message_router.dart';
 import '../script/sniffer_script_host.dart';
@@ -16,8 +18,6 @@ import '../session/sniff_session.dart';
 import '../single/single_sniff_strategy.dart';
 import '../single/sniffer_single_host.dart';
 import '../single/webview_fallback_strategy.dart';
-import '../sniffer_time_budget.dart';
-import '../lifecycle/sniff_cancelled_exception.dart';
 import '../../multi_work/i_multi_work_extractor.dart';
 import '../../multi_work/multi_work_extractor.dart';
 import '../../single_work/i_single_work_extractor.dart';
@@ -26,12 +26,6 @@ import '../../user_home/i_user_home_extractor.dart';
 import '../../user_home/user_home_extractor.dart';
 
 part '../common/navigation_flow.dart';
-
-part '../home/home_finish_flow.dart';
-
-part '../home/home_sniff_flow.dart';
-
-part '../home/profile_sniff_flow.dart';
 
 part '../lifecycle/sniffer_lifecycle_flow.dart';
 
@@ -49,7 +43,8 @@ class DouyinSniffer
         IMultiWorkSnifferDelegate,
         SnifferMessageHost,
         SnifferScriptHost,
-        SnifferSingleHost {
+        SnifferSingleHost,
+        SnifferHomeHost {
   /// 单作品解析领域提取器
   late final ISingleWorkExtractor singleWork = SingleWorkExtractor(this);
 
@@ -71,6 +66,14 @@ class DouyinSniffer
   late final SnifferMessageRouter _messageRouter = SnifferMessageRouter(this);
   late final SnifferScriptInjector _scriptInjector = SnifferScriptInjector(this);
   late final SingleSniffStrategy _singleStrategy = SingleSniffStrategy(this);
+  late final ProfileSniffStrategy _profileStrategy = ProfileSniffStrategy(
+    host: this,
+    cancelHomeWork: (error, {taskId}) => _homeStrategy.finishWithError(error, taskId: taskId),
+  );
+  late final HomeSniffStrategy _homeStrategy = HomeSniffStrategy(
+    host: this,
+    profileStrategy: _profileStrategy,
+  );
 
   @override
   SniffSession get session => _session;
@@ -105,11 +108,13 @@ class DouyinSniffer
     _log('注入捕获脚本失败: $error');
   }
   @override
-  void refreshHomeInactivity(int taskId) => _refreshHomeInactivityTimer(taskId);
+  void refreshHomeInactivity(int taskId) => _homeStrategy.refreshInactivityTimer(taskId);
   @override
-  void finishProfile(UserHomeProfile profile, int taskId) => _finishProfileWithResult(profile, taskId);
+  void finishProfile(UserHomeProfile profile, int taskId) =>
+      _profileStrategy.finishWithResult(profile, taskId);
   @override
-  void finishHome(UserHomeResult home, int taskId) => _finishHomeWithResult(home, taskId);
+  void finishHome(UserHomeResult home, int taskId) =>
+      _homeStrategy.finishWithResult(home, taskId);
   @override
   Future<void> finishResultItems(
     List<MediaItem> items,
@@ -147,9 +152,12 @@ class DouyinSniffer
 
   @override
   void cancelOtherTasks() {
-    _finishHomeWithError(StateError('已有新的解析任务开始，旧任务已取消'));
-    _finishProfileWithError(StateError('已有新的解析任务开始，旧任务已取消'));
+    _homeStrategy.finishWithError(StateError('已有新的解析任务开始，旧任务已取消'));
+    _profileStrategy.finishWithError(StateError('已有新的解析任务开始，旧任务已取消'));
   }
+
+  @override
+  void cancelSingleWork() => _singleStrategy.cancelActive();
 
   @override
   void clearBlockedSchemes() => _blockedSchemes.clear();
@@ -165,6 +173,9 @@ class DouyinSniffer
 
   @override
   void cancelScheduledUnload() => _cancelScheduledUnload();
+
+  @override
+  void stopTimers() => _stopTimers();
 
   final Set<String> _blockedSchemes = <String>{};
   bool _disposed = false;
@@ -303,17 +314,8 @@ class DouyinSniffer
     _session.acceptLogs = false;
 
     _singleStrategy.cancelActive();
-
-    final homeCompleter = _session.homeCompleter;
-    _session.homeCompleter = null;
-    if (homeCompleter != null && !homeCompleter.isCompleted) {
-      homeCompleter.completeError(const SniffCancelledException());
-    }
-    final profileCompleter = _session.profileCompleter;
-    _session.profileCompleter = null;
-    if (profileCompleter != null && !profileCompleter.isCompleted) {
-      profileCompleter.completeError(const SniffCancelledException());
-    }
+    _homeStrategy.cancelActive();
+    _profileStrategy.cancelActive();
 
     unawaited(
       _controller.loadRequest(Uri.parse('about:blank')).catchError((Object error) {
@@ -331,9 +333,9 @@ class DouyinSniffer
     _session.taskId++;
     _session.acceptMessages = false;
     _session.acceptLogs = false;
-    _finishWithError(StateError('捕获服务已释放'));
-    _finishHomeWithError(StateError('捕获服务已释放'));
-    _finishProfileWithError(StateError('捕获服务已释放'));
+    _singleStrategy.finishWithError(StateError('捕获服务已释放'));
+    _homeStrategy.finishWithError(StateError('捕获服务已释放'));
+    _profileStrategy.finishWithError(StateError('捕获服务已释放'));
   }
 
   // =======================================================
@@ -368,8 +370,8 @@ class DouyinSniffer
   Future<SniffResult> sniffVideoUrl(String shareUrl) => _singleStrategy.sniff(shareUrl);
   @override
   Future<UserHomeResult> sniffUserHomeUrl(String homeUrl) =>
-      flowSniffUserHomeUrl(homeUrl);
+      _homeStrategy.sniff(homeUrl);
   @override
   Future<UserHomeProfile> sniffUserProfile(String homeUrl) =>
-      flowSniffUserProfile(homeUrl);
+      _profileStrategy.sniff(homeUrl);
 }
