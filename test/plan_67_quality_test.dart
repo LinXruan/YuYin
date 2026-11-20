@@ -64,8 +64,8 @@ void main() {
 
     test('未选视频不影响聚合画质', () {
       final session = _videoSession();
-      session.setWork('w2', SelectionState.none);
       session.setTier('w2', 'w2#t2');
+      session.setWork('w2', SelectionState.none);
 
       expect(session.workOf('w2')!.quality, QualityIndicator.none);
       expect(session.terminal.quality, QualityIndicator.highest);
@@ -99,15 +99,20 @@ void main() {
       expect(session.workOf('w1')!.quality, QualityIndicator.lowest);
     });
 
-    test('底部选档不会选中未选视频', () {
+    test('底部选档会同步选中未选视频并更新画质', () {
       final session = _videoSession();
       session.setWork('w1', SelectionState.none);
 
-      session.setTier('w1', 'w1#t1');
+      expect(session.setTier('w1', 'w1#t1'), isTrue);
+      expect(session.workState('w1'), SelectionState.all);
+      expect(session.workOf('w1')!.selectedTier?.url, 'w1#t1');
+      expect(session.workOf('w1')!.quality, QualityIndicator.mixed);
 
-      expect(session.workState('w1'), SelectionState.none);
-      expect(session.workOf('w1')!.quality, QualityIndicator.none);
-      expect(session.workOf('w1')!.selectedResourceCount, 0);
+      // 目标档位已是当前偏好但作品未选时，点选同档位仍需重新选中
+      session.setWork('w1', SelectionState.none);
+      expect(session.setTier('w1', 'w1#t1'), isTrue);
+      expect(session.workState('w1'), SelectionState.all);
+      expect(session.workOf('w1')!.selectedTier?.url, 'w1#t1');
     });
 
     test('单档视频显示最高画质', () {

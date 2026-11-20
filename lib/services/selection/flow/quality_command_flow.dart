@@ -1,8 +1,8 @@
 part of '../save_selection_session.dart';
 
-/// 画质轴命令：只写 qualityPreference，绝不改变选中
+/// 画质轴命令：上层画质开关不改变选中；底层选档同步选中该视频
 extension QualityCommands on SaveSelectionSession {
-  /// 底层视频画质面板：只写具体档位，不改变 selected
+  /// 底层视频画质面板：写入具体档位并同步将该视频置为选中
   bool setTier(String workUrl, String tierKey) {
     final work = _workByUrl[workUrl];
     if (work == null || !work.behavesAsVideo) return false;
@@ -18,7 +18,9 @@ extension QualityCommands on SaveSelectionSession {
         : SpecificQualityPreference.fromItem(tier);
     var changed = false;
     _run(() {
-      if (!work.applyQuality(preference)) return;
+      final selectionChanged = work.applySelection(SelectionState.all);
+      final qualityChanged = work.applyQuality(preference);
+      if (!selectionChanged && !qualityChanged) return;
       changed = true;
       _terminal.refresh();
       _touch();

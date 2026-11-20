@@ -6,16 +6,15 @@ import 'quality_badge.dart';
 
 /// 保存页 resource 层画质档位面板。
 ///
-/// 勾选态直接来自 [SaveSelectionSession]；点选立即写入会话，
-/// 底部按钮只负责关闭，不承担确认语义。
+/// 勾选态直接来自 [SaveSelectionSession]；点选立即写入档位并选中该视频，
+/// 底部按钮只负责关闭（嵌套为「返回」，单作品为「保存选中项 (0/1)」）。
 class VideoTierPickerSheet extends StatelessWidget {
   const VideoTierPickerSheet({
     super.key,
     required this.session,
     required this.workUrl,
     required this.tiers,
-    required this.actionLabel,
-    required this.actionIcon,
+    this.nested = false,
   });
 
   final SaveSelectionSession session;
@@ -25,17 +24,15 @@ class VideoTierPickerSheet extends StatelessWidget {
   /// 已按全局设置过滤并排序的展示档位
   final List<MediaItem> tiers;
 
-  final String actionLabel;
-
-  final IconData actionIcon;
+  /// true 表示由中层进入，底部按钮显示“返回”
+  final bool nested;
 
   static Future<bool?> show(
     BuildContext context, {
     required SaveSelectionSession session,
     required String workUrl,
     required List<MediaItem> tiers,
-    required String actionLabel,
-    required IconData actionIcon,
+    bool nested = false,
   }) {
     return showModalBottomSheet<bool>(
       context: context,
@@ -45,8 +42,7 @@ class VideoTierPickerSheet extends StatelessWidget {
         session: session,
         workUrl: workUrl,
         tiers: tiers,
-        actionLabel: actionLabel,
-        actionIcon: actionIcon,
+        nested: nested,
       ),
     );
   }
@@ -63,6 +59,7 @@ class VideoTierPickerSheet extends StatelessWidget {
           listenable: session,
           builder: (context, _) {
             final selectedUrl = session.workOf(workUrl)?.selectedTier?.url;
+            final hasSelected = selectedUrl != null;
             return Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -117,7 +114,7 @@ class VideoTierPickerSheet extends StatelessWidget {
                                 : theme.colorScheme.outline,
                           ),
                         ),
-                        // 点选即写入会话，面板不持有任何选择副本
+                        // 点选即写入会话并选中该视频，面板不持有任何选择副本
                         onTap: () => session.setTier(workUrl, item.url),
                       );
                     },
@@ -129,9 +126,17 @@ class VideoTierPickerSheet extends StatelessWidget {
                     width: double.infinity,
                     child: FilledButton.icon(
                       key: const ValueKey('video_tier_action_button'),
-                      onPressed: () => Navigator.pop(context, true),
-                      icon: Icon(actionIcon),
-                      label: Text(actionLabel),
+                      onPressed: nested
+                          ? () => Navigator.pop(context, true)
+                          : (hasSelected
+                                ? () => Navigator.pop(context, true)
+                                : null),
+                      icon: Icon(
+                        nested ? Icons.arrow_back_rounded : Icons.save_alt,
+                      ),
+                      label: Text(
+                        nested ? '返回' : '保存选中项 (${hasSelected ? 1 : 0})',
+                      ),
                     ),
                   ),
                 ),

@@ -54,8 +54,7 @@ extension _ParseSavePageFlow on _ParsePageState {
         session: session,
         workUrl: workUrl,
         tiers: tiers,
-        actionLabel: '返回',
-        actionIcon: Icons.arrow_back_rounded,
+        nested: true,
       ).then((_) {
         if (!mounted) return;
         final tier = session.workOf(workUrl)?.selectedTier;
@@ -104,8 +103,6 @@ extension _ParseSavePageFlow on _ParsePageState {
       session: session,
       workUrl: workUrl,
       tiers: tiers,
-      actionLabel: '保存选中项 (1)',
-      actionIcon: Icons.save_alt,
     );
     if (!mounted || confirmed != true) return false;
 

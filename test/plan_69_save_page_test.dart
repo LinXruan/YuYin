@@ -58,8 +58,7 @@ SaveSelectionSession _singleVideoSession() {
 
 Widget _pickerHost(
   SaveSelectionSession session, {
-  String label = '返回',
-  IconData icon = Icons.arrow_back_rounded,
+  bool nested = true,
 }) {
   final row = session.workOf('v1')!;
   return MaterialApp(
@@ -72,8 +71,7 @@ Widget _pickerHost(
               session: session,
               workUrl: 'v1',
               tiers: VideoQualityUtils.displayTiers(row.tiers),
-              actionLabel: label,
-              actionIcon: icon,
+              nested: nested,
             ),
             child: const Text('open'),
           ),
@@ -193,9 +191,7 @@ void main() {
 
     testWidgets('底部动作文案与图标可配置为保存', (tester) async {
       final session = _singleVideoSession();
-      await tester.pumpWidget(
-        _pickerHost(session, label: '保存选中项 (1)', icon: Icons.save_alt),
-      );
+      await tester.pumpWidget(_pickerHost(session, nested: false));
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
 
