@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -9,14 +8,16 @@ import '../../../utils/login_state_store.dart';
 import '../../../utils/url_parser.dart';
 import '../../share/client/douyin_share_api.dart';
 import '../channel/sniffer_channel_parser.dart';
+import '../message/sniffer_message_host.dart';
 import '../message/sniffer_message_router.dart';
 import '../script/sniffer_script_host.dart';
 import '../script/sniffer_script_injector.dart';
-import '../message/sniffer_message_host.dart';
 import '../session/sniff_session.dart';
+import '../single/single_sniff_strategy.dart';
+import '../single/sniffer_single_host.dart';
+import '../single/webview_fallback_strategy.dart';
 import '../sniffer_time_budget.dart';
 import '../lifecycle/sniff_cancelled_exception.dart';
-import '../../multi_work/article_work_exception.dart';
 import '../../multi_work/i_multi_work_extractor.dart';
 import '../../multi_work/multi_work_extractor.dart';
 import '../../single_work/i_single_work_extractor.dart';
@@ -24,15 +25,7 @@ import '../../single_work/single_work_extractor.dart';
 import '../../user_home/i_user_home_extractor.dart';
 import '../../user_home/user_home_extractor.dart';
 
-part '../single/sniff_start_flow.dart';
-
 part '../common/navigation_flow.dart';
-
-part '../single/share_fallback_flow.dart';
-
-part '../single/webview_fallback_flow.dart';
-
-part '../common/message_result_flow.dart';
 
 part '../home/home_finish_flow.dart';
 
@@ -46,11 +39,7 @@ part '../lifecycle/page_lifecycle_flow.dart';
 
 /// 隐藏式 WebView 捕获服务：抓取无水印视频/图文/实况图直链
 ///
-/// 三路结果来源：
-/// - A：主 WebView 注入 JS（主路径）；
-/// - B：Dio 请求 iesdouyin 分享页（[_runShareFallback]）；
-/// - C：切换 iPhone UA 的 WebView 分享页（[_startWebViewShareFallback]）。
-/// A 的 30 秒主超时是所有兜底的总预算，C 必须在超时前结束。
+/// 门面对象：管理 WebView 实例与路由分发，具体策略委托至专用领域对象。
 class DouyinSniffer
     implements
         ISingleWorkExtractor,
@@ -59,7 +48,8 @@ class DouyinSniffer
         IUserHomeSnifferDelegate,
         IMultiWorkSnifferDelegate,
         SnifferMessageHost,
-        SnifferScriptHost {
+        SnifferScriptHost,
+        SnifferSingleHost {
   /// 单作品解析领域提取器
   late final ISingleWorkExtractor singleWork = SingleWorkExtractor(this);
 
@@ -80,6 +70,7 @@ class DouyinSniffer
 
   late final SnifferMessageRouter _messageRouter = SnifferMessageRouter(this);
   late final SnifferScriptInjector _scriptInjector = SnifferScriptInjector(this);
+  late final SingleSniffStrategy _singleStrategy = SingleSniffStrategy(this);
 
   @override
   SniffSession get session => _session;
@@ -99,6 +90,9 @@ class DouyinSniffer
   bool get isDisposed => _disposed;
   @override
   String get taskNonce => _taskNonce;
+  @override
+  SnifferScriptInjector get scriptInjector => _scriptInjector;
+
   @override
   void markScriptAccepted() {
     _session.acceptMessages = true;
@@ -124,7 +118,7 @@ class DouyinSniffer
     String? desc,
     String? coverUrl,
     String? awemeId,
-  }) => _finishWithItems(
+  }) => _singleStrategy.finishWithItems(
         items,
         isImagePost,
         taskId,
@@ -141,7 +135,7 @@ class DouyinSniffer
     String? coverUrl,
     String? awemeId,
   }) =>
-      _finishWithItems(
+      _singleStrategy.finishWithItems(
         items,
         false,
         taskId,
@@ -151,11 +145,31 @@ class DouyinSniffer
         awemeId: awemeId,
       );
 
-  final DouyinShareApi _shareApi = DouyinShareApi();
+  @override
+  void cancelOtherTasks() {
+    _finishHomeWithError(StateError('已有新的解析任务开始，旧任务已取消'));
+    _finishProfileWithError(StateError('已有新的解析任务开始，旧任务已取消'));
+  }
+
+  @override
+  void clearBlockedSchemes() => _blockedSchemes.clear();
+
+  @override
+  Future<void> restoreDesktopUserAgent() => _restoreDesktopUserAgent();
+
+  @override
+  Future<void> resetPageBeforeStart() => _resetPageBeforeStart();
+
+  @override
+  void schedulePageUnload() => _schedulePageUnload();
+
+  @override
+  void cancelScheduledUnload() => _cancelScheduledUnload();
+
   final Set<String> _blockedSchemes = <String>{};
   bool _disposed = false;
 
-  bool get _isNotePage => _session.workPageKind == DouyinWorkPage.note;
+  DouyinShareApi get _shareApi => _singleStrategy.shareApi;
 
   /// 当前是否仍在等待解析结果；任务完成后不再重新注入脚本或接收结果
   bool get _isTaskActive {
@@ -176,9 +190,10 @@ class DouyinSniffer
   void Function(String message)? onUserLog;
 
   /// 登录状态回调，由主界面设置
+  @override
   bool Function()? isLoggedIn;
 
-  /// 远端登录状态变化感知回调（用于在远端被动失效时通知主界面同步状态并清除本地凭证）
+  /// 远端登录状态变化感知回调
   void Function(bool loggedIn)? onLoginStateDetected;
 
   bool _isLoggedIn = false;
@@ -213,15 +228,12 @@ class DouyinSniffer
           onWebResourceError: _onWebResourceError,
           onPageStarted: (url) {
             _markPageReset(url);
-            // 空白页只用于任务边界重置，不参与捕获
             if (url.startsWith('about:')) return;
-            // 任务结束后页面仍可能继续跳转，不能再重新开启捕获
             if (!_isTaskActive) return;
             if (!UrlParser.isAllowedNavigationUrl(url)) {
               _logNonWebPage(url);
               return;
             }
-            // 旧作品页迟到的导航开始：不解除上一任务的屏障
             final startedId = UrlParser.extractAwemeId(url);
             if (_session.retiredAwemeId != null &&
                 startedId != null &&
@@ -229,7 +241,6 @@ class DouyinSniffer
               return;
             }
             _session.taskPageStarted = true;
-            // 新页面开始加载后才接受回传，避免旧页面的延迟消息
             _session.acceptMessages = true;
             _session.acceptLogs = true;
             _handlePageUrl(url, _session.taskId);
@@ -238,7 +249,6 @@ class DouyinSniffer
           onUrlChange: (change) {
             if (change.url?.startsWith('about:') ?? false) return;
             if (!_isTaskActive) return;
-            // 重定向/SPA history 变化时补一次最终 URL 识别
             _handlePageUrl(change.url, _session.taskId);
           },
           onPageFinished: (url) {
@@ -264,24 +274,16 @@ class DouyinSniffer
   /// 用户输入的原始链接
   String? get sourceUrl => _session.sourceUrl;
 
-  /// 第一次带 awemeId 的主页面 URL（不会记录 C 分享页，仅调试展示）
+  /// 第一次带 awemeId 的主页面 URL（仅调试展示）
   String? get awemePageUrl => _session.awemePageUrl;
 
   /// 加载分享链接并等待 JS 回传，最长等待 30 秒
-  /// 按作品链接解析的便捷入口
   Future<SingleWorkResult> sniffWork(String url) => sniffVideoUrl(url);
-
 
   /// 区分深链中断和无数据，避免统一误报“风控”
   @visibleForTesting
-  static String shareFallbackErrorMessage(String? lastWebResourceError) {
-    final error = lastWebResourceError ?? '';
-    if (error.contains('ERR_UNKNOWN_URL_SCHEME') ||
-        error.contains('ERR_ABORTED')) {
-      return '分享页被深链中断，请稍后重试';
-    }
-    return '分享页兜底未返回作品数据，请稍后重试';
-  }
+  static String shareFallbackErrorMessage(String? lastWebResourceError) =>
+      WebviewFallbackStrategy.shareFallbackErrorMessage(lastWebResourceError);
 
   /// 接收 JS 通过 DouyinChannel 回传的 JSON 消息
   static bool? parseChannelLoginState(Object? rawData) =>
@@ -300,11 +302,8 @@ class DouyinSniffer
     _session.acceptMessages = false;
     _session.acceptLogs = false;
 
-    final completer = _session.completer;
-    _session.completer = null;
-    if (completer != null && !completer.isCompleted) {
-      completer.completeError(const SniffCancelledException());
-    }
+    _singleStrategy.cancelActive();
+
     final homeCompleter = _session.homeCompleter;
     _session.homeCompleter = null;
     if (homeCompleter != null && !homeCompleter.isCompleted) {
@@ -315,15 +314,16 @@ class DouyinSniffer
     if (profileCompleter != null && !profileCompleter.isCompleted) {
       profileCompleter.completeError(const SniffCancelledException());
     }
-    _stopTimers();
 
-    // webview_flutter 没有 stopLoading，用 about:blank 终止当前页面加载
     unawaited(
       _controller.loadRequest(Uri.parse('about:blank')).catchError((Object error) {
         debugPrint('停止网页加载失败: $error');
       }),
     );
   }
+
+  void _finishWithError(Object error, {int? taskId}) =>
+      _singleStrategy.finishWithError(error, taskId: taskId);
 
   void dispose() {
     _disposed = true;
@@ -338,7 +338,7 @@ class DouyinSniffer
 
   // =======================================================
   // ISingleWorkExtractor & IUserHomeExtractor 契约实现
-  // ==========================================
+  // =======================================================
   @override
   String? extractShareUrl(String text) {
     final url = UrlParser.extractDouyinUrl(text);
@@ -365,7 +365,7 @@ class DouyinSniffer
   @override
   void cancel() => cancelActiveTask();
   @override
-  Future<SniffResult> sniffVideoUrl(String shareUrl) => flowSniffVideoUrl(shareUrl);
+  Future<SniffResult> sniffVideoUrl(String shareUrl) => _singleStrategy.sniff(shareUrl);
   @override
   Future<UserHomeResult> sniffUserHomeUrl(String homeUrl) =>
       flowSniffUserHomeUrl(homeUrl);
