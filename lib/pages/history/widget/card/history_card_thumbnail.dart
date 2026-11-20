@@ -1,9 +1,24 @@
-part of '../../page/history_page.dart';
+import 'dart:io';
 
-/// 历史卡片封面：本地缓存、占位与兜底缩略图。
-extension _HistoryCardThumbnail on _HistoryCard {
-  Widget _buildThumbnail(ThemeData theme) {
-    const size = 80.0;
+import 'package:flutter/material.dart';
+
+import '../../../../models/history_item.dart';
+import '../../../../widgets/thumbnail/cached_thumbnail_image.dart';
+
+/// 历史卡片封面缩略图组件：100% 本地离线缓存驱动，兜底优雅占位
+class HistoryCardThumbnail extends StatelessWidget {
+  const HistoryCardThumbnail({
+    super.key,
+    required this.item,
+    this.size = 80.0,
+  });
+
+  final HistoryItem item;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final hasCover = item.coverUrl != null &&
         item.coverUrl!.isNotEmpty &&
         !HistoryItem.isVideoUrl(item.coverUrl);
@@ -29,7 +44,7 @@ extension _HistoryCardThumbnail on _HistoryCard {
           cacheId: item.id,
           coverUrl: item.coverUrl!,
           size: size,
-          placeholder: _buildPlaceholderThumbnail(theme),
+          placeholder: _buildFallbackThumbnail(theme),
           imageBuilder: (file) => _buildLocalImageStack(theme, file, size),
         ),
       ),
@@ -70,11 +85,6 @@ extension _HistoryCardThumbnail on _HistoryCard {
           ),
       ],
     );
-  }
-
-  /// 本地缩略图尚未落盘时的占位图组件（避免白屏或网络闪烁）
-  Widget _buildPlaceholderThumbnail(ThemeData theme) {
-    return _buildFallbackThumbnail(theme);
   }
 
   /// 兜底缩略图（根据媒体类型渲染专属矢量图标与文案，避免重复请求并保持视觉优雅）

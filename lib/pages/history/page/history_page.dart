@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,21 +6,16 @@ import 'package:flutter/services.dart';
 import '../../../models/history_item.dart';
 import '../../../utils/history/history_store.dart';
 import '../../../utils/thumbnail/history_thumbnail_cache.dart';
-import '../../../widgets/thumbnail/cached_thumbnail_image.dart';
 import '../widget/banner/history_prompt_banner.dart';
+import '../widget/card/history_card.dart';
 import '../widget/empty/history_empty_view.dart';
 import '../widget/filter/history_filter_button.dart';
-import '../widget/open/history_open_actions.dart';
 
 part '../flow/search/history_search_flow.dart';
 
 part '../flow/selection/history_selection_flow.dart';
 
 part '../flow/action/history_action_flow.dart';
-
-part '../widget/card/history_card.dart';
-
-part '../widget/card/history_card_thumbnail.dart';
 
 part '../widget/frame/history_frame.dart';
 

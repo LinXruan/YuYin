@@ -1,7 +1,12 @@
-part of '../../page/history_page.dart';
+import 'package:flutter/material.dart';
 
-class _HistoryCard extends StatelessWidget {
-  const _HistoryCard({
+import '../../../../models/history_item.dart';
+import '../open/history_open_actions.dart';
+import 'history_card_thumbnail.dart';
+
+/// 历史记录卡片组件（严格遵照设计：不含“抖音”二字，圆角缩略图与作品文案）
+class HistoryCard extends StatelessWidget {
+  const HistoryCard({
     super.key,
     required this.item,
     required this.isSelectionMode,
@@ -47,7 +52,7 @@ class _HistoryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // 左侧封面缩略图
-                _buildThumbnail(theme),
+                HistoryCardThumbnail(item: item),
                 const SizedBox(width: 14),
 
                 // 右侧文案与信息
@@ -132,6 +137,4 @@ class _HistoryCard extends StatelessWidget {
       ),
     );
   }
-
-  /// 封面缩略图构建：100% 纯本地离线缓存驱动，彻底杜绝任何网络图片请求与流量消耗
 }

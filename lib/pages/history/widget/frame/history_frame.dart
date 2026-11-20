@@ -131,7 +131,7 @@ extension _HistoryPageFrame on _HistoryPageState {
                         final item = displayedItems[index];
                         final isSelected = _selectedIds.contains(item.id);
 
-                        return _HistoryCard(
+                        return HistoryCard(
                           key: ValueKey(item.id),
                           item: item,
                           isSelectionMode: _isSelectionMode,
