@@ -1,19 +1,43 @@
-part of '../../page/parse_page.dart';
+import 'dart:async';
 
-/// 主页解析：作者 -> 顶层保存页
-extension _ParseHomeParseFlow on _ParsePageState {
-  Future<void> _parseUserHomes(List<String> homeUrls) async {
-    var isLogged = widget.loggedIn.value;
+import 'package:dio/dio.dart';
+
+import '../../../../models/history_item.dart';
+import '../../../../models/media_item.dart';
+import '../../../../services/download/download_cancel_registry.dart';
+import '../../../../services/media/video_downloader.dart';
+import '../../../../services/selection/debug/selection_debug_bridge.dart';
+import '../../../../services/selection/save_selection_session.dart';
+import '../../../../services/sniffer/lifecycle/sniff_cancelled_exception.dart';
+import '../../../../services/user_home/user_home_batch_saver.dart';
+import '../../../../utils/history/history_store.dart';
+import '../../../../utils/login_state_store.dart';
+import '../../../../utils/memory/terminal_memory_store.dart';
+import '../../../../utils/url_parser.dart';
+import '../../../../widgets/save_page/middle_multi_work_sheet.dart';
+import '../../../../widgets/save_page/top_multi_home_sheet.dart';
+import '../common/parse_flow_context.dart';
+import '../common/parse_flow_helper.dart';
+import '../common/parse_save_coordinator.dart';
+
+/// 作者主页批量解析协调器：主页抓取、首屏去重、写入历史、顶层选作者与批量下载
+class HomeParseCoordinator {
+  const HomeParseCoordinator(this.ctx);
+
+  final ParseFlowContext ctx;
+
+  Future<void> parseUserHomes(List<String> homeUrls) async {
+    var isLogged = ctx.loggedIn.value;
     if (!isLogged) {
       try {
         isLogged = await LoginStateStore.isLoggedIn() &&
             await LoginStateStore.checkWebViewCookieSession();
-        if (isLogged) widget.loggedIn.value = true;
+        if (isLogged) ctx.loggedIn.value = true;
       } catch (_) {}
     }
 
     if (!isLogged) {
-      widget.logs.add('未登录模式：仅解析首屏作品');
+      ctx.logs.add('未登录模式：仅解析首屏作品');
     }
 
     final profiles = <UserHomeProfile>[];
@@ -26,37 +50,37 @@ extension _ParseHomeParseFlow on _ParsePageState {
 
     try {
       for (var i = 0; i < orderedHomeUrls.length; i++) {
-        if (!mounted || !_isParsing) return;
+        if (!ctx.mounted || !ctx.isParsing()) return;
         final homeUrl = orderedHomeUrls[i];
-        widget.logs.add(
+        ctx.logs.add(
           '正在捕获主页作品 (${i + 1}/${orderedHomeUrls.length})...',
         );
         try {
           final homeResult =
-              await widget.sniffer.userHome.extractAllWorks(homeUrl);
-          if (!mounted || !_isParsing) return;
+              await ctx.sniffer.userHome.extractAllWorks(homeUrl);
+          if (!ctx.mounted || !ctx.isParsing()) return;
 
           final secUid = homeResult.secUid.trim();
           if (secUid.isEmpty) {
-            widget.logs.add('第 ${i + 1} 个主页未识别到 secUid，已跳过');
+            ctx.logs.add('第 ${i + 1} 个主页未识别到 secUid，已跳过');
             continue;
           }
           if (!seenHomeKeys.add(secUid)) {
-            widget.logs.add(
+            ctx.logs.add(
               '重复主页已去重（同一作者的口令与网址）: ${homeResult.nickname}',
             );
             continue;
           }
 
           if (homeResult.partial) {
-            widget.logs.add(
+            ctx.logs.add(
               '未登录仅获取首屏 ${homeResult.count} 条（主页标注 ${homeResult.worksTotalTag} 条），登录后可获取全部',
             );
           }
 
           final works = _buildHomeWorks(homeResult);
           if (works.isEmpty) {
-            widget.logs.add(
+            ctx.logs.add(
               '作者【${homeResult.nickname.isNotEmpty ? homeResult.nickname : "未知作者"}】暂无可保存作品，已跳过',
             );
             continue;
@@ -80,7 +104,7 @@ extension _ParseHomeParseFlow on _ParsePageState {
           final articleText = homeResult.filteredArticleCount > 0
               ? '，已过滤 ${homeResult.filteredArticleCount} 条文章'
               : '';
-          widget.logs.add(
+          ctx.logs.add(
             '作者【${homeResult.nickname.isNotEmpty ? homeResult.nickname : "未知作者"}】'
             '作品捕获完成：${works.length} 条可保存，'
             '已关联封面 ${homeResult.coversCount} 条$articleText',
@@ -88,24 +112,24 @@ extension _ParseHomeParseFlow on _ParsePageState {
         } on SniffCancelledException {
           rethrow;
         } catch (e) {
-          if (!mounted || !_isParsing) return;
-          widget.logs.add('第 ${i + 1} 个主页捕获失败：${_friendlyError(e)}');
+          if (!ctx.mounted || !ctx.isParsing()) return;
+          ctx.logs.add('第 ${i + 1} 个主页捕获失败：${ParseFlowHelper.friendlyError(e)}');
         }
       }
 
-      _isParsing = false;
-      if (mounted) _refresh(() {});
+      ctx.setParsing(false);
+      ctx.refresh();
 
       if (profiles.isEmpty) {
-        widget.logs.add('未捕获到有效作者信息，请检查主页链接或登录状态');
+        ctx.logs.add('未捕获到有效作者信息，请检查主页链接或登录状态');
         return;
       }
-      if (!mounted) return;
+      if (!ctx.context.mounted) return;
 
-      widget.logs.add(
+      ctx.logs.add(
         '成功捕获 ${profiles.length} 位作者信息，正在打开顶层保存页',
       );
-      widget.onRequestParseTab();
+      ctx.onRequestParseTab();
 
       final session = SaveSelectionSession.home(
         profiles: profiles,
@@ -116,14 +140,14 @@ extension _ParseHomeParseFlow on _ParsePageState {
 
       try {
         final confirmed = await MultiHomePreviewSheet.show(
-          context,
+          ctx.context,
           session: session,
-          headers: _ParsePageState._mediaHeaders,
+          headers: ParseSaveCoordinator.mediaHeaders,
           onOpenAuthor: (secUid, index) => _openAuthorWorks(session, secUid),
         );
-        if (!mounted) return;
+        if (!ctx.context.mounted) return;
         if (confirmed != true) {
-          widget.logs.add('已取消多主页保存');
+          ctx.logs.add('已取消多主页保存');
           return;
         }
 
@@ -131,50 +155,51 @@ extension _ParseHomeParseFlow on _ParsePageState {
             .where((author) => author.selection.isSelected)
             .toList();
         if (selectedAuthors.isEmpty) {
-          widget.logs.add('未选择任何作者');
+          ctx.logs.add('未选择任何作者');
           return;
         }
 
         final qualityMode =
             session.terminal.quality.mode ?? BatchVideoQualityMode.highest;
-        widget.busy.value = true;
-        _downloadCancelToken = CancelToken();
+        ctx.busy.value = true;
+        final cancelToken = CancelToken();
+        ctx.setDownloadCancelToken(cancelToken);
         DownloadCancelRegistry.attach(
-          () => _downloadCancelToken?.cancel('用户取消保存'),
+          () => cancelToken.cancel('用户取消保存'),
         );
-        widget.logs.add('正在准备保存 ${selectedAuthors.length} 位作者...');
+        ctx.logs.add('正在准备保存 ${selectedAuthors.length} 位作者...');
 
-        final prepared = await _prepareByAuthor(
+        final prepared = await ctx.saveCoordinator.prepareByAuthor(
           session,
           selectedAuthors,
-          isCancelled: () => _downloadCancelToken?.isCancelled ?? false,
-          onProgress: (nickname, current, total) => _updateBatchSaveProgress(
+          isCancelled: () => cancelToken.isCancelled,
+          onProgress: (nickname, current, total) => ctx.updateBatchSaveProgress(
             current,
             total,
             '正在准备保存：$nickname $current/$total',
           ),
         );
-        if (!mounted) return;
-        if (_downloadCancelToken?.isCancelled ?? false) {
+        if (!ctx.mounted) return;
+        if (cancelToken.isCancelled) {
           throw const DouyinDownloadCancelledException();
         }
 
-        final homeSaver = UserHomeBatchSaver(workSaver: _workBatchSaver);
-        widget.logs.add(
-          '开始保存 ${selectedAuthors.length} 位作者（${_qualityLabel(qualityMode)}）...',
+        final homeSaver = UserHomeBatchSaver(workSaver: ctx.workBatchSaver);
+        ctx.logs.add(
+          '开始保存 ${selectedAuthors.length} 位作者（${ParseFlowHelper.qualityLabel(qualityMode)}）...',
         );
 
         final result = await homeSaver.saveAuthors(
           authors: selectedAuthors.map((author) => author.profile).toList(),
           worksBySecUid: prepared,
           qualityMode: qualityMode,
-          cancelToken: _downloadCancelToken,
-          onProgress: _updateBatchSaveProgress,
+          cancelToken: cancelToken,
+          onProgress: ctx.updateBatchSaveProgress,
           onLog: (message) {
-            if (mounted) widget.logs.add(message);
+            if (ctx.mounted) ctx.logs.add(message);
           },
         );
-        if (!mounted) return;
+        if (!ctx.mounted) return;
 
         await HistoryStore.markSavedBatch({
           for (final author in result.authors)
@@ -182,7 +207,7 @@ extension _ParseHomeParseFlow on _ParsePageState {
         });
 
         final successCount = result.authors.where((a) => a.success).length;
-        widget.logs.add(
+        ctx.logs.add(
           '主页批量保存完成：成功 $successCount/${result.authors.length} 位作者，共 ${result.totalSaved} 项资源',
         );
       } finally {
@@ -190,45 +215,45 @@ extension _ParseHomeParseFlow on _ParsePageState {
         session.close();
       }
     } on DouyinDownloadCancelledException {
-      if (mounted) widget.logs.add('已取消主页批量保存');
+      if (ctx.mounted) ctx.logs.add('已取消主页批量保存');
     } on SniffCancelledException {
-      if (mounted) {
-        widget.logs.add(
-          _downloadCancelToken?.isCancelled == true ? '已取消主页批量保存' : '已取消解析',
+      if (ctx.mounted) {
+        final cancelToken = ctx.getDownloadCancelToken();
+        ctx.logs.add(
+          cancelToken?.isCancelled == true ? '已取消主页批量保存' : '已取消解析',
         );
       }
     } catch (e) {
-      if (mounted) {
-        widget.logs.add('主页捕获失败：${_friendlyError(e)}');
+      if (ctx.mounted) {
+        ctx.logs.add('主页捕获失败：${ParseFlowHelper.friendlyError(e)}');
       }
     } finally {
       DownloadCancelRegistry.detach();
-      _downloadCancelToken = null;
-      if (mounted) {
-        widget.busy.value = false;
-        _isParsing = false;
-        _downloadProgress.value = null;
-        _refresh(() {});
+      ctx.setDownloadCancelToken(null);
+      if (ctx.mounted) {
+        ctx.busy.value = false;
+        ctx.setParsing(false);
+        ctx.refresh();
       }
     }
   }
 
-  /// 打开某个作者的中层；面板压栈后立即返回，顶层加载态当帧清除
   void _openAuthorWorks(SaveSelectionSession session, String secUid) {
     final rows = session.rowsOf(secUid);
-    if (!mounted || rows.isEmpty) return;
+    if (!ctx.mounted || rows.isEmpty) return;
     unawaited(
       MiddleMultiWorkSheet.show(
-        context,
+        ctx.context,
         session: session,
         secUid: secUid,
-        headers: _ParsePageState._mediaHeaders,
+        headers: ParseSaveCoordinator.mediaHeaders,
         nested: true,
-        onOpenWork: (workUrl, index) => _openWorkDetail(session, workUrl),
+        onOpenWork: (workUrl, index) =>
+            ctx.saveCoordinator.openWorkDetail(ctx.context, session, workUrl),
       ).then((confirmed) {
-        if (!mounted) return;
+        if (!ctx.mounted) return;
         if (confirmed == true) {
-          widget.logs.add(
+          ctx.logs.add(
             '作者作品已更新：${session.selectedCountOf(rows)}/${rows.length}',
           );
         }
@@ -236,7 +261,6 @@ extension _ParseHomeParseFlow on _ParsePageState {
     );
   }
 
-  /// 主页捕获结果 -> 作品条目
   List<SaveWorkItem> _buildHomeWorks(UserHomeResult result) {
     final works = <SaveWorkItem>[];
     for (final url in result.workUrls) {
