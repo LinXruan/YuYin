@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/pages/parse/page/parse_page.dart';
+import 'package:yuyin/pages/parse/widget/status/status_card.dart';
 import 'package:yuyin/utils/debug/log_controller.dart';
 
 void main() {

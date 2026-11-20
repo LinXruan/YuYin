@@ -1,17 +1,20 @@
-part of '../../page/parse_page.dart';
+import 'package:flutter/material.dart';
+
+import '../../../../utils/login_state_store.dart';
+import 'prompt_surface.dart';
 
 /// 登录提示横幅。
-class _LoginPromptBanner extends StatefulWidget {
-  const _LoginPromptBanner({required this.loggedIn, this.onTapLogin});
+class LoginPromptBanner extends StatefulWidget {
+  const LoginPromptBanner({super.key, required this.loggedIn, this.onTapLogin});
 
   final ValueNotifier<bool> loggedIn;
   final VoidCallback? onTapLogin;
 
   @override
-  State<_LoginPromptBanner> createState() => _LoginPromptBannerState();
+  State<LoginPromptBanner> createState() => _LoginPromptBannerState();
 }
 
-class _LoginPromptBannerState extends State<_LoginPromptBanner> {
+class _LoginPromptBannerState extends State<LoginPromptBanner> {
   bool _sessionDismissed = false;
   bool _permanentlyDismissed = false;
 
@@ -35,9 +38,9 @@ class _LoginPromptBannerState extends State<_LoginPromptBanner> {
         }
 
         final theme = Theme.of(context);
-        final style = _PromptStyle.of(context);
+        final style = PromptStyle.of(context);
 
-        return _PromptSurface(
+        return PromptSurface(
           style: style,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

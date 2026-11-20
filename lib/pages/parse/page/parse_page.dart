@@ -19,10 +19,8 @@ import '../../../utils/network_detector.dart';
 import '../../../utils/savelocation/save_location_store.dart';
 import '../../../utils/memory/terminal_memory_store.dart';
 import '../../../utils/url_parser.dart';
-import '../../../utils/settings/parse_hint_store.dart';
 import '../../../utils/settings/video_quality_utils.dart';
 import '../../../models/history_item.dart';
-import '../../../models/parse/parse_action_state.dart';
 import '../../../utils/history/history_store.dart';
 import '../../../services/selection/debug/selection_debug_bridge.dart';
 import '../../../services/selection/save_selection_session.dart';
@@ -31,6 +29,10 @@ import '../../../widgets/save_page/bottom_media_sheet.dart';
 import '../../../widgets/save_page/middle_multi_work_sheet.dart';
 import '../../../widgets/save_page/top_multi_home_sheet.dart';
 import '../../../widgets/save_page/bottom/widget/video_tier_picker_sheet.dart';
+import '../widget/banner/batch_support_banner.dart';
+import '../widget/banner/login_prompt_banner.dart';
+import '../widget/frame/parse_action_button.dart';
+import '../widget/status/status_card.dart';
 
 part '../flow/common/parse_input_flow.dart';
 
@@ -41,15 +43,7 @@ part '../flow/home/home_parse_flow.dart';
 part '../flow/multi/multi_parse_flow.dart';
 
 part '../flow/common/parse_progress_flow.dart';
-part '../widget/status/status_card.dart';
-part '../widget/banner/prompt_surface.dart';
-
-part '../widget/banner/login_prompt_banner.dart';
-
-part '../widget/banner/batch_support_banner.dart';
 part '../flow/common/save_page_flow.dart';
-
-part '../widget/frame/parse_action_button.dart';
 
 part '../widget/frame/parse_frame.dart';
 

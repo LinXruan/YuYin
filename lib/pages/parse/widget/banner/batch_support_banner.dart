@@ -1,14 +1,17 @@
-part of '../../page/parse_page.dart';
+import 'package:flutter/material.dart';
+
+import '../../../../utils/settings/parse_hint_store.dart';
+import 'prompt_surface.dart';
 
 /// 常驻功能提示：与登录提示卡同风格，可关闭或永久隐藏。
-class _BatchSupportBanner extends StatefulWidget {
-  const _BatchSupportBanner();
+class BatchSupportBanner extends StatefulWidget {
+  const BatchSupportBanner({super.key});
 
   @override
-  State<_BatchSupportBanner> createState() => _BatchSupportBannerState();
+  State<BatchSupportBanner> createState() => _BatchSupportBannerState();
 }
 
-class _BatchSupportBannerState extends State<_BatchSupportBanner> {
+class _BatchSupportBannerState extends State<BatchSupportBanner> {
   bool _sessionDismissed = false;
   bool _permanentlyDismissed = false;
 
@@ -29,9 +32,9 @@ class _BatchSupportBannerState extends State<_BatchSupportBanner> {
     }
 
     final theme = Theme.of(context);
-    final style = _PromptStyle.of(context);
+    final style = PromptStyle.of(context);
 
-    return _PromptSurface(
+    return PromptSurface(
       style: style,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

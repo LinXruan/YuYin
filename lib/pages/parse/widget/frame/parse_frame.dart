@@ -107,12 +107,12 @@ extension _ParsePageFrame on _ParsePageState {
                   const SizedBox(height: 16),
                   StatusCard(logs: widget.logs),
                   const SizedBox(height: 12),
-                  _LoginPromptBanner(
+                  LoginPromptBanner(
                     loggedIn: widget.loggedIn,
                     onTapLogin: widget.onTapAccount,
                   ),
                   const SizedBox(height: 8),
-                  const _BatchSupportBanner(),
+                  const BatchSupportBanner(),
                   const SizedBox(height: 16),
                 ],
               );

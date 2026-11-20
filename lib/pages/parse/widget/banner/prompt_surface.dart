@@ -1,8 +1,8 @@
-part of '../../page/parse_page.dart';
+import 'package:flutter/material.dart';
 
 /// 解析页提示卡配色：登录卡与批量解析卡共用。
-class _PromptStyle {
-  const _PromptStyle({
+class PromptStyle {
+  const PromptStyle({
     required this.isDark,
     required this.background,
     required this.border,
@@ -11,10 +11,10 @@ class _PromptStyle {
     required this.secondaryText,
   });
 
-  factory _PromptStyle.of(BuildContext context) {
+  factory PromptStyle.of(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    return _PromptStyle(
+    return PromptStyle(
       isDark: isDark,
       background: isDark
           ? const Color(0xFF261F22)
@@ -39,10 +39,10 @@ class _PromptStyle {
 }
 
 /// 提示卡外壳：圆角、描边与内边距统一。
-class _PromptSurface extends StatelessWidget {
-  const _PromptSurface({required this.style, required this.child});
+class PromptSurface extends StatelessWidget {
+  const PromptSurface({super.key, required this.style, required this.child});
 
-  final _PromptStyle style;
+  final PromptStyle style;
   final Widget child;
 
   @override

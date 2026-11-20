@@ -1,4 +1,6 @@
-part of '../../page/parse_page.dart';
+import 'package:flutter/material.dart';
+
+import '../../../../utils/debug/log_controller.dart';
 
 /// 状态卡片：把日志映射为可读状态文本。
 /// 过程态保持单行极简显示，完成态（下载落盘）智能聚合多分类保存路径全量展示
@@ -95,5 +97,3 @@ class StatusCard extends StatelessWidget {
     );
   }
 }
-
-/// 未登录时展示的提示浮窗：跟随日志栏上下滚动，提示登录以获取更高画质
