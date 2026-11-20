@@ -76,11 +76,11 @@ class DouyinUrlClassifier {
     return DouyinWorkPage.unknown;
   }
 
-  /// 判断链接域名是否为抖音（douyin.com 及其子域名）
+  /// 判断链接域名是否为抖音（含 iesdouyin 分享页）
   static bool isDouyinLink(String url) {
     final uri = Uri.tryParse(url);
     final host = uri?.host.toLowerCase() ?? '';
-    return host == 'douyin.com' || host.endsWith('.douyin.com');
+    return isSupportedHost(host);
   }
 
   /// 判断域名是否属于抖音（含 iesdouyin 分享页）

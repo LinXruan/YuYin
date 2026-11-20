@@ -23,6 +23,10 @@ class UserHomeBatchSaver {
     void Function(String message)? onLog,
   }) async {
     final results = <UserHomeAuthorSaveResult>[];
+    // 进度以「作品」为粒度：仅按作者数计算时，单作者会在开局直接显示 100%
+    final totalWorks = worksBySecUid.values
+        .fold<int>(0, (sum, works) => sum + works.length);
+    var completedWorks = 0;
 
     for (var index = 0; index < authors.length; index++) {
       if (cancelToken?.isCancelled ?? false) {
@@ -46,8 +50,8 @@ class UserHomeBatchSaver {
       }
 
       onProgress?.call(
-        index + 1,
-        authors.length,
+        totalWorks == 0 ? 0 : completedWorks + 1,
+        totalWorks,
         '正在准备 ${index + 1}/${authors.length}',
       );
 
@@ -64,10 +68,12 @@ class UserHomeBatchSaver {
           targetResolver: resolveTarget,
           cancelToken: cancelToken,
           onProgress: (current, total, message) {
-            onProgress?.call(index + 1, authors.length, message);
+            onProgress?.call(completedWorks + current, totalWorks, message);
           },
           onLog: onLog,
         );
+
+        completedWorks += works.length;
 
         final counts = <MediaType, int>{};
         for (final result in workResults) {

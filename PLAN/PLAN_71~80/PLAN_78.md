@@ -56,3 +56,18 @@
 | 单次注入失败后页面无脚本 | 导航完成事件与 `onPageFinished` 双触发，带每文档去重标记 |
 | 并发下载触发抖音限流 | 默认 2/3 并发 + 指数退避，失败降级串行 |
 | Cursor 查询列缺失 | 按 API 分支投影，异常回退 `DocumentFile` |
+---
+
+## 六、落地状态（2026-11-20，1.5.9+193）
+
+已落地：
+- 脚本单次注入 + 800ms 轻量 `__dySniffTick`（消除整段 25KB 重传）。
+- 有界并发下载池 `BoundedPool`（图片/音频 3 路、视频 2 路）+ 进度单调。
+- 正式版调试快照 `kDebugMode` 守卫；`LogPanel` 虚拟化；历史缩略图改为状态组件，不再在 `build()` 里建 `FutureBuilder`。
+- `main.dart` 5 个 Store `Future.wait` 并行初始化。
+
+未落地（顺延到后续迭代）：
+- 原生 Cookie 读取替换 `document.cookie`、`about:blank`/UA 冗余 IPC 清理。
+- `StorageBridge` 单次 Cursor 查询与目录缓存、线程池。
+- `SessionWorkPreparer` 滑动窗口边解析边下载。
+- `js_scan_engine` 去全量 DOM 回流与 `O(N²)` 扫描。

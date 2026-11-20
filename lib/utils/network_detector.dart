@@ -33,27 +33,45 @@ class NetworkDetector {
         return false;
       }
 
-      // 2. 快速轻量级 DNS 解析测试
-      final result = await InternetAddress.lookup('douyin.com')
-          .timeout(timeout);
-      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
-        return true;
-      }
-      return false;
+      // 2. 并发解析两个高可用域名，整体受 timeout 约束
+      final results = await Future.wait([
+        _resolves('douyin.com'),
+        _resolves('baidu.com'),
+      ]).timeout(timeout, onTimeout: () => const [false, false]);
+      return results.any((reachable) => reachable);
     } on SocketException {
       return false;
     } on TimeoutException {
-      // 超时情况下尝试备用高可用域名 baidu.com 快速确认
-      try {
-        final fallback = await InternetAddress.lookup('baidu.com')
-            .timeout(const Duration(milliseconds: 1500));
-        return fallback.isNotEmpty && fallback[0].rawAddress.isNotEmpty;
-      } catch (_) {
-        return false;
-      }
+      return false;
     } catch (_) {
       return false;
     }
+  }
+
+  static Future<bool> _resolves(String host) async {
+    try {
+      final result = await InternetAddress.lookup(host);
+      return result.any((addr) => isUsableAddress(addr));
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 排除回环、link-local（169.254/fe80::）与未指定地址，避免断网时误判为在线
+  @visibleForTesting
+  static bool isUsableAddress(InternetAddress address) {
+    if (address.isLoopback) return false;
+    final bytes = address.rawAddress;
+    if (address.type == InternetAddressType.IPv4 && bytes.length == 4) {
+      if (bytes[0] == 0) return false;
+      if (bytes[0] == 169 && bytes[1] == 254) return false;
+      return true;
+    }
+    if (address.type == InternetAddressType.IPv6 && bytes.length == 16) {
+      if (bytes[0] == 0xfe && (bytes[1] & 0xc0) == 0x80) return false;
+      return true;
+    }
+    return true;
   }
 
   /// 弹出统一的“网络未连接”提示
@@ -81,4 +99,3 @@ class NetworkDetector {
     );
   }
 }
-

@@ -111,12 +111,13 @@ class DouyinBatchInputParser {
 
   /// 生成批量去重键：明确主页按 secUid、明确作品按 awemeId 去重。
   static String dedupeKeyForUrl(String url) {
+    // 主页里的作品浮层链接带 ?modal_id=，必须先按作品去重，不能被 /user/ 路径吞掉
+    final awemeId = DouyinUrlExtractor.extractAwemeId(url);
+    if (awemeId != null) return 'work:$awemeId';
     if (DouyinUrlClassifier.isUserHomeUrl(url)) {
       final secUid = DouyinUrlExtractor.extractSecUid(url);
       if (secUid != null && secUid.isNotEmpty) return 'home:$secUid';
     }
-    final awemeId = DouyinUrlExtractor.extractAwemeId(url);
-    if (awemeId != null) return 'work:$awemeId';
     return 'raw:$url';
   }
 
@@ -129,11 +130,12 @@ class DouyinBatchInputParser {
     if (DouyinUrlClassifier.isArticleUrl(url)) {
       return (kind: DouyinLinkKind.article, nakedShortLink: false);
     }
-    if (DouyinUrlClassifier.isUserHomeUrl(url)) {
-      return (kind: DouyinLinkKind.userHome, nakedShortLink: false);
-    }
+    // 作品 id 优先于主页判定：/user/xxx?modal_id=123 是作品浮层链接而非主页
     if (DouyinUrlExtractor.extractAwemeId(url) != null) {
       return (kind: DouyinLinkKind.work, nakedShortLink: false);
+    }
+    if (DouyinUrlClassifier.isUserHomeUrl(url)) {
+      return (kind: DouyinLinkKind.userHome, nakedShortLink: false);
     }
 
     // 短链（口令链接）：以是否包含 MM/dd 日期参数区分口令作品与口令主页
