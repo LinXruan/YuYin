@@ -9,10 +9,9 @@ import '../../../utils/login_state_store.dart';
 import '../../../utils/url_parser.dart';
 import '../../share/client/douyin_share_api.dart';
 import '../channel/sniffer_channel_parser.dart';
-import '../message/login_message_handler.dart';
+import '../message/sniffer_message_router.dart';
 import '../message/sniffer_message_host.dart';
 import '../session/sniff_session.dart';
-import '../common/log_message_policy.dart';
 import '../lifecycle/sniff_cancelled_exception.dart';
 import '../../script/douyin/douyin_sniff_script.dart';
 import '../../multi_work/article_work_exception.dart';
@@ -30,8 +29,6 @@ part '../common/navigation_flow.dart';
 part '../single/share_fallback_flow.dart';
 
 part '../single/webview_fallback_flow.dart';
-
-part '../common/message_flow.dart';
 
 part '../common/message_result_flow.dart';
 
@@ -94,7 +91,7 @@ class DouyinSniffer
   /// 单任务共享状态（任务态字段统一收敛于此）
   final SniffSession _session = SniffSession();
 
-  late final LoginMessageHandler _loginHandler = LoginMessageHandler(this);
+  late final SnifferMessageRouter _messageRouter = SnifferMessageRouter(this);
 
   @override
   SniffSession get session => _session;
@@ -113,6 +110,39 @@ class DouyinSniffer
 
   @override
   void logDiagnostic(String message) => _log(message);
+
+  @override
+  void reportUserLog(String message) => _report(message);
+  @override
+  bool get isDisposed => _disposed;
+  @override
+  String get taskNonce => _taskNonce;
+  @override
+  void refreshHomeInactivity(int taskId) => _refreshHomeInactivityTimer(taskId);
+  @override
+  void finishProfile(UserHomeProfile profile, int taskId) =>
+      _finishProfileWithResult(profile, taskId);
+  @override
+  void finishHome(UserHomeResult home, int taskId) =>
+      _finishHomeWithResult(home, taskId);
+
+  @override
+  Future<void> finishResultItems(
+    List<MediaItem> items,
+    bool isImagePost,
+    int taskId, {
+    String? desc,
+    String? coverUrl,
+    String? awemeId,
+  }) =>
+      _finishWithItems(
+        items,
+        isImagePost,
+        taskId,
+        desc: desc,
+        coverUrl: coverUrl,
+        awemeId: awemeId,
+      );
 
   @override
   Future<void> finishWithFallbackItems(
@@ -188,7 +218,7 @@ class DouyinSniffer
       ..setUserAgent(desktopUserAgent)
       ..addJavaScriptChannel(
         'DouyinChannel',
-        onMessageReceived: _onJavaScriptMessage,
+        onMessageReceived: (message) => _messageRouter.onMessage(message.message),
       )
       ..setNavigationDelegate(
         NavigationDelegate(

@@ -15,6 +15,27 @@ abstract class SnifferMessageHost {
 
   void logDiagnostic(String message);
 
+  void reportUserLog(String message);
+
+  bool get isDisposed;
+
+  String get taskNonce;
+
+  void refreshHomeInactivity(int taskId);
+
+  void finishProfile(UserHomeProfile profile, int taskId);
+
+  void finishHome(UserHomeResult home, int taskId);
+
+  Future<void> finishResultItems(
+    List<MediaItem> items,
+    bool isImagePost,
+    int taskId, {
+    String? desc,
+    String? coverUrl,
+    String? awemeId,
+  });
+
   Future<void> finishWithFallbackItems(
     List<MediaItem> items,
     int taskId, {
