@@ -1,9 +1,9 @@
 import 'dart:io';
 
-import '../../../utils/history/history_store.dart';
-import '../../../utils/settings/display_mode_service.dart';
-import '../../../utils/thumbnail/history_thumbnail_cache.dart';
-import '../server/agent_automation_server.dart';
+import '../../../../utils/history/history_store.dart';
+import '../../../../utils/settings/display_mode_service.dart';
+import '../../../../utils/thumbnail/history_thumbnail_cache.dart';
+import '../../server/agent_automation_server.dart';
 
 /// 媒体相关端点：屏幕信息与缩略图离线缓存。
 class MediaHandler {

@@ -49,7 +49,7 @@
 - 新增 `channel/StorageChannel.kt`（SAF 选择、落盘、查询、权限）与 `channel/UiChannel.kt`，结果统一回主线程。
 - 移除 `gal` 依赖，改用自有通道 `hasStorageAccess/requestStorageAccess`；删除 `VideoQualitySheet` 与其测试。
 
-已拆解调试桥：27 → 8 个 `part`。系统/日志/媒体/历史 → 16（+197）；下载/校验 → 12（+198）；保存/选择矩阵 → 8（+199，真机验证 mock 会话、批量保存）。剩余：parse 5 个、protocol 2 个、router 1 个。
+调试桥已完成零 `part` 化（27 → 0）：系统/日志/媒体/历史（+197）、下载/校验（+198）、保存/选择（+199）、解析/批量解析（+200），协议与序列化内联进门面，路由独立为 `BridgeRouter`。处理器按域放在 `handler/system|parse|save/`，真机验证解析、保存、下载、选择矩阵、历史与状态端点。
 
 未落地（顺延）：
 - 其余 16 个调试桥 `part`（parse/save/download/verify/selection/protocol/路由）。

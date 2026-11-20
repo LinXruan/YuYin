@@ -1,10 +1,10 @@
 import 'dart:io';
 
-import '../../../models/history/saved_media_availability.dart';
-import '../../../models/history_item.dart';
-import '../../../utils/history/history_store.dart';
-import '../../history/album_locator.dart';
-import '../server/agent_automation_server.dart';
+import '../../../../models/history/saved_media_availability.dart';
+import '../../../../models/history_item.dart';
+import '../../../../utils/history/history_store.dart';
+import '../../../history/album_locator.dart';
+import '../../server/agent_automation_server.dart';
 
 /// 历史记录端点：查询、注入、扫描保存位置、打开与清空。
 class HistoryHandler {

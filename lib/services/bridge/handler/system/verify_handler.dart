@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import '../server/agent_automation_server.dart';
+import '../../server/agent_automation_server.dart';
 
 /// 校验端点：主页封面、标题与作者资料与样表比对（仅 Debug 版）。
 class VerifyHandler {

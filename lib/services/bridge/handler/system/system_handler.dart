@@ -1,9 +1,9 @@
 import 'dart:io';
 
-import '../../../utils/login_state_store.dart';
-import '../../../utils/settings/download_settings_store.dart';
-import '../../download/download_cancel_registry.dart';
-import '../server/agent_automation_server.dart';
+import '../../../../utils/login_state_store.dart';
+import '../../../../utils/settings/download_settings_store.dart';
+import '../../../download/download_cancel_registry.dart';
+import '../../server/agent_automation_server.dart';
 
 /// 系统端点：取消任务、执行 JS、画质开关与登录态模拟。
 class SystemHandler {

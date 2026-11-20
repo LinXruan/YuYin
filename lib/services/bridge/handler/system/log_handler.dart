@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import '../server/agent_automation_server.dart';
+import '../../server/agent_automation_server.dart';
 
 /// 日志端点：读取与清空当前调试日志。
 class LogHandler {

@@ -5,42 +5,21 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../../app_info.dart';
-import '../../../models/history_item.dart';
 import '../../../models/media_item.dart';
-import '../../../utils/settings/display_mode_service.dart';
-import '../../../utils/settings/download_settings_store.dart';
-import '../../../utils/history/history_store.dart';
 import '../../../utils/debug/log_controller.dart';
-import '../../../utils/savelocation/save_location_store.dart';
-import '../../../utils/debug/save_page_debug_store.dart';
-import '../../../utils/url_parser.dart';
 import '../../sniffer/facade/douyin_sniffer.dart';
 import '../../media/video_downloader.dart';
-import '../handler/download_handler.dart';
-import '../handler/history_handler.dart';
-import '../handler/log_handler.dart';
-import '../handler/media_handler.dart';
-import '../handler/save_handler.dart';
-import '../handler/selection_handler.dart';
-import '../handler/system_handler.dart';
-import '../handler/verify_handler.dart';
-
-part '../parse/parse_handler.dart';
-
-part '../parse/status_handler.dart';
-
-part '../parse/parse_works_handler.dart';
-
-part '../parse/parse_homes_handler.dart';
-
-part '../parse/parse_profile_handler.dart';
-
-part 'agent_router.dart';
-
-part '../protocol/bridge_serializers.dart';
-
-part '../protocol/bridge_protocol.dart';
+import '../handler/save/download_handler.dart';
+import '../handler/parse/history_handler.dart';
+import '../handler/system/log_handler.dart';
+import '../handler/system/media_handler.dart';
+import '../handler/parse/parse_batch_handler.dart';
+import '../handler/parse/parse_handler.dart';
+import '../handler/save/save_handler.dart';
+import '../handler/save/selection_handler.dart';
+import '../handler/system/system_handler.dart';
+import '../handler/system/verify_handler.dart';
+import 'bridge_router.dart';
 
 /// 专为 Agent 自动化操控设计的本地无头调试服务（仅在 Debug 模式下启用）
 class AgentAutomationServer {
@@ -77,6 +56,9 @@ class AgentAutomationServer {
   late final DownloadHandler downloadHandler = DownloadHandler(this);
   late final SaveHandler saveHandler = SaveHandler(this);
   late final SelectionHandler selectionHandler = SelectionHandler(this);
+  late final ParseHandler parseHandler = ParseHandler(this);
+  late final ParseBatchHandler parseBatchHandler = ParseBatchHandler(this);
+  late final BridgeRouter router = BridgeRouter(this);
 
   /// 供单元测试注入模拟的主页捕获结果
   @visibleForTesting
@@ -104,7 +86,7 @@ class AgentAutomationServer {
     try {
       _server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
       debugPrint('[AgentBridge] 本地自动化控制台已就绪: port=$port (PID=$pid)');
-      _server!.listen(_handleRequest, onError: (Object err) {
+      _server!.listen(router.handleRequest, onError: (Object err) {
         debugPrint('[AgentBridge] 接收请求异常: $err');
       });
     } catch (e) {
@@ -119,6 +101,66 @@ class AgentAutomationServer {
     await _server?.close(force: true);
     _server = null;
     debugPrint('[AgentBridge] 自动化控制台已关闭');
+  }
+
+  /// 读取 JSON 请求体；空体或非法 JSON 返回空 Map
+  Future<Map<String, dynamic>> readJsonBody(HttpRequest request) async {
+    try {
+      final content = await utf8.decodeStream(request);
+      if (content.trim().isEmpty) return const {};
+      final decoded = jsonDecode(content);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      return const {};
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  /// 写出 JSON 响应
+  void sendJson(
+    HttpRequest request,
+    int statusCode,
+    Map<String, dynamic> data,
+  ) {
+    request.response.statusCode = statusCode;
+    request.response.write(jsonEncode(data));
+    request.response.close();
+  }
+
+  /// 将画质字符串转换为批量保存模式
+  BatchVideoQualityMode qualityModeFrom(String? raw) {
+    if (raw == 'lowest') return BatchVideoQualityMode.lowest;
+    if (raw == 'mixed') return BatchVideoQualityMode.mixed;
+    return BatchVideoQualityMode.highest;
+  }
+
+  Map<String, dynamic> serializeWorkSaveResult(WorkSaveResult result) {
+    return {
+      'url': result.url,
+      'success': result.success,
+      'savedTypes': result.savedTypes.map((type) => type.name).toList(),
+      'savedBaseName': result.savedBaseName,
+      if (result.error != null) 'error': result.error,
+    };
+  }
+
+  List<Map<String, dynamic>> serializeItems(List<MediaItem> items) {
+    return items.asMap().entries.map((entry) {
+      final item = entry.value;
+      return {
+        'index': entry.key,
+        'type': item.type.name,
+        'url': item.url,
+        'resolution': item.resolution,
+        'resolutionLabel': item.resolutionLabel,
+        'dataSize': item.dataSize,
+        'formattedSize': item.formattedSize,
+        'bitRate': item.bitRate,
+        'formattedBitRate': item.formattedBitRate,
+        'gearName': item.gearName,
+      };
+    }).toList();
   }
 
   static const Map<String, String> kReference167Map = {
