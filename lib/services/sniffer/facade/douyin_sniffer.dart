@@ -5,35 +5,30 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../models/media_item.dart';
 import '../../../utils/url_parser.dart';
-import '../../share/client/douyin_share_api.dart';
-import '../channel/sniffer_channel_parser.dart';
-import '../home/home_sniff_strategy.dart';
-import '../home/profile_sniff_strategy.dart';
-import '../home/sniffer_home_host.dart';
-import '../message/sniffer_message_host.dart';
-import '../message/sniffer_message_router.dart';
-import '../script/sniffer_script_host.dart';
-import '../script/sniffer_script_injector.dart';
-import '../session/sniff_session.dart';
-import '../single/single_sniff_strategy.dart';
-import '../single/sniffer_single_host.dart';
-import '../single/webview_fallback_strategy.dart';
 import '../../multi_work/i_multi_work_extractor.dart';
 import '../../multi_work/multi_work_extractor.dart';
 import '../../single_work/i_single_work_extractor.dart';
 import '../../single_work/single_work_extractor.dart';
 import '../../user_home/i_user_home_extractor.dart';
 import '../../user_home/user_home_extractor.dart';
+import '../channel/sniffer_channel_parser.dart';
+import '../home/home_sniff_strategy.dart';
+import '../home/profile_sniff_strategy.dart';
+import '../home/sniffer_home_host.dart';
+import '../lifecycle/sniffer_page_lifecycle.dart';
+import '../message/sniffer_message_host.dart';
+import '../message/sniffer_message_router.dart';
+import '../navigation/sniffer_navigation_policy.dart';
+import '../script/sniffer_script_host.dart';
+import '../script/sniffer_script_injector.dart';
+import '../session/sniff_session.dart';
+import '../single/single_sniff_strategy.dart';
+import '../single/sniffer_single_host.dart';
+import '../single/webview_fallback_strategy.dart';
 
-part '../common/navigation_flow.dart';
-
-part '../lifecycle/sniffer_lifecycle_flow.dart';
-
-part '../lifecycle/page_lifecycle_flow.dart';
-
-/// 隐藏式 WebView 捕获服务：抓取无水印视频/图文/实况图直链
+/// 隐藏式 WebView 捕获服务门面：抓取无水印视频/图文/实况图直链与主页作品
 ///
-/// 门面对象：管理 WebView 实例与路由分发，具体策略委托至专用领域对象。
+/// 门面对象：管理底层 WebViewController 实例、协调四大领域策略，对外部屏蔽具体时序。
 class DouyinSniffer
     implements
         ISingleWorkExtractor,
@@ -60,11 +55,17 @@ class DouyinSniffer
       '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
   late final WebViewController _controller;
-
   final SniffSession _session = SniffSession();
 
   late final SnifferMessageRouter _messageRouter = SnifferMessageRouter(this);
   late final SnifferScriptInjector _scriptInjector = SnifferScriptInjector(this);
+  late final SnifferPageLifecycle _pageLifecycle = SnifferPageLifecycle(
+    session: _session,
+    controller: _controller,
+    isDisposed: () => _disposed,
+    isTaskActive: () => _isTaskActive,
+    logDiagnostic: _log,
+  );
   late final SingleSniffStrategy _singleStrategy = SingleSniffStrategy(this);
   late final ProfileSniffStrategy _profileStrategy = ProfileSniffStrategy(
     host: this,
@@ -74,7 +75,56 @@ class DouyinSniffer
     host: this,
     profileStrategy: _profileStrategy,
   );
+  late final SnifferNavigationPolicy _navigationPolicy = SnifferNavigationPolicy(
+    session: _session,
+    controller: _controller,
+    scriptInjector: _scriptInjector,
+    pageLifecycle: _pageLifecycle,
+    singleStrategy: _singleStrategy,
+    isDisposed: () => _disposed,
+    isTaskActive: () => _isTaskActive,
+    logDiagnostic: _log,
+    reportUserLog: _report,
+  );
 
+  bool _disposed = false;
+  bool _isLoggedIn = false;
+
+  /// 内部诊断日志回调：仅 debug 版写入界面日志
+  void Function(String message)? onLog;
+
+  /// 用户可见日志回调：正式版与 debug 版都写入界面日志
+  void Function(String message)? onUserLog;
+
+  /// 登录状态回调，由主界面设置
+  @override
+  bool Function()? isLoggedIn;
+
+  /// 远端登录状态变化感知回调
+  void Function(bool loggedIn)? onLoginStateDetected;
+
+  DouyinSniffer() {
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setUserAgent(desktopUserAgent)
+      ..addJavaScriptChannel(
+        'DouyinChannel',
+        onMessageReceived: (message) => _messageRouter.onMessage(message.message),
+      )
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: _navigationPolicy.onNavigationRequest,
+          onWebResourceError: _navigationPolicy.onWebResourceError,
+          onPageStarted: _navigationPolicy.onPageStarted,
+          onUrlChange: _navigationPolicy.onUrlChange,
+          onPageFinished: _navigationPolicy.onPageFinished,
+        ),
+      );
+  }
+
+  // ==========================================
+  // SnifferMessageHost & SnifferScriptHost 契约
+  // ==========================================
   @override
   SniffSession get session => _session;
   @override
@@ -92,7 +142,7 @@ class DouyinSniffer
   @override
   bool get isDisposed => _disposed;
   @override
-  String get taskNonce => _taskNonce;
+  String get taskNonce => _session.taskNonce;
   @override
   SnifferScriptInjector get scriptInjector => _scriptInjector;
 
@@ -101,12 +151,14 @@ class DouyinSniffer
     _session.acceptMessages = true;
     _session.acceptLogs = true;
   }
+
   @override
   void logInjectFailure(String error) {
     if (_session.loggedInjectFailure) return;
     _session.loggedInjectFailure = true;
     _log('注入捕获脚本失败: $error');
   }
+
   @override
   void refreshHomeInactivity(int taskId) => _homeStrategy.refreshInactivityTimer(taskId);
   @override
@@ -115,6 +167,7 @@ class DouyinSniffer
   @override
   void finishHome(UserHomeResult home, int taskId) =>
       _homeStrategy.finishWithResult(home, taskId);
+
   @override
   Future<void> finishResultItems(
     List<MediaItem> items,
@@ -123,7 +176,8 @@ class DouyinSniffer
     String? desc,
     String? coverUrl,
     String? awemeId,
-  }) => _singleStrategy.finishWithItems(
+  }) =>
+      _singleStrategy.finishWithItems(
         items,
         isImagePost,
         taskId,
@@ -131,6 +185,7 @@ class DouyinSniffer
         coverUrl: coverUrl,
         awemeId: awemeId,
       );
+
   @override
   Future<void> finishWithFallbackItems(
     List<MediaItem> items,
@@ -150,6 +205,9 @@ class DouyinSniffer
         awemeId: awemeId,
       );
 
+  // ==========================================
+  // SnifferSingleHost & SnifferHomeHost 契约
+  // ==========================================
   @override
   void cancelOtherTasks() {
     _homeStrategy.finishWithError(StateError('已有新的解析任务开始，旧任务已取消'));
@@ -160,29 +218,33 @@ class DouyinSniffer
   void cancelSingleWork() => _singleStrategy.cancelActive();
 
   @override
-  void clearBlockedSchemes() => _blockedSchemes.clear();
+  void clearBlockedSchemes() => _navigationPolicy.clearBlockedSchemes();
 
   @override
-  Future<void> restoreDesktopUserAgent() => _restoreDesktopUserAgent();
+  Future<void> restoreDesktopUserAgent() => _pageLifecycle.restoreDesktopUserAgent();
 
   @override
-  Future<void> resetPageBeforeStart() => _resetPageBeforeStart();
+  Future<void> resetPageBeforeStart() => _pageLifecycle.resetPageBeforeStart();
 
   @override
-  void schedulePageUnload() => _schedulePageUnload();
+  void schedulePageUnload() => _pageLifecycle.schedulePageUnload();
 
   @override
-  void cancelScheduledUnload() => _cancelScheduledUnload();
+  void cancelScheduledUnload() => _pageLifecycle.cancelScheduledUnload();
 
   @override
-  void stopTimers() => _stopTimers();
+  void stopTimers() => _singleStrategy.stopTimers();
 
-  final Set<String> _blockedSchemes = <String>{};
-  bool _disposed = false;
+  // ==========================================
+  // 门面公开属性与生命周期控制
+  // ==========================================
+  @override
+  WebViewController get controller => _controller;
 
-  DouyinShareApi get _shareApi => _singleStrategy.shareApi;
+  bool get isUserLoggedIn => _isLoggedIn;
+  String? get sourceUrl => _session.sourceUrl;
+  String? get awemePageUrl => _session.awemePageUrl;
 
-  /// 当前是否仍在等待解析结果；任务完成后不再重新注入脚本或接收结果
   bool get _isTaskActive {
     if (_disposed) return false;
     final completer = _session.completer;
@@ -194,25 +256,6 @@ class DouyinSniffer
     return false;
   }
 
-  /// 内部诊断日志回调：仅 debug 版写入界面日志
-  void Function(String message)? onLog;
-
-  /// 用户可见日志回调：正式版与 debug 版都写入界面日志
-  void Function(String message)? onUserLog;
-
-  /// 登录状态回调，由主界面设置
-  @override
-  bool Function()? isLoggedIn;
-
-  /// 远端登录状态变化感知回调
-  void Function(bool loggedIn)? onLoginStateDetected;
-
-  bool _isLoggedIn = false;
-
-  /// 当前捕获任务执行时检测到的登录状态
-  bool get isUserLoggedIn => _isLoggedIn;
-
-  /// 内部诊断日志：仅 debug 版输出，正式版不进入界面日志
   void _log(String message) {
     if (!kDebugMode) return;
     final ms = DateTime.now().difference(_session.taskStartedAt).inMilliseconds;
@@ -220,95 +263,12 @@ class DouyinSniffer
     onLog?.call(message);
   }
 
-  /// 用户可见日志：正式版与 debug 版都输出
-  void _report(String message) {
-    onUserLog?.call(message);
-  }
-
-  DouyinSniffer() {
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setUserAgent(desktopUserAgent)
-      ..addJavaScriptChannel(
-        'DouyinChannel',
-        onMessageReceived: (message) => _messageRouter.onMessage(message.message),
-      )
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onNavigationRequest: _onNavigationRequest,
-          onWebResourceError: _onWebResourceError,
-          onPageStarted: (url) {
-            _markPageReset(url);
-            if (url.startsWith('about:')) return;
-            if (!_isTaskActive) return;
-            if (!UrlParser.isAllowedNavigationUrl(url)) {
-              _logNonWebPage(url);
-              return;
-            }
-            final startedId = UrlParser.extractAwemeId(url);
-            if (_session.retiredAwemeId != null &&
-                startedId != null &&
-                startedId == _session.retiredAwemeId) {
-              return;
-            }
-            _session.taskPageStarted = true;
-            _session.acceptMessages = true;
-            _session.acceptLogs = true;
-            _handlePageUrl(url, _session.taskId);
-            _scriptInjector.injectFull();
-          },
-          onUrlChange: (change) {
-            if (change.url?.startsWith('about:') ?? false) return;
-            if (!_isTaskActive) return;
-            _handlePageUrl(change.url, _session.taskId);
-          },
-          onPageFinished: (url) {
-            _markPageReset(url);
-            if (url.startsWith('about:')) return;
-            if (!_isTaskActive) return;
-            if (!UrlParser.isAllowedNavigationUrl(url)) {
-              _logNonWebPage(url);
-              return;
-            }
-            _handlePageUrl(url, _session.taskId);
-            _scriptInjector.injectFull();
-            _checkCaptcha(url, _session.taskId);
-          },
-        ),
-      );
-  }
-
-  /// 供主界面挂载隐藏 WebViewWidget 使用
-  @override
-  WebViewController get controller => _controller;
-
-  /// 用户输入的原始链接
-  String? get sourceUrl => _session.sourceUrl;
-
-  /// 第一次带 awemeId 的主页面 URL（仅调试展示）
-  String? get awemePageUrl => _session.awemePageUrl;
-
-  /// 加载分享链接并等待 JS 回传，最长等待 30 秒
-  Future<SingleWorkResult> sniffWork(String url) => sniffVideoUrl(url);
-
-  /// 区分深链中断和无数据，避免统一误报“风控”
-  @visibleForTesting
-  static String shareFallbackErrorMessage(String? lastWebResourceError) =>
-      WebviewFallbackStrategy.shareFallbackErrorMessage(lastWebResourceError);
-
-  /// 接收 JS 通过 DouyinChannel 回传的 JSON 消息
-  static bool? parseChannelLoginState(Object? rawData) =>
-      SnifferChannelParser.parseChannelLoginState(rawData);
-
-  /// 把 Channel result 消息里的 items 数组转成媒体列表（纯函数，便于测试）
-  @visibleForTesting
-  static List<MediaItem> parseChannelItems(Object? rawItems) =>
-      SnifferChannelParser.parseChannelItems(rawItems);
+  void _report(String message) => onUserLog?.call(message);
 
   /// 用户取消下载/选择后，立即停止后台捕获与网页加载
   @override
   void cancelActiveTask() {
-    _cancelScheduledUnload();
+    _pageLifecycle.cancelScheduledUnload();
     _session.taskId++;
     _session.acceptMessages = false;
     _session.acceptLogs = false;
@@ -324,12 +284,9 @@ class DouyinSniffer
     );
   }
 
-  void _finishWithError(Object error, {int? taskId}) =>
-      _singleStrategy.finishWithError(error, taskId: taskId);
-
   void dispose() {
     _disposed = true;
-    _cancelScheduledUnload();
+    _pageLifecycle.cancelScheduledUnload();
     _session.taskId++;
     _session.acceptMessages = false;
     _session.acceptLogs = false;
@@ -338,40 +295,58 @@ class DouyinSniffer
     _profileStrategy.finishWithError(StateError('捕获服务已释放'));
   }
 
-  // =======================================================
+  // ==========================================
   // ISingleWorkExtractor & IUserHomeExtractor 契约实现
-  // =======================================================
+  // ==========================================
   @override
   String? extractShareUrl(String text) {
     final url = UrlParser.extractDouyinUrl(text);
     if (url != null && !UrlParser.isUserHomeUrl(url)) return url;
     return null;
   }
+
   @override
   Future<SingleWorkResult> extract(String shareUrl) => sniffVideoUrl(shareUrl);
+
   @override
   String? extractHomeUrl(String text) {
     final url = UrlParser.extractDouyinUrl(text);
     if (url != null && UrlParser.isUserHomeUrl(url)) return url;
     return null;
   }
+
   @override
-  Future<UserHomeProfile> extractProfile(String homeUrl) =>
-      sniffUserProfile(homeUrl);
+  Future<UserHomeProfile> extractProfile(String homeUrl) => sniffUserProfile(homeUrl);
+
   @override
   Future<UserHomeResult> extractAllWorks(
     String homeUrl, {
     void Function(int current, int total)? onProgress,
   }) =>
       sniffUserHomeUrl(homeUrl);
+
   @override
   void cancel() => cancelActiveTask();
+
   @override
   Future<SniffResult> sniffVideoUrl(String shareUrl) => _singleStrategy.sniff(shareUrl);
+
   @override
-  Future<UserHomeResult> sniffUserHomeUrl(String homeUrl) =>
-      _homeStrategy.sniff(homeUrl);
+  Future<UserHomeResult> sniffUserHomeUrl(String homeUrl) => _homeStrategy.sniff(homeUrl);
+
   @override
-  Future<UserHomeProfile> sniffUserProfile(String homeUrl) =>
-      _profileStrategy.sniff(homeUrl);
+  Future<UserHomeProfile> sniffUserProfile(String homeUrl) => _profileStrategy.sniff(homeUrl);
+
+  Future<SingleWorkResult> sniffWork(String url) => sniffVideoUrl(url);
+
+  @visibleForTesting
+  static String shareFallbackErrorMessage(String? lastWebResourceError) =>
+      WebviewFallbackStrategy.shareFallbackErrorMessage(lastWebResourceError);
+
+  static bool? parseChannelLoginState(Object? rawData) =>
+      SnifferChannelParser.parseChannelLoginState(rawData);
+
+  @visibleForTesting
+  static List<MediaItem> parseChannelItems(Object? rawItems) =>
+      SnifferChannelParser.parseChannelItems(rawItems);
 }

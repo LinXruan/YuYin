@@ -32,6 +32,9 @@ class SniffSession {
   /// 任务序号：异步回调返回时用它丢弃旧任务结果
   int taskId = 0;
 
+  /// 当前任务标识：脚本与回传消息共用，旧文档的迟到消息据此丢弃
+  String get taskNonce => 't$taskId';
+
   String? lastPageUrl;
   String? retiredAwemeId;
   bool taskPageStarted = false;
