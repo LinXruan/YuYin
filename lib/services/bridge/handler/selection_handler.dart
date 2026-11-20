@@ -1,0 +1,280 @@
+import 'dart:io';
+
+import '../../../models/media_item.dart';
+import '../../../utils/memory/terminal_memory_store.dart';
+import '../../../utils/url_parser.dart';
+import '../../selection/debug/selection_debug_bridge.dart';
+import '../../selection/save_selection_session.dart';
+import '../server/agent_automation_server.dart';
+
+/// 保存页选择矩阵端点：GET /api/selection/state 与 POST /api/selection/{action}
+class SelectionHandler {
+  SelectionHandler(this.server);
+
+  final AgentAutomationServer server;
+
+  Future<void> handleSelection(HttpRequest request) async {
+    final path = request.uri.path;
+
+    if (path == '/api/selection/state') {
+      if (request.method != 'GET') {
+        _methodNotAllowed(request, '仅支持 GET');
+        return;
+      }
+      final withCells = request.uri.queryParameters['cells'] != '0';
+      server.sendJson(
+        request,
+        HttpStatus.ok,
+        SelectionDebugBridge.state(withCells: withCells),
+      );
+      return;
+    }
+
+    if (path == '/api/selection/verify') {
+      if (request.method != 'GET') {
+        _methodNotAllowed(request, '仅支持 GET');
+        return;
+      }
+      server.sendJson(request, HttpStatus.ok, SelectionDebugBridge.verify());
+      return;
+    }
+
+    if (path == '/api/selection/quality-options') {
+      if (request.method != 'GET') {
+        _methodNotAllowed(request, '仅支持 GET');
+        return;
+      }
+      final workUrl = request.uri.queryParameters['workUrl'] ?? '';
+      server.sendJson(
+        request,
+        HttpStatus.ok,
+        SelectionDebugBridge.qualityOptions(workUrl),
+      );
+      return;
+    }
+
+    if (request.method != 'POST') {
+      _methodNotAllowed(request, '仅支持 POST');
+      return;
+    }
+
+    final action = path.substring('/api/selection/'.length);
+    final body = await server.readJsonBody(request);
+
+    if (action == 'load') {
+      final result = await loadSelection(body);
+      server.sendJson(
+        request,
+        result['success'] == true ? HttpStatus.ok : HttpStatus.badRequest,
+        result,
+      );
+      return;
+    }
+
+    if (action == 'ingest') {
+      final workUrl = body['workUrl']?.toString() ?? '';
+      final sniffer = server.sniffer;
+      if (sniffer == null) {
+        server.sendJson(request, HttpStatus.serviceUnavailable, {
+          'error': '捕获服务未初始化',
+        });
+        return;
+      }
+      final ok = await SelectionDebugBridge.ingest(
+        workUrl,
+        () => sniffer.sniffVideoUrl(workUrl),
+      );
+      server.sendJson(request, ok ? HttpStatus.ok : HttpStatus.badRequest, {
+        'success': ok,
+        if (!ok) 'error': '解析失败或没有可用资源',
+      });
+      return;
+    }
+
+    final result = SelectionDebugBridge.run(action, body);
+    server.sendJson(
+      request,
+      result['success'] == true ? HttpStatus.ok : HttpStatus.badRequest,
+      result,
+    );
+  }
+
+  /// 加载一个矩阵会话（不弹 UI），用于无界面验证
+  Future<Map<String, dynamic>> loadSelection(Map<String, dynamic> body) async {
+    final source = body['source']?.toString() ?? 'mock';
+    final quality = body['quality']?.toString() == 'lowest'
+        ? BatchVideoQualityMode.lowest
+        : BatchVideoQualityMode.highest;
+
+    final memory = TerminalMemoryStore.seed;
+    final seed = TerminalSeed(
+      picture: memory.picture,
+      live: memory.live,
+      music: memory.music,
+      video: memory.video,
+      quality: quality,
+    );
+
+    if (source == 'mock') {
+      return _loadMockSelection(body, seed);
+    }
+
+    final sniffer = server.sniffer;
+    if (sniffer == null) {
+      return {'success': false, 'error': '捕获服务未初始化'};
+    }
+    final text = body['text']?.toString() ?? '';
+    if (text.trim().isEmpty) {
+      return {'success': false, 'error': 'text is required'};
+    }
+    final batch = UrlParser.parseBatchInput(text);
+
+    if (source == 'home') {
+      final profiles = <UserHomeProfile>[];
+      final works = <String, List<SaveWorkItem>>{};
+      for (final url in batch.homeUrls) {
+        final home = await sniffer.userHome.extractAllWorks(url);
+        final secUid = home.secUid.trim();
+        if (secUid.isEmpty) continue;
+        profiles.add(home.profile);
+        works[secUid] = [
+          for (final workUrl in home.workUrls)
+            if (!UrlParser.isArticleUrl(workUrl))
+              SaveWorkItem(
+                url: workUrl,
+                kind: UrlParser.classifyWorkPage(workUrl) == DouyinWorkPage.note
+                    ? WorkMediaKind.image
+                    : WorkMediaKind.video,
+                title: home.getTitle(workUrl) ?? '',
+                coverUrl: home.getCover(workUrl) ?? '',
+              ),
+        ];
+      }
+      if (profiles.isEmpty) {
+        return {'success': false, 'error': '未捕获到有效作者'};
+      }
+      final session = SaveSelectionSession.home(
+        profiles: profiles,
+        worksBySecUid: works,
+        seed: seed,
+      );
+      SelectionDebugBridge.attach(session);
+      return {'success': true, 'source': 'home', 'authors': profiles.length};
+    }
+
+    if (source == 'multi') {
+      final extract = await sniffer.multiWork.extractWorks(batch.workUrls);
+      if (extract.works.isEmpty) {
+        return {'success': false, 'error': '未捕获到作品'};
+      }
+      final session = SaveSelectionSession.multiWork(
+        works: extract.works,
+        seed: seed,
+      );
+      SelectionDebugBridge.attach(session);
+      return {
+        'success': true,
+        'source': 'multiWork',
+        'works': extract.works.length,
+      };
+    }
+
+    final url = batch.workUrls.isNotEmpty ? batch.workUrls.first : text.trim();
+    final parsed = await sniffer.sniffVideoUrl(url);
+    final session = SaveSelectionSession.singleWork(
+      work: SaveWorkItem(
+        url: url,
+        kind: parsed.isImagePost ? WorkMediaKind.image : WorkMediaKind.video,
+        title: parsed.displayTitle,
+        coverUrl: parsed.coverUrl ?? '',
+      ),
+      parsed: parsed,
+      seed: seed,
+    );
+    SelectionDebugBridge.attach(session);
+    return {
+      'success': true,
+      'source': 'singleWork',
+      'items': parsed.items.length,
+    };
+  }
+
+  Map<String, dynamic> _loadMockSelection(
+    Map<String, dynamic> body,
+    TerminalSeed seed,
+  ) {
+    final authors = (body['authors'] as num?)?.toInt() ?? 2;
+    final worksPerAuthor = (body['works'] as num?)?.toInt() ?? 3;
+    final resources = (body['resources'] as num?)?.toInt() ?? 4;
+    final videoWorks = body['video'] == true;
+    final profiles = [
+      for (var i = 1; i <= authors; i++)
+        UserHomeProfile(secUid: 'mock_a$i', nickname: '模拟作者$i'),
+    ];
+    final works = <String, List<SaveWorkItem>>{
+      for (var i = 1; i <= authors; i++)
+        'mock_a$i': [
+          for (var w = 1; w <= worksPerAuthor; w++)
+            SaveWorkItem(
+              url: 'mock://a${i}_w$w',
+              kind: videoWorks ? WorkMediaKind.video : WorkMediaKind.image,
+              title: '作品$i-$w',
+            ),
+        ],
+    };
+    final session = SaveSelectionSession.home(
+      profiles: profiles,
+      worksBySecUid: works,
+      seed: seed,
+    );
+    for (var i = 1; i <= authors; i++) {
+      for (var w = 1; w <= worksPerAuthor; w++) {
+        session.ingest(
+          'mock://a${i}_w$w',
+          videoWorks
+              ? SingleWorkResult(
+                  items: [
+                    MediaItem(
+                      url: 'mock://a${i}_w${w}_high',
+                      type: MediaType.video,
+                      bitRate: 3000000,
+                      resolution: '1080x1920',
+                    ),
+                    MediaItem(
+                      url: 'mock://a${i}_w${w}_mid',
+                      type: MediaType.video,
+                      bitRate: 1500000,
+                      resolution: '720x1280',
+                    ),
+                    MediaItem(
+                      url: 'mock://a${i}_w${w}_low',
+                      type: MediaType.video,
+                      bitRate: 700000,
+                      resolution: '720x1280',
+                    ),
+                  ],
+                  cookie: '',
+                  isImagePost: false,
+                )
+              : SingleWorkResult(
+                  items: [
+                    for (var r = 1; r <= resources; r++)
+                      MediaItem(
+                        url: 'mock://a${i}_w${w}_r$r',
+                        type: MediaType.image,
+                      ),
+                  ],
+                  cookie: '',
+                  isImagePost: true,
+                ),
+        );
+      }
+    }
+    SelectionDebugBridge.attach(session);
+    return {'success': true, 'source': 'home', 'mock': true};
+  }
+
+  void _methodNotAllowed(HttpRequest request, String message) {
+    server.sendJson(request, HttpStatus.methodNotAllowed, {'error': message});
+  }
+}

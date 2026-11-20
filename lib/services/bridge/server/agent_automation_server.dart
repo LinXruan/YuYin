@@ -14,20 +14,15 @@ import '../../../utils/history/history_store.dart';
 import '../../../utils/debug/log_controller.dart';
 import '../../../utils/savelocation/save_location_store.dart';
 import '../../../utils/debug/save_page_debug_store.dart';
-import '../../../utils/save/author_folder_name.dart';
-import '../../../utils/save/home_save_path.dart';
-import '../../../utils/memory/terminal_memory_store.dart';
 import '../../../utils/url_parser.dart';
-import '../../batch_work/work_batch_saver.dart';
-import '../../selection/debug/selection_debug_bridge.dart';
-import '../../selection/save_selection_session.dart';
-import '../../selection/session_work_preparer.dart';
 import '../../sniffer/facade/douyin_sniffer.dart';
 import '../../media/video_downloader.dart';
 import '../handler/download_handler.dart';
 import '../handler/history_handler.dart';
 import '../handler/log_handler.dart';
 import '../handler/media_handler.dart';
+import '../handler/save_handler.dart';
+import '../handler/selection_handler.dart';
 import '../handler/system_handler.dart';
 import '../handler/verify_handler.dart';
 
@@ -39,15 +34,7 @@ part '../parse/parse_works_handler.dart';
 
 part '../parse/parse_homes_handler.dart';
 
-part '../save/save_works_handler.dart';
-
-part '../save/save_home_handler.dart';
-
 part '../parse/parse_profile_handler.dart';
-
-part '../handler/save/selection_handler.dart';
-
-part '../handler/save/selection_load_handler.dart';
 
 part 'agent_router.dart';
 
@@ -88,6 +75,8 @@ class AgentAutomationServer {
   late final HistoryHandler historyHandler = HistoryHandler(this);
   late final VerifyHandler verifyHandler = VerifyHandler(this);
   late final DownloadHandler downloadHandler = DownloadHandler(this);
+  late final SaveHandler saveHandler = SaveHandler(this);
+  late final SelectionHandler selectionHandler = SelectionHandler(this);
 
   /// 供单元测试注入模拟的主页捕获结果
   @visibleForTesting

@@ -27,9 +27,9 @@ extension AgentRouting on AgentAutomationServer {
       } else if (path == '/api/parse-homes' && request.method == 'POST') {
         await _handleParseHomes(request);
       } else if (path == '/api/save/works' && request.method == 'POST') {
-        await _handleSaveWorks(request);
+        await saveHandler.handleSaveWorks(request);
       } else if (path == '/api/save/home' && request.method == 'POST') {
-        await _handleSaveHome(request);
+        await saveHandler.handleSaveHome(request);
       } else if (path == '/api/download' && request.method == 'POST') {
         await downloadHandler.handleDownload(request);
       } else if (path == '/api/logs' && request.method == 'GET') {
@@ -43,7 +43,7 @@ extension AgentRouting on AgentAutomationServer {
       } else if (path == '/api/settings/quality' && request.method == 'POST') {
         await system.handleQualitySetting(request);
       } else if (path.startsWith('/api/selection/')) {
-        await _handleSelection(request);
+        await selectionHandler.handleSelection(request);
       } else if (path == '/api/save-debug' && request.method == 'GET') {
         sendJson(request, HttpStatus.ok, {
           'snapshot': SavePageDebugStore.snapshot ?? {'layer': 'none'},
