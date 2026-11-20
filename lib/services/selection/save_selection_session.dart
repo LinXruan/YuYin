@@ -16,36 +16,20 @@ import '../../models/save_page/selection/terminal_seed.dart';
 import '../../models/save_page/selection/terminal_view.dart';
 import '../../models/save_page/selection/work_selection_view.dart';
 import '../../models/save_page/work_kind.dart';
-import '../../models/save_page/work_video_quality_choice.dart';
-import '../../models/single_work/media_download_item.dart';
 import '../../models/single_work/single_work_result.dart';
 import '../../models/user_home/user_home_profile.dart';
 import '../../utils/memory/terminal_memory_store.dart';
-import '../../utils/settings/video_quality_utils.dart';
 import 'node/author_node.dart';
-import 'node/resource_node.dart';
 import 'node/terminal_node.dart';
 import 'node/work_node.dart';
 import 'node/video_work_node.dart';
+import 'command/save_operator.dart';
+import 'command/selection_operator.dart';
+import 'command/terminal_operator.dart';
 import 'node/media_work_node.dart';
-
-part 'flow/selection_command_flow.dart';
-
-part 'flow/author_command_flow.dart';
-
-part 'flow/terminal_command_flow.dart';
-
-part 'flow/quality_command_flow.dart';
-
-part 'flow/ingest_flow.dart';
-
-part 'flow/save_resolver_flow.dart';
 
 /// 保存页四层聚合会话：Terminal -> Author -> Work -> Resource
 ///
-/// 任意层命令只向下写自己的子树，随后自下而上重算聚合；UI 只读 view。
-part 'session/session_query.dart';
-
 class SaveSelectionSession extends ChangeNotifier {
   SaveSelectionSession._({
     required this.source,
@@ -142,6 +126,10 @@ class SaveSelectionSession extends ChangeNotifier {
   final Map<String, WorkNode> _workByUrl = <String, WorkNode>{};
   final Map<String, AuthorNode> _authorOfWork = <String, AuthorNode>{};
 
+  late final SelectionOperator _selectionOperator = SelectionOperator(this);
+  late final TerminalOperator _terminalOperator = TerminalOperator(this);
+  late final SaveOperator _saveOperator = SaveOperator(this);
+
   late final List<WorkSelectionView> _allWorkViews =
       UnmodifiableListView(_allWorks);
 
@@ -159,6 +147,159 @@ class SaveSelectionSession extends ChangeNotifier {
   List<AuthorSelectionView> get authors => _terminal.authors;
 
   List<WorkSelectionView> get allWorks => _allWorkViews;
+
+  // ---------- selection 域内部访问 ----------
+
+  TerminalNode get terminalNode => _terminal;
+
+  List<AuthorNode> get authorNodes => _authors;
+
+  List<WorkNode> get workNodes => _allWorks;
+
+  AuthorNode? authorNodeOf(String secUid) => _authorBySecUid[secUid];
+
+  WorkNode? workNodeOf(String workUrl) => _workByUrl[workUrl];
+
+  bool get isClosed => _closed;
+
+  void runTransaction(void Function() action) => _run(action);
+
+  void markMutated() => _touch();
+
+  // ---------- 只读查询 ----------
+
+  List<String> get allWorkUrls => [for (final work in _allWorks) work.url];
+
+  List<String> workUrlsOf(String secUid) {
+    final author = _authorBySecUid[secUid];
+    if (author == null) return const <String>[];
+    return [for (final work in author.nodes) work.url];
+  }
+
+  List<WorkSelectionView> rowsOf(String secUid) {
+    final author = _authorBySecUid[secUid];
+    return author == null ? const <WorkSelectionView>[] : author.works;
+  }
+
+  AuthorSelectionView? authorOf(String secUid) => _authorBySecUid[secUid];
+
+  WorkSelectionView? workOf(String workUrl) => _workByUrl[workUrl];
+
+  int get authorCount => _terminal.authorCount;
+
+  int get selectedAuthorCount => _terminal.selectedAuthorCount;
+
+  AggregateState authorState(String secUid) =>
+      _authorBySecUid[secUid]?.selection ?? AggregateState.empty;
+
+  SelectionState workState(String workUrl) =>
+      _workByUrl[workUrl]?.selection ?? SelectionState.none;
+
+  QualityIndicator authorQuality(String secUid) =>
+      _authorBySecUid[secUid]?.quality ?? QualityIndicator.none;
+
+  int selectedCountOf(Iterable<WorkSelectionView> rows) =>
+      rows.where((row) => row.selection.isSelected).length;
+
+  int selectedResourceCount(String workUrl) =>
+      _workByUrl[workUrl]?.selectedResourceCount ?? 0;
+
+  // ---------- 命令 API（委托领域对象） ----------
+
+  void toggleAuthor(String secUid) => _selectionOperator.toggleAuthor(secUid);
+
+  void setAuthor(String secUid, SelectionState target) =>
+      _selectionOperator.setAuthor(secUid, target);
+
+  void toggleAll() => _selectionOperator.toggleAll();
+
+  void setAll(SelectionState target) => _selectionOperator.setAll(target);
+
+  void toggleWork(String workUrl) => _selectionOperator.toggleWork(workUrl);
+
+  void setWork(String workUrl, SelectionState target) =>
+      _selectionOperator.setWork(workUrl, target);
+
+  void toggleResource(String workUrl, String key) =>
+      _selectionOperator.toggleResource(workUrl, key);
+
+  void setResource(String workUrl, String key, bool selected) =>
+      _selectionOperator.setResource(workUrl, key, selected);
+
+  void toggleResourceCategory(String workUrl, MediaType type) =>
+      _selectionOperator.toggleResourceCategory(workUrl, type);
+
+  void setResourceCategory(String workUrl, MediaType type, bool selected) =>
+      _selectionOperator.setResourceCategory(workUrl, type, selected);
+
+  AggregateState authorResourceState(String secUid, MediaType type) =>
+      _selectionOperator.authorResourceState(secUid, type);
+
+  AggregateState authorKindState(String secUid, WorkMediaKind kind) =>
+      _selectionOperator.authorKindState(secUid, kind);
+
+  bool setAuthorResource(String secUid, MediaType type, bool selected) =>
+      _selectionOperator.setAuthorResource(secUid, type, selected);
+
+  bool toggleAuthorResource(String secUid, MediaType type) =>
+      _selectionOperator.toggleAuthorResource(secUid, type);
+
+  bool setAuthorKind(String secUid, WorkMediaKind kind, SelectionState target) =>
+      _selectionOperator.setAuthorKind(secUid, kind, target);
+
+  bool toggleAuthorKind(String secUid, WorkMediaKind kind) =>
+      _selectionOperator.toggleAuthorKind(secUid, kind);
+
+  bool setAuthorQuality(String secUid, QualityEdge edge) =>
+      _selectionOperator.setAuthorQuality(secUid, edge);
+
+  bool toggleAuthorQuality(String secUid) =>
+      _selectionOperator.toggleAuthorQuality(secUid);
+
+  AggregateState terminalResourceState(MediaType type) =>
+      _terminalOperator.terminalResourceState(type);
+
+  AggregateState terminalKindState(WorkMediaKind kind) =>
+      _terminalOperator.terminalKindState(kind);
+
+  bool setTerminalResource(MediaType type, bool selected) =>
+      _terminalOperator.setTerminalResource(type, selected);
+
+  bool toggleTerminalResource(MediaType type) =>
+      _terminalOperator.toggleTerminalResource(type);
+
+  bool setTerminalKind(WorkMediaKind kind, SelectionState target) =>
+      _terminalOperator.setTerminalKind(kind, target);
+
+  bool toggleTerminalKind(WorkMediaKind kind) =>
+      _terminalOperator.toggleTerminalKind(kind);
+
+  bool setTerminalQuality(QualityEdge edge) =>
+      _terminalOperator.setTerminalQuality(edge);
+
+  bool toggleTerminalQuality() => _terminalOperator.toggleTerminalQuality();
+
+  bool setTier(String workUrl, String tierKey) =>
+      _terminalOperator.setTier(workUrl, tierKey);
+
+  bool setWorkQuality(String workUrl, QualityEdge edge) =>
+      _terminalOperator.setWorkQuality(workUrl, edge);
+
+  void ingest(String workUrl, SingleWorkResult parsed) =>
+      _saveOperator.ingest(workUrl, parsed);
+
+  Future<bool> ensureParsed(
+    String workUrl,
+    Future<SingleWorkResult> Function() parser,
+  ) =>
+      _saveOperator.ensureParsed(workUrl, parser);
+
+  SelectedWork? buildSelectedWork(String workUrl) =>
+      _saveOperator.buildSelectedWork(workUrl);
+
+  List<SelectedWork> buildSelectedWorks(Iterable<String> workUrls) =>
+      _saveOperator.buildSelectedWorks(workUrls);
+
 
   // ---------- 生命周期 ----------
 

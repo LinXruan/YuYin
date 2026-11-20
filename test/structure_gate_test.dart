@@ -33,7 +33,7 @@ void main() {
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
 
-  test('lib 的 part 指令数量不再增长（当前上限 126）', () {
+  test('lib 的 part 指令数量不再增长（当前上限 112）', () {
     // 这是历史遗留债务：只允许减少，不允许新增。拆解完成后上限降为 0。
     var count = 0;
     for (final entity in Directory('lib').listSync(recursive: true)) {
@@ -42,7 +42,7 @@ void main() {
         if (line.trimLeft().startsWith('part ')) count++;
       }
     }
-    expect(count, lessThanOrEqualTo(126), reason: '当前 part 指令数: $count');
+    expect(count, lessThanOrEqualTo(112), reason: '当前 part 指令数: $count');
   });
 
   test('services 根目录不再堆积领域 Dart 文件', () {

@@ -54,4 +54,4 @@
 - 拆解 5 个 `part` 巨石库（Sniffer/Selection/Parse/History/Bridge）与 `_FlowFlow` 命名。
 - 删除 `models/media_item.dart` 聚合导出、`url_parser.dart` 转发壳。
 - 静态 Store 改为显式注入。
-- 1.6.1+201：Selection 节点独立成类（`TerminalNode`/`AuthorNode`/`WorkNode`/`VideoWorkNode`/`MediaWorkNode`/`ResourceNode`），`part` 13 → 7；真机验证选择矩阵装载与状态。
+- 1.6.1+201：Selection 节点独立成类（`TerminalNode`/`AuthorNode`/`WorkNode`/`VideoWorkNode`/`MediaWorkNode`/`ResourceNode`），`part` 13 → 7；真机验证选择矩阵装载与状态。- 1.6.1+203：Selection 命令流改为领域对象（`SelectionOperator`/`TerminalOperator`/`SaveOperator`），会话保留只读查询与门面委托，`part` 7 → 0；真机验证会话装载、作者选择、画质命令与不变量校验。
