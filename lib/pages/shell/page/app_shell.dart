@@ -1,34 +1,23 @@
-// ignore_for_file: unnecessary_this
-
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../app_info.dart';
 import '../../../services/bridge/server/agent_automation_server.dart';
+import '../../../services/media/video_downloader.dart';
 import '../../../services/sniffer/common/log_message_policy.dart';
 import '../../../services/sniffer/facade/douyin_sniffer.dart';
 import '../../../services/update/client/update_checker.dart';
-import '../../../services/media/video_downloader.dart';
-import '../../../utils/update/app_update_store.dart';
-import '../../../utils/settings/display_mode_service.dart';
-import '../../../utils/settings/download_settings_store.dart';
 import '../../../utils/debug/log_controller.dart';
 import '../../../utils/login_state_store.dart';
 import '../../../utils/network_detector.dart';
+import '../../../utils/settings/display_mode_service.dart';
+import '../../../utils/settings/download_settings_store.dart';
+import '../../../utils/update/app_update_store.dart';
 import '../../../widgets/update/dialog/update_dialog.dart';
-import '../../history/page/history_page.dart';
 import '../../login_webview_page.dart';
-import '../../parse/page/parse_page.dart';
-import '../../settings/settings_page.dart';
-
-part '../flow/shell_startup_flow.dart';
-
-part '../widget/shell_update_banner.dart';
-
-part '../widget/shell_scaffold.dart';
+import '../widget/shell_scaffold.dart';
 
 /// 应用主框架：底部三个主页面（解析 / 历史 / 设置）
 ///
@@ -52,8 +41,6 @@ class _AppShellState extends State<AppShell> {
 
   int _index = 0;
   Timer? _autoCheckUpdateTimer;
-
-  static const List<String> _titles = ['余音', '历史', '设置'];
 
   @override
   void initState() {
@@ -109,10 +96,9 @@ class _AppShellState extends State<AppShell> {
     });
 
     // 启动 2 秒后自动静默检查更新（仅在有新版本时提醒用户）
-    this._scheduleAutoCheckUpdate();
+    _scheduleAutoCheckUpdate();
   }
 
-  /// 启动 2 秒后执行自动检查更新逻辑
   @override
   void dispose() {
     _autoCheckUpdateTimer?.cancel();
@@ -128,12 +114,102 @@ class _AppShellState extends State<AppShell> {
     super.dispose();
   }
 
-  /// 供流程分片调用的状态刷新入口
-  void _refresh(VoidCallback fn) => setState(fn);
+  /// 启动 2 秒后执行自动检查更新逻辑
+  void _scheduleAutoCheckUpdate() {
+    _autoCheckUpdateTimer?.cancel();
+    _autoCheckUpdateTimer = Timer(const Duration(seconds: 2), () async {
+      if (!mounted) return;
+      if (!DownloadSettingsStore.autoCheckUpdate) return;
+      if (AppUpdateStore.statusNotifier.value.isDownloading) return;
+      final hasNet = await NetworkDetector.hasInternetConnection();
+      if (!mounted || !hasNet) return;
 
-  /// 打开抖音网页登录页；Cookie 由 WebView 全局共享给捕获器
+      final checker = UpdateChecker();
+      try {
+        final result = await checker.checkUpdate(currentVersion: appVersion);
+        if (!mounted || result.isCancelled || result.errorMessage != null) {
+          return;
+        }
+        if (result.info != null && result.info!.hasUpdate) {
+          final localApk =
+              await AppUpdateStore.findMatchingApk(result.info!.version);
+          if (!mounted) return;
+          UpdateDialog.show(context, result.info!, localApk: localApk);
+        }
+      } catch (_) {
+        // 静默异常吞吐，保证不打扰用户
+      } finally {
+        checker.dispose();
+      }
+    });
+  }
+
+  Future<void> _openLoginPage({bool initialLoggedIn = false}) async {
+    final done = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => LoginWebViewPage(initialLoggedIn: initialLoggedIn),
+      ),
+    );
+    if (!mounted) return;
+    if (done == true) {
+      _loggedIn.value = true;
+      _logs.add('登录完成，Cookie 已保存，可重新解析获取高清画质');
+    } else if (done == false) {
+      _loggedIn.value = false;
+      await LoginStateStore.clearLogin();
+      _logs.add('检测到账号已退出登录，恢复未登录状态');
+    }
+  }
+
+  /// 未登录时先说明登录用途；已登录（我的主页）直接进入登录页
+  Future<void> _onAccountTap(bool loggedIn) async {
+    final hasNet = await NetworkDetector.hasInternetConnection();
+    if (!mounted) return;
+    if (!hasNet) {
+      NetworkDetector.showOfflineSnackbar(context);
+      return;
+    }
+
+    if (!loggedIn) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('登录提示'),
+          content: const Text(loginNotice),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('继续登录'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+    await _openLoginPage(initialLoggedIn: loggedIn);
+  }
+
+  void _selectTab(int index) {
+    if (index == _index) return;
+    setState(() => _index = index);
+  }
+
   @override
-  Widget build(BuildContext context) => _buildScaffold(context);
-
-  /// 底部更新下载浮动条
+  Widget build(BuildContext context) {
+    return ShellScaffold(
+      index: _index,
+      sniffer: _sniffer,
+      downloader: _downloader,
+      logs: _logs,
+      busy: _busy,
+      loggedIn: _loggedIn,
+      pendingInputUrl: _pendingInputUrl,
+      onAccountTap: _onAccountTap,
+      onTabSelected: _selectTab,
+    );
+  }
 }

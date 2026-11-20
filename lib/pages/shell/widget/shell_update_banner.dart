@@ -1,13 +1,22 @@
-part of '../page/app_shell.dart';
+import 'package:flutter/material.dart';
 
-// ignore_for_file: unnecessary_this
+import '../../../utils/update/app_update_store.dart';
 
-/// shell update banner
-extension _ShellShellUpdateBannerFlow on _AppShellState {
-  Widget _buildUpdateProgressBar(BuildContext context, AppUpdateStatus status) {
+/// 底部更新条：下载中显示进度，失败时提供重试与关闭。
+class ShellUpdateBanner extends StatelessWidget {
+  const ShellUpdateBanner({super.key, required this.status});
+
+  final AppUpdateStatus status;
+
+  @override
+  Widget build(BuildContext context) {
     if (!status.isDownloading && status.errorMessage != null) {
-      return _buildFailureBar(context, status);
+      return _buildFailureBar(context);
     }
+    return _buildProgressBar(context);
+  }
+
+  Widget _buildProgressBar(BuildContext context) {
     final theme = Theme.of(context);
     final percent = (status.progress * 100).toInt();
     final versionStr = status.version != null ? ' v${status.version}' : '';
@@ -110,8 +119,7 @@ extension _ShellShellUpdateBannerFlow on _AppShellState {
     );
   }
 
-  /// 下载失败：保留可关闭的提示条，并提供一键重试
-  Widget _buildFailureBar(BuildContext context, AppUpdateStatus status) {
+  Widget _buildFailureBar(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,

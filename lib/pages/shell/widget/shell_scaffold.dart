@@ -1,59 +1,57 @@
-// ignore_for_file: unnecessary_this
+import 'package:flutter/material.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
-part of '../page/app_shell.dart';
+import '../../../services/media/video_downloader.dart';
+import '../../../services/sniffer/facade/douyin_sniffer.dart';
+import '../../../utils/debug/log_controller.dart';
+import '../../../utils/update/app_update_store.dart';
+import '../../history/page/history_page.dart';
+import '../../parse/page/parse_page.dart';
+import '../../settings/settings_page.dart';
+import 'shell_update_banner.dart';
 
-/// 应用主框架骨架：页面栈、隐藏 WebView 与底部导航。
-extension _AppShellScaffold on _AppShellState {
-  Widget _buildScaffold(BuildContext context) {
+/// 应用主框架：页面栈、常驻隐藏 WebView 与底部导航。
+class ShellScaffold extends StatelessWidget {
+  const ShellScaffold({
+    super.key,
+    required this.index,
+    required this.sniffer,
+    required this.downloader,
+    required this.logs,
+    required this.busy,
+    required this.loggedIn,
+    required this.pendingInputUrl,
+    required this.onAccountTap,
+    required this.onTabSelected,
+  });
+
+  final int index;
+  final DouyinSniffer sniffer;
+  final VideoDownloader downloader;
+  final LogController logs;
+  final ValueNotifier<bool> busy;
+  final ValueNotifier<bool> loggedIn;
+  final ValueNotifier<String?> pendingInputUrl;
+  final ValueChanged<bool> onAccountTap;
+  final ValueChanged<int> onTabSelected;
+
+  static const List<String> titles = ['余音', '历史', '设置'];
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      appBar: _index == 1
+      appBar: index == 1
           ? null
           : AppBar(
-              title: Text(_AppShellState._titles[_index]),
+              title: Text(titles[index]),
               actions: [
-                if (_index == 0)
+                if (index == 0)
                   Padding(
                     padding: const EdgeInsets.only(right: 12),
                     child: ValueListenableBuilder<bool>(
-                      valueListenable: _loggedIn,
-                      builder: (context, loggedIn, _) {
-                        final theme = Theme.of(context);
-                        final isDark = theme.brightness == Brightness.dark;
-                        return OutlinedButton.icon(
-                          onPressed: () => this._onAccountTap(loggedIn),
-                          icon: Icon(
-                            loggedIn ? Icons.person_rounded : Icons.login_rounded,
-                            size: 16,
-                          ),
-                          label: Text(
-                            loggedIn ? '我的主页' : '抖音登录/提画质',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: theme.colorScheme.primary,
-                            backgroundColor: theme.colorScheme.primary.withValues(
-                              alpha: isDark ? 0.12 : 0.06,
-                            ),
-                            side: BorderSide(
-                              color: theme.colorScheme.primary.withValues(
-                                alpha: isDark ? 0.45 : 0.35,
-                              ),
-                              width: 1.2,
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 0,
-                            ),
-                            minimumSize: const Size(0, 34),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(17),
-                            ),
-                          ),
-                        );
-                      },
+                      valueListenable: loggedIn,
+                      builder: (context, isLoggedIn, _) =>
+                          _buildAccountButton(context, isLoggedIn),
                     ),
                   ),
               ],
@@ -61,23 +59,23 @@ extension _AppShellScaffold on _AppShellState {
       body: Stack(
         children: [
           IndexedStack(
-            index: _index,
+            index: index,
             children: [
               ParsePage(
-                sniffer: _sniffer,
-                downloader: _downloader,
-                logs: _logs,
-                busy: _busy,
-                loggedIn: _loggedIn,
-                externalUrlNotifier: _pendingInputUrl,
-                onTapAccount: () => this._onAccountTap(_loggedIn.value),
+                sniffer: sniffer,
+                downloader: downloader,
+                logs: logs,
+                busy: busy,
+                loggedIn: loggedIn,
+                externalUrlNotifier: pendingInputUrl,
+                onTapAccount: () => onAccountTap(loggedIn.value),
                 // 解析出结果、准备弹选择面板前，确保用户看到的是解析页
                 onRequestParseTab: () {
-                  if (mounted && _index != 0) _refresh(() => _index = 0);
+                  if (index != 0) onTabSelected(0);
                 },
               ),
               HistoryPage(),
-              SettingsPage(logs: _logs, sniffer: _sniffer),
+              SettingsPage(logs: logs, sniffer: sniffer),
             ],
           ),
           // 常驻隐藏 WebView：只保留 1x1 透明挂载，切换页面时解析不中断
@@ -91,7 +89,7 @@ extension _AppShellScaffold on _AppShellState {
                 opacity: 0,
                 child: WebViewWidget(
                   key: const ValueKey('douyin-sniffer-webview'),
-                  controller: _sniffer.controller,
+                  controller: sniffer.controller,
                 ),
               ),
             ),
@@ -101,15 +99,15 @@ extension _AppShellScaffold on _AppShellState {
       bottomNavigationBar: ValueListenableBuilder<AppUpdateStatus>(
         valueListenable: AppUpdateStore.statusNotifier,
         builder: (context, updateStatus, _) {
+          final showBanner =
+              updateStatus.isDownloading || updateStatus.errorMessage != null;
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 底部导航栏上方的悬浮应用内更新进度条 / 失败重试条
-              if (updateStatus.isDownloading || updateStatus.errorMessage != null)
-                this._buildUpdateProgressBar(context, updateStatus),
+              if (showBanner) ShellUpdateBanner(status: updateStatus),
               NavigationBar(
-                selectedIndex: _index,
-                onDestinationSelected: this._selectTab,
+                selectedIndex: index,
+                onDestinationSelected: onTabSelected,
                 destinations: const [
                   NavigationDestination(
                     icon: Icon(Icons.download_outlined),
@@ -131,6 +129,36 @@ extension _AppShellScaffold on _AppShellState {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildAccountButton(BuildContext context, bool isLoggedIn) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return OutlinedButton.icon(
+      onPressed: () => onAccountTap(isLoggedIn),
+      icon: Icon(
+        isLoggedIn ? Icons.person_rounded : Icons.login_rounded,
+        size: 16,
+      ),
+      label: Text(
+        isLoggedIn ? '我的主页' : '抖音登录/提画质',
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      ),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: theme.colorScheme.primary,
+        backgroundColor:
+            theme.colorScheme.primary.withValues(alpha: isDark ? 0.12 : 0.06),
+        side: BorderSide(
+          color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.45 : 0.35),
+          width: 1.2,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+        minimumSize: const Size(0, 34),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(17),
+        ),
       ),
     );
   }
