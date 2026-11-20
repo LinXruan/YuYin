@@ -9,7 +9,7 @@ extension SnifferMessageFlowFlow on DouyinSniffer {
       if (data is! Map) return;
 
       // 只接收当前任务文档的消息；旧文档的迟到消息一律丢弃
-      if (data['type'] != 'login_state' && data['task'] != _taskNonce) return;
+      if (data['task'] != _taskNonce) return;
 
       // 日志与结果分开接收：结果只处理一次，日志覆盖到任务收尾
       if (data['type'] == 'log') {
@@ -17,12 +17,11 @@ extension SnifferMessageFlowFlow on DouyinSniffer {
         final msg = data['msg']?.toString() ?? '';
         if (msg.isNotEmpty) {
           if (LogMessagePolicy.classify(msg) == SnifferLogKind.homeProgress) {
+            // 主页进度日志即视为滚动存活信号，刷新失活定时器
             _report(LogMessagePolicy.formatHomeProgress(msg));
+            _refreshHomeInactivityTimer(_taskId);
           } else {
             _log(msg);
-          }
-          if (msg.contains('正在加载')) {
-            _refreshHomeInactivityTimer(_taskId);
           }
         }
         return;
@@ -124,13 +123,17 @@ extension SnifferMessageFlowFlow on DouyinSniffer {
       if (items.isNotEmpty) {
         final desc = data['desc']?.toString();
         final coverUrl = data['coverUrl']?.toString();
+        final rawAwemeId = data['awemeId']?.toString().trim();
         _finishWithItems(
           items,
           data['isImagePost'] == true,
           _taskId,
           desc: desc?.trim().isNotEmpty == true ? desc!.trim() : null,
           coverUrl: coverUrl?.trim().isNotEmpty == true ? coverUrl!.trim() : null,
-          awemeId: data['awemeId']?.toString(),
+          // 空串归一化为 null，避免多个短链作品被同一个空 id 误去重
+          awemeId: (rawAwemeId == null || rawAwemeId.isEmpty)
+              ? null
+              : rawAwemeId,
         );
       }
     } catch (e) {

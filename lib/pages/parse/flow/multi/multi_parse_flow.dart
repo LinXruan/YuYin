@@ -31,12 +31,13 @@ extension _ParseMultiParseFlow on _ParsePageState {
         return;
       }
 
+      final historyRecords = <HistoryItem>[];
       for (final work in extractResult.works) {
         final parsed = work.parsedResult;
         final desc = (parsed?.desc?.trim().isNotEmpty ?? false)
             ? parsed!.desc!.trim()
             : (work.title.trim().isNotEmpty ? work.title.trim() : work.url);
-        HistoryStore.addRecord(
+        historyRecords.add(
           HistoryItem(
             id: work.url,
             url: work.url,
@@ -50,6 +51,8 @@ extension _ParseMultiParseFlow on _ParsePageState {
           ),
         );
       }
+      await HistoryStore.addRecords(historyRecords);
+      if (!mounted || !_isParsing) return;
 
       _isParsing = false;
       if (mounted) _refresh(() {});
@@ -126,14 +129,11 @@ extension _ParseMultiParseFlow on _ParsePageState {
         );
         if (!mounted) return;
 
-        for (final item in results) {
-          if (item.success) {
-            HistoryStore.markSavedWithMeta(
-              item.url,
-              savedBaseName: item.savedBaseName,
-            );
-          }
-        }
+        final savedEntries = <String, String?>{
+          for (final item in results)
+            if (item.success) item.url: item.savedBaseName,
+        };
+        await HistoryStore.markSavedBatch(savedEntries);
 
         final successCount = results.where((item) => item.success).length;
         widget.logs.add('多作品保存完成：成功 $successCount/${results.length}');

@@ -4,12 +4,11 @@ part of 'agent_automation_server.dart';
 extension AgentRouting on AgentAutomationServer {
   /// 请求分发路由器
   Future<void> _handleRequest(HttpRequest request) async {
-    // 跨域支持与编码设置
-    request.response.headers
-      ..set('Access-Control-Allow-Origin', '*')
-      ..set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-      ..set('Access-Control-Allow-Headers', 'Content-Type')
-      ..set('Content-Type', 'application/json; charset=utf-8');
+    // 仅本机调试使用：不开放通配跨域，避免任意网页借浏览器调用控制台
+    request.response.headers.set(
+      'Content-Type',
+      'application/json; charset=utf-8',
+    );
 
     if (request.method == 'OPTIONS') {
       request.response.statusCode = HttpStatus.ok;

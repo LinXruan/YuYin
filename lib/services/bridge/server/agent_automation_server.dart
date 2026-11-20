@@ -123,11 +123,18 @@ class AgentAutomationServer {
     _lastUserHomeProfile = profile;
   }
 
-  /// 启动本地 HTTP 自动化服务
+  /// 服务实际绑定的端口（未启动时为 null）
+  int? get boundPort => _server?.port;
+
+  /// 启动本地 HTTP 自动化服务：仅 Debug 构建、仅环回地址
   Future<void> start() async {
+    if (!kDebugMode) {
+      debugPrint('[AgentBridge] 非 Debug 构建，跳过本地自动化控制台');
+      return;
+    }
     if (_server != null) return;
     try {
-      _server = await HttpServer.bind(InternetAddress.anyIPv4, port);
+      _server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
       debugPrint('[AgentBridge] 本地自动化控制台已就绪: port=$port (PID=$pid)');
       _server!.listen(_handleRequest, onError: (Object err) {
         debugPrint('[AgentBridge] 接收请求异常: $err');

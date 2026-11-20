@@ -72,7 +72,11 @@ class MultiWorkExtractor implements IMultiWorkExtractor {
           continue;
         }
 
-        final resolvedAwemeId = explicitAwemeId ?? result.awemeId;
+        final resultAwemeId = result.awemeId?.trim();
+        final resolvedAwemeId = explicitAwemeId ??
+            (resultAwemeId != null && resultAwemeId.isNotEmpty
+                ? resultAwemeId
+                : null);
         if (resolvedAwemeId != null &&
             indexByAwemeId.containsKey(resolvedAwemeId)) {
           onLog?.call('重复作品已去重（同一作品的口令与网址）: $workUrl');
@@ -156,8 +160,8 @@ class MultiWorkExtractor implements IMultiWorkExtractor {
   /// 显式链接必须与页面结果指向同一作品；短链没有预期 id 时直接信任结果
   bool _matchesTarget(SingleWorkResult result, String? expectedAwemeId) {
     if (expectedAwemeId == null) return true;
-    final actual = result.awemeId;
-    return actual == null || actual == expectedAwemeId;
+    final actual = result.awemeId?.trim();
+    return actual == null || actual.isEmpty || actual == expectedAwemeId;
   }
 
   @override

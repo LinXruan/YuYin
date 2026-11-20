@@ -36,29 +36,40 @@ class _HistoryOpenActionsState extends State<HistoryOpenActions> {
   OverlayEntry? _overlay;
   List<SavedMediaAvailability> _results = const [];
 
+  /// 扫描请求令牌：关闭浮窗或重新发起后，迟到的扫描结果直接丢弃
+  int _scanToken = 0;
+
   @override
   void dispose() {
+    _scanToken++;
     _removeOverlay();
     super.dispose();
   }
 
   Future<void> _toggle() async {
     if (_overlay != null) {
-      _removeOverlay();
+      _dismissOverlay();
       return;
     }
     _results = const [];
+    final token = ++_scanToken;
     _insertOverlay(loading: true);
     try {
       final results = await _flow.scan(widget.item);
-      if (!mounted) return;
+      if (!mounted || token != _scanToken) return;
       _results = results;
       _insertOverlay(loading: false);
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || token != _scanToken) return;
       _results = const [];
       _insertOverlay(loading: false);
     }
+  }
+
+  /// 用户主动关闭：作废在途扫描，迟到结果不再复活浮窗
+  void _dismissOverlay() {
+    _scanToken++;
+    _removeOverlay();
   }
 
   void _insertOverlay({required bool loading}) {
@@ -74,7 +85,7 @@ class _HistoryOpenActionsState extends State<HistoryOpenActions> {
         loading: loading,
         results: _results,
         onOpen: _open,
-        onDismiss: _removeOverlay,
+        onDismiss: _dismissOverlay,
       ),
     );
     Overlay.of(context).insert(_overlay!);

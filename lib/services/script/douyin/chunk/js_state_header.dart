@@ -4,7 +4,7 @@ const String jsStateHeader = r'''
   // Dart 轮询重复注入，结果与日志状态必须挂到 window 上共享
   var S = window.__dyState || (window.__dyState = {
     sent: false, homeSent: false, worksTabCount: 0, lastUrl: '', logs: {}, videoHintSent: false, degraded: false,
-    desc: '', coverUrl: '', scannedPaceIdx: 0, loginReported: null, authProbed: false,
+    desc: '', coverUrl: '', scannedPaceIdx: 0, loginReported: null, authProbed: false, pendingVideo: null,
     homeWorks: [], homeWorkSet: {}, homeWorkCovers: {}, homeWorkTitles: {}, homeLoggedCount: 0, homeScrollInterval: null,
     homeHasMore: null, homeIdleScrolls: 0, homeLastCount: 0, homeFinished: false, authorNickname: ''
   });

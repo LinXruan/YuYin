@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../models/history_item.dart';
+import '../atomic_file_writer.dart';
 import '../thumbnail/history_thumbnail_cache.dart';
 import 'history_query.dart';
 
@@ -37,17 +38,19 @@ class HistoryStore {
     skipSaveForTesting = skipSave;
   }
 
-  /// 启动时从本地文件恢复历史记录
+  /// 启动时从本地文件恢复历史记录（主文件损坏时回退 .bak）
   static Future<void> init() async {
     try {
       final file = await _getFile();
-      if (!await file.exists()) {
+      final content = await AtomicFileWriter.readString(
+        file,
+        isValid: _isJsonList,
+      );
+      if (content == null) {
         _records.clear();
         recordsNotifier.value = [];
         return;
       }
-      final content = await file.readAsString();
-      if (content.trim().isEmpty) return;
 
       final list = jsonDecode(content);
       if (list is List) {
@@ -72,7 +75,111 @@ class HistoryStore {
 
   /// 添加一条成功解析的历史记录（若已存在则更新时间并置顶，保留已保存状态）
   static Future<void> addRecord(HistoryItem item) async {
-    // 1. 去重检查：根据 id 或有效 url
+    final inserted = _applyAdd(item);
+    _publish();
+    await _save();
+    _cacheThumbnail(inserted);
+  }
+
+  /// 批量添加：一次通知、一次原子落盘，避免循环内并发覆写文件
+  static Future<void> addRecords(Iterable<HistoryItem> items) async {
+    final inserted = <HistoryItem>[];
+    for (final item in items) {
+      inserted.add(_applyAdd(item));
+    }
+    if (inserted.isEmpty) return;
+    _publish();
+    await _save();
+    for (final item in inserted) {
+      _cacheThumbnail(item);
+    }
+  }
+
+  /// 标记指定历史记录的保存状态（true=已保存到本地，false=仅解析）
+  static Future<void> markSaved(String id, [bool isSaved = true]) {
+    return markSavedWithMeta(id, isSaved: isSaved);
+  }
+
+  /// 标记保存状态，并可同时写入文件基名（用于历史页定位）
+  static Future<void> markSavedWithMeta(
+    String id, {
+    bool isSaved = true,
+    String? savedBaseName,
+  }) async {
+    final changed = _applySaved(
+      id,
+      isSaved: isSaved,
+      savedBaseName: savedBaseName,
+    );
+    if (changed) {
+      _publish();
+      await _save();
+    }
+    // PLAN_53：标记已保存时确保缩略图离线缓存就绪，与“已保存”筛选模式完全对齐
+    if (isSaved) _cacheThumbnailById(id);
+  }
+
+  /// 批量标记保存状态：值可为文件基名（null 表示不变），单次落盘
+  static Future<void> markSavedBatch(
+    Map<String, String?> savedBaseNames, {
+    bool isSaved = true,
+  }) async {
+    if (savedBaseNames.isEmpty) return;
+    var changed = false;
+    for (final entry in savedBaseNames.entries) {
+      changed =
+          _applySaved(
+            entry.key,
+            isSaved: isSaved,
+            savedBaseName: entry.value,
+          ) ||
+          changed;
+    }
+    if (!changed) return;
+    _publish();
+    await _save();
+    if (isSaved) {
+      for (final id in savedBaseNames.keys) {
+        _cacheThumbnailById(id);
+      }
+    }
+  }
+
+  /// 删除单条历史记录
+  static Future<void> deleteRecord(String id) async {
+    final originalLength = _records.length;
+    _records.removeWhere((item) => item.id == id);
+    if (_records.length != originalLength) {
+      _publish();
+      await _save();
+    }
+  }
+
+  /// 批量删除选中的历史记录
+  static Future<void> deleteRecords(Set<String> ids) async {
+    if (ids.isEmpty) return;
+    final originalLength = _records.length;
+    _records.removeWhere((item) => ids.contains(item.id));
+    if (_records.length != originalLength) {
+      _publish();
+      await _save();
+    }
+  }
+
+  /// 清空全部历史记录
+  static Future<void> clearAll() async {
+    if (_records.isEmpty) return;
+    _records.clear();
+    recordsNotifier.value = [];
+    await _save();
+  }
+
+  /// 纯内存极速分词搜索：委托给 HistoryQuery 纯函数。
+  static List<HistoryItem> search(String query, {bool onlySaved = false}) =>
+      HistoryQuery.search(_records, query, onlySaved: onlySaved);
+
+  /// 纯函数：应用一条新增记录并返回实际入库项
+  static HistoryItem _applyAdd(HistoryItem item) {
     final existingIndex = _records.indexWhere(
       (old) => old.id == item.id || (old.url.isNotEmpty && old.url == item.url),
     );
@@ -89,34 +196,19 @@ class HistoryStore {
       _records.removeAt(existingIndex);
     }
 
-    // 2. 置顶最新记录
     _records.insert(0, toInsert);
-
-    // 3. 超额截断
     if (_records.length > maxHistoryCount) {
       _records.removeRange(maxHistoryCount, _records.length);
     }
-
-    recordsNotifier.value = List.unmodifiable(_records);
-    await _save();
-
-    // 4. 后台静默离线缓存封面缩略图，避免弱网或断网时无法显示
-    if (toInsert.coverUrl != null && toInsert.coverUrl!.isNotEmpty) {
-      HistoryThumbnailCache.cacheThumbnail(toInsert.id, toInsert.coverUrl!);
-    }
+    return toInsert;
   }
 
-  /// 标记指定历史记录的保存状态（true=已保存到本地，false=仅解析）
-  static Future<void> markSaved(String id, [bool isSaved = true]) {
-    return markSavedWithMeta(id, isSaved: isSaved);
-  }
-
-  /// 标记保存状态，并可同时写入文件基名（用于历史页定位）
-  static Future<void> markSavedWithMeta(
+  /// 纯函数：应用一次保存状态变更，返回是否有实际变化
+  static bool _applySaved(
     String id, {
-    bool isSaved = true,
+    required bool isSaved,
     String? savedBaseName,
-  }) async {
+  }) {
     final index = _records.indexWhere(
       (item) =>
           item.id == id ||
@@ -125,58 +217,48 @@ class HistoryStore {
               item.authorSecUid != null &&
               'home:${item.authorSecUid}' == id),
     );
-    if (index == -1) return;
+    if (index == -1) return false;
 
     final current = _records[index];
     final nextBaseName = savedBaseName ?? current.savedBaseName;
-    final changed =
-        current.isSaved != isSaved || current.savedBaseName != nextBaseName;
-    if (changed) {
-      _records[index] = current.copyWith(
-        isSaved: isSaved,
-        savedBaseName: nextBaseName,
-      );
-      recordsNotifier.value = List.unmodifiable(_records);
-      await _save();
+    if (current.isSaved == isSaved && current.savedBaseName == nextBaseName) {
+      return false;
     }
-    // PLAN_53：标记已保存时确保缩略图离线缓存就绪，与“已保存”筛选模式完全对齐
-    if (isSaved && current.coverUrl != null && current.coverUrl!.isNotEmpty) {
-      HistoryThumbnailCache.cacheThumbnail(current.id, current.coverUrl!);
-    }
+    _records[index] = current.copyWith(
+      isSaved: isSaved,
+      savedBaseName: nextBaseName,
+    );
+    return true;
   }
 
-  /// 删除单条历史记录
-  static Future<void> deleteRecord(String id) async {
-    final originalLength = _records.length;
-    _records.removeWhere((item) => item.id == id);
-    if (_records.length != originalLength) {
-      recordsNotifier.value = List.unmodifiable(_records);
-      await _save();
+  static void _publish() {
+    recordsNotifier.value = List.unmodifiable(_records);
+  }
+
+  static void _cacheThumbnail(HistoryItem item) {
+    final cover = item.coverUrl;
+    if (cover != null && cover.isNotEmpty) {
+      HistoryThumbnailCache.cacheThumbnail(item.id, cover);
     }
   }
 
-  /// 批量删除选中的历史记录
-  static Future<void> deleteRecords(Set<String> ids) async {
-    if (ids.isEmpty) return;
-    final originalLength = _records.length;
-    _records.removeWhere((item) => ids.contains(item.id));
-    if (_records.length != originalLength) {
-      recordsNotifier.value = List.unmodifiable(_records);
-      await _save();
+  static void _cacheThumbnailById(String id) {
+    for (final item in _records) {
+      if (item.id == id) {
+        _cacheThumbnail(item);
+        return;
+      }
     }
   }
 
-  /// 清空全部历史记录
-  static Future<void> clearAll() async {
-    if (_records.isEmpty) return;
-    _records.clear();
-    recordsNotifier.value = [];
-    await _save();
+  /// 主文件必须是合法 JSON 数组，截断内容不可当成有效历史
+  static bool _isJsonList(String content) {
+    try {
+      return jsonDecode(content) is List;
+    } catch (_) {
+      return false;
+    }
   }
-
-  /// 纯内存极速分词搜索：委托给 HistoryQuery 纯函数。
-  static List<HistoryItem> search(String query, {bool onlySaved = false}) =>
-      HistoryQuery.search(_records, query, onlySaved: onlySaved);
 
   static Future<File> _getFile() async {
     final dir = await getApplicationDocumentsDirectory();
@@ -203,9 +285,9 @@ class HistoryStore {
     try {
       final file = await _getHidePromptFile();
       if (dismissed) {
-        await file.writeAsString('1', flush: true);
-      } else if (await file.exists()) {
-        await file.delete();
+        await AtomicFileWriter.writeString(file, '1');
+      } else {
+        await AtomicFileWriter.delete(file);
       }
     } catch (_) {
       // 忽略存储异常
@@ -214,10 +296,11 @@ class HistoryStore {
 
   static Future<void> _save() async {
     if (skipSaveForTesting) return;
+    // 同步取快照，保证排队顺序与内存状态顺序一致
+    final data = jsonEncode(_records.map((item) => item.toJson()).toList());
     try {
       final file = await _getFile();
-      final data = _records.map((item) => item.toJson()).toList();
-      await file.writeAsString(jsonEncode(data), flush: true);
+      await AtomicFileWriter.writeString(file, data);
     } catch (_) {
       // 写入异常不阻断内存即时生效
     }

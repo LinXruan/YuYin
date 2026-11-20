@@ -3,6 +3,7 @@ part of '../save_selection_session.dart';
 /// 解析物化：视频档位/图文资源；再次解析保留旧值
 extension IngestCommands on SaveSelectionSession {
   void ingest(String workUrl, SingleWorkResult parsed) {
+    if (_closed) return;
     final work = _workByUrl[workUrl];
     if (work == null) return;
     _run(() {
@@ -22,9 +23,11 @@ extension IngestCommands on SaveSelectionSession {
     Future<SingleWorkResult> Function() parser,
   ) async {
     final work = _workByUrl[workUrl];
+    if (_closed) return false;
     if (work == null) return false;
     if (work.parsed) return true;
     final parsed = await parser();
+    if (_closed) return false;
     if (parsed.items.isEmpty) return false;
     ingest(workUrl, parsed);
     return true;

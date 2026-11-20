@@ -2,44 +2,33 @@ package com.debug.yuyin
 
 import android.app.Activity
 import android.app.UiModeManager
-import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
-import android.media.AudioAttributes
-import android.media.MediaPlayer
-import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import android.provider.DocumentsContract
-import android.provider.MediaStore
-import android.provider.Settings
 import android.view.Display
 import android.view.WindowManager
-import androidx.core.content.FileProvider
-import androidx.documentfile.provider.DocumentFile
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import com.debug.yuyin.audio.AudioPreviewPlayer
+import com.debug.yuyin.install.InstallerChannel
+import com.debug.yuyin.storage.MediaSaver
 import com.debug.yuyin.storage.StorageBridge
 import java.io.File
-import java.io.FileInputStream
 import java.io.IOException
 
 class MainActivity : FlutterActivity() {
     private val themeChannel = "com.debug.yuyin/theme"
     private val audioChannel = "com.debug.yuyin/audio_player"
-    private var mediaPlayer: MediaPlayer? = null
-    private var currentPlayingUrl: String? = null
-    private var audioMethodChannel: MethodChannel? = null
+    private var audioPreviewPlayer: AudioPreviewPlayer? = null
     private val appChannel = "com.debug.yuyin/app"
     private val storageChannel = "com.debug.yuyin/storage"
-    private val installerChannel = "com.debug.yuyin/app_installer"
     private val displayModeChannel = "com.debug.yuyin/display_mode"
 
-    private val requestCodeInstallPermission = 2002
-    private var pendingApkPathForInstall: String? = null
+    private var installerChannel: InstallerChannel? = null
 
     private val requestCodePickDirectory = 2001
     private var pendingDirPickerResult: MethodChannel.Result? = null
@@ -98,36 +87,7 @@ class MainActivity : FlutterActivity() {
             }
 
         // 2.5 应用更新与安装通道
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, installerChannel)
-            .setMethodCallHandler { call, result ->
-                when (call.method) {
-                    "getCpuAbi" -> {
-                        val abis = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                            Build.SUPPORTED_ABIS.toList()
-                        } else {
-                            listOf(Build.CPU_ABI)
-                        }
-                        result.success(abis)
-                    }
-                    "checkInstallPermission" -> {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            result.success(packageManager.canRequestPackageInstalls())
-                        } else {
-                            result.success(true)
-                        }
-                    }
-                    "installApk" -> {
-                        val filePath = call.argument<String>("filePath")
-                        if (filePath.isNullOrBlank()) {
-                            result.error("INVALID_PATH", "APK path is empty", null)
-                            return@setMethodCallHandler
-                        }
-                        val success = triggerInstallApk(filePath)
-                        result.success(success)
-                    }
-                    else -> result.notImplemented()
-                }
-            }
+        installerChannel = InstallerChannel(this).also { it.attach(flutterEngine) }
 
         // 3. 存储与 SAF 目录选择器通道
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, storageChannel)
@@ -177,44 +137,32 @@ class MainActivity : FlutterActivity() {
                                 }
 
                                 if (!treeUri.isNullOrBlank()) {
-                                    // 自定义 SAF 目录保存（支持逐级作者/分类子目录）
-                                    var targetDir = DocumentFile.fromTreeUri(this, Uri.parse(treeUri))
-                                        ?: throw IOException("无法访问目标自定义文件夹")
-                                    for (name in subDirNames) {
-                                        if (name.isBlank()) continue
-                                        val existing = targetDir.findFile(name)
-                                        targetDir = if (existing != null && existing.isDirectory) {
-                                            existing
-                                        } else {
-                                            targetDir.createDirectory(name)
-                                                ?: throw IOException("无法创建子文件夹: $name")
-                                        }
-                                    }
-                                    val mimeType = getMimeType(fileName, mediaType)
-                                    val targetDoc = targetDir.createFile(mimeType, fileName)
-                                        ?: throw IOException("无法在目标文件夹创建文件: $fileName")
-
-                                    contentResolver.openOutputStream(targetDoc.uri)?.use { out ->
-                                        FileInputStream(srcFile).use { inStream ->
-                                            inStream.copyTo(out)
-                                        }
-                                    } ?: throw IOException("无法写入自定义文件数据")
-
-                                    try {
-                                        MediaScannerConnection.scanFile(this, arrayOf(targetDoc.uri.path), arrayOf(mimeType), null)
-                                    } catch (_: Exception) {}
+                                    // 自定义 SAF 目录保存（逐级作者/分类子目录，失败自动删除空壳文件）
+                                    MediaSaver.saveToTree(
+                                        this,
+                                        treeUri,
+                                        subDirNames,
+                                        srcFile,
+                                        fileName,
+                                        mediaType
+                                    )
                                 } else if (collection == "downloads" && !relativePath.isNullOrBlank()) {
                                     // 主页链接：Download/YuYin/<作者>/<Movies|Pictures|Music>/
-                                    StorageBridge.saveToDownloads(
+                                    MediaSaver.saveToDownloads(
                                         this,
                                         srcFile,
                                         fileName,
-                                        getMimeType(fileName, mediaType),
+                                        MediaSaver.mimeTypeFor(fileName, mediaType),
                                         relativePath
                                     )
                                 } else {
                                     // 默认分类目录保存 (Movies/YuYin/, Pictures/YuYin/, Music/YuYin/)
-                                    saveToDefaultDirectory(srcFile, mediaType, fileName)
+                                    MediaSaver.saveToDefaultDirectory(
+                                        this,
+                                        srcFile,
+                                        mediaType,
+                                        fileName
+                                    )
                                 }
                                 runOnUiThread { result.success(true) }
                             } catch (e: Exception) {
@@ -257,127 +205,11 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
-        // 4. 原生音频试听播放器通道
-        audioMethodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, audioChannel).apply {
-            setMethodCallHandler { call, result ->
-                when (call.method) {
-                    "play" -> {
-                        val url = call.argument<String>("url")
-                        if (url.isNullOrBlank()) {
-                            result.error("INVALID_URL", "Audio URL is empty", null)
-                            return@setMethodCallHandler
-                        }
-                        try {
-                            if (currentPlayingUrl == url && mediaPlayer != null) {
-                                if (mediaPlayer?.isPlaying == false) {
-                                    mediaPlayer?.start()
-                                    invokeMethod("onPlayerStateChanged", mapOf("state" to "playing"))
-                                }
-                                result.success(true)
-                                return@setMethodCallHandler
-                            }
-
-                            // 停止并清理前一个播放器实例
-                            mediaPlayer?.let {
-                                try {
-                                    if (it.isPlaying) it.stop()
-                                    it.release()
-                                } catch (_: Exception) {}
-                            }
-                            mediaPlayer = null
-                            currentPlayingUrl = url
-
-                            invokeMethod("onPlayerStateChanged", mapOf("state" to "buffering"))
-
-                            val mp = MediaPlayer().apply {
-                                setAudioAttributes(
-                                    AudioAttributes.Builder()
-                                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                                        .build()
-                                )
-                                val rawHeaders = call.argument<Map<String, String>>("headers")
-                                val headers = HashMap<String, String>()
-                                headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-                                rawHeaders?.let { headers.putAll(it) }
-
-                                setDataSource(context, Uri.parse(url), headers)
-                                setOnPreparedListener { preparedMp ->
-                                    preparedMp.start()
-                                    invokeMethod(
-                                        "onPlayerStateChanged",
-                                        mapOf(
-                                            "state" to "playing",
-                                            "duration" to preparedMp.duration
-                                        )
-                                    )
-                                }
-                                setOnCompletionListener {
-                                    invokeMethod("onPlayerStateChanged", mapOf("state" to "completed"))
-                                }
-                                setOnErrorListener { _, what, extra ->
-                                    invokeMethod(
-                                        "onPlayerStateChanged",
-                                        mapOf("state" to "error", "message" to "what=$what, extra=$extra")
-                                    )
-                                    true
-                                }
-                                prepareAsync()
-                            }
-                            mediaPlayer = mp
-                            result.success(true)
-                        } catch (e: Exception) {
-                            invokeMethod("onPlayerStateChanged", mapOf("state" to "error", "message" to e.message))
-                            result.error("PLAY_ERROR", e.message, null)
-                        }
-                    }
-                    "pause" -> {
-                        try {
-                            if (mediaPlayer?.isPlaying == true) {
-                                mediaPlayer?.pause()
-                                invokeMethod("onPlayerStateChanged", mapOf("state" to "paused"))
-                            }
-                            result.success(true)
-                        } catch (e: Exception) {
-                            result.error("PAUSE_ERROR", e.message, null)
-                        }
-                    }
-                    "stop" -> {
-                        try {
-                            mediaPlayer?.let {
-                                if (it.isPlaying) it.stop()
-                                it.release()
-                            }
-                            mediaPlayer = null
-                            currentPlayingUrl = null
-                            invokeMethod("onPlayerStateChanged", mapOf("state" to "idle"))
-                            result.success(true)
-                        } catch (e: Exception) {
-                            result.error("STOP_ERROR", e.message, null)
-                        }
-                    }
-                    "seek" -> {
-                        val pos = call.argument<Int>("position") ?: 0
-                        try {
-                            mediaPlayer?.seekTo(pos)
-                            result.success(true)
-                        } catch (e: Exception) {
-                            result.error("SEEK_ERROR", e.message, null)
-                        }
-                    }
-                    "getPosition" -> {
-                        try {
-                            val pos = mediaPlayer?.currentPosition ?: 0
-                            val dur = mediaPlayer?.duration ?: 0
-                            result.success(mapOf("position" to pos, "duration" to dur))
-                        } catch (e: Exception) {
-                            result.success(mapOf("position" to 0, "duration" to 0))
-                        }
-                    }
-                    else -> result.notImplemented()
-                }
-            }
-        }
+        // 4. 原生音频试听播放器通道（状态机见 AudioPreviewPlayer）
+        audioPreviewPlayer = AudioPreviewPlayer(
+            this,
+            MethodChannel(flutterEngine.dartExecutor.binaryMessenger, audioChannel)
+        )
 
         // 5. 屏幕刷新率通道
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, displayModeChannel)
@@ -391,39 +223,28 @@ class MainActivity : FlutterActivity() {
             }
     }
 
+    override fun onStop() {
+        // 退到后台时暂停试听，避免无交互继续播放
+        audioPreviewPlayer?.pauseForBackground()
+        super.onStop()
+    }
+
     override fun onDestroy() {
-        try {
-            mediaPlayer?.let {
-                if (it.isPlaying) it.stop()
-                it.release()
-            }
-            mediaPlayer = null
-        } catch (_: Exception) {}
+        audioPreviewPlayer?.release()
+        audioPreviewPlayer = null
         super.onDestroy()
     }
 
     override fun onResume() {
         super.onResume()
         // 若从安装未知应用权限设置页返回且已有暂存安装包，自动续装不断流
-        val pendingPath = pendingApkPathForInstall
-        if (pendingPath != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (packageManager.canRequestPackageInstalls()) {
-                pendingApkPathForInstall = null
-                triggerInstallApk(pendingPath)
-            }
-        }
+        installerChannel?.resumePendingInstall()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == requestCodeInstallPermission) {
-            val pendingPath = pendingApkPathForInstall
-            if (pendingPath != null) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && packageManager.canRequestPackageInstalls()) {
-                    pendingApkPathForInstall = null
-                    triggerInstallApk(pendingPath)
-                }
-            }
+        if (installerChannel?.onActivityResult(requestCode) == true) {
+            // 已消费未知来源权限页返回
         }
         if (requestCode == requestCodePickDirectory) {
             val cb = pendingDirPickerResult
@@ -476,114 +297,6 @@ class MainActivity : FlutterActivity() {
         return "/自定义目录/"
     }
 
-    private fun saveToDefaultDirectory(srcFile: File, mediaType: String, fileName: String) {
-        when (mediaType.lowercase()) {
-            "video" -> {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    val values = ContentValues().apply {
-                        put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
-                        put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-                        put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/YuYin/")
-                        put(MediaStore.Video.Media.IS_PENDING, 1)
-                    }
-                    val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
-                        ?: throw IOException("无法在系统媒体库创建视频记录")
-                    contentResolver.openOutputStream(uri)?.use { out ->
-                        FileInputStream(srcFile).use { it.copyTo(out) }
-                    } ?: throw IOException("无法写入视频数据")
-                    values.clear()
-                    values.put(MediaStore.Video.Media.IS_PENDING, 0)
-                    contentResolver.update(uri, values, null, null)
-                } else {
-                    val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "YuYin")
-                    if (!dir.exists()) dir.mkdirs()
-                    val destFile = File(dir, fileName)
-                    srcFile.copyTo(destFile, overwrite = true)
-                    MediaScannerConnection.scanFile(this, arrayOf(destFile.absolutePath), arrayOf("video/mp4"), null)
-                }
-            }
-            "image" -> {
-                val mimeType = when {
-                    fileName.endsWith(".png", ignoreCase = true) -> "image/png"
-                    fileName.endsWith(".webp", ignoreCase = true) -> "image/webp"
-                    else -> "image/jpeg"
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    val values = ContentValues().apply {
-                        put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
-                        put(MediaStore.Images.Media.MIME_TYPE, mimeType)
-                        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/YuYin/")
-                        put(MediaStore.Images.Media.IS_PENDING, 1)
-                    }
-                    val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                        ?: throw IOException("无法在系统媒体库创建图片记录")
-                    contentResolver.openOutputStream(uri)?.use { out ->
-                        FileInputStream(srcFile).use { it.copyTo(out) }
-                    } ?: throw IOException("无法写入图片数据")
-                    values.clear()
-                    values.put(MediaStore.Images.Media.IS_PENDING, 0)
-                    contentResolver.update(uri, values, null, null)
-                } else {
-                    val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "YuYin")
-                    if (!dir.exists()) dir.mkdirs()
-                    val destFile = File(dir, fileName)
-                    srcFile.copyTo(destFile, overwrite = true)
-                    MediaScannerConnection.scanFile(this, arrayOf(destFile.absolutePath), arrayOf(mimeType), null)
-                }
-            }
-            "audio" -> {
-                val mimeType = when {
-                    fileName.endsWith(".m4a", ignoreCase = true) -> "audio/mp4"
-                    fileName.endsWith(".wav", ignoreCase = true) -> "audio/wav"
-                    else -> "audio/mpeg"
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    val values = ContentValues().apply {
-                        put(MediaStore.Audio.Media.DISPLAY_NAME, fileName)
-                        put(MediaStore.Audio.Media.MIME_TYPE, mimeType)
-                        put(MediaStore.Audio.Media.RELATIVE_PATH, "Music/YuYin/")
-                        put(MediaStore.Audio.Media.IS_PENDING, 1)
-                    }
-                    val uri = contentResolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
-                        ?: throw IOException("无法在系统媒体库创建音频记录")
-                    contentResolver.openOutputStream(uri)?.use { out ->
-                        FileInputStream(srcFile).use { it.copyTo(out) }
-                    } ?: throw IOException("无法写入音频数据")
-                    values.clear()
-                    values.put(MediaStore.Audio.Media.IS_PENDING, 0)
-                    contentResolver.update(uri, values, null, null)
-                } else {
-                    val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "YuYin")
-                    if (!dir.exists()) dir.mkdirs()
-                    val destFile = File(dir, fileName)
-                    srcFile.copyTo(destFile, overwrite = true)
-                    MediaScannerConnection.scanFile(this, arrayOf(destFile.absolutePath), arrayOf(mimeType), null)
-                }
-            }
-            else -> throw IllegalArgumentException("不支持的媒体类型: $mediaType")
-        }
-    }
-
-    private fun getMimeType(fileName: String, mediaType: String): String {
-        return when (mediaType.lowercase()) {
-            "video" -> "video/mp4"
-            "audio" -> {
-                when {
-                    fileName.endsWith(".m4a", ignoreCase = true) -> "audio/mp4"
-                    fileName.endsWith(".wav", ignoreCase = true) -> "audio/wav"
-                    else -> "audio/mpeg"
-                }
-            }
-            else -> {
-                when {
-                    fileName.endsWith(".png", ignoreCase = true) -> "image/png"
-                    fileName.endsWith(".webp", ignoreCase = true) -> "image/webp"
-                    else -> "image/jpeg"
-                }
-            }
-        }
-    }
-
     private fun applySavedThemeMode() {
         try {
             val file = File(filesDir, "theme_mode.flag")
@@ -613,43 +326,6 @@ class MainActivity : FlutterActivity() {
             else -> R.drawable.launch_background
         }
         window.setBackgroundDrawableResource(backgroundRes)
-    }
-
-    private fun triggerInstallApk(filePath: String): Boolean {
-        try {
-            val apkFile = File(filePath)
-            if (!apkFile.exists()) return false
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (!packageManager.canRequestPackageInstalls()) {
-                    pendingApkPathForInstall = filePath
-                    val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                        data = Uri.parse("package:$packageName")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    startActivityForResult(intent, requestCodeInstallPermission)
-                    return false
-                }
-            }
-
-            pendingApkPathForInstall = null
-            val apkUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                FileProvider.getUriForFile(this, "$packageName.fileprovider", apkFile)
-            } else {
-                Uri.fromFile(apkFile)
-            }
-
-            val installIntent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(apkUri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            startActivity(installIntent)
-            return true
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return false
-        }
     }
 
     private fun getTargetDisplay(): Display? {

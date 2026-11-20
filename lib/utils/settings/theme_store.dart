@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+import '../atomic_file_writer.dart';
 
 /// 主题模式持久化与全局控制器
 class ThemeStore {
@@ -20,11 +21,12 @@ class ThemeStore {
   static Future<void> init() async {
     try {
       final file = await _file();
-      if (!await file.exists()) {
+      final raw = await AtomicFileWriter.readString(file);
+      if (raw == null) {
         await _syncToNative(ThemeMode.system);
         return;
       }
-      final text = (await file.readAsString()).trim();
+      final text = raw.trim();
       final mode = parseThemeMode(text);
       themeModeNotifier.value = mode;
       await _syncToNative(mode);
@@ -38,7 +40,7 @@ class ThemeStore {
     themeModeNotifier.value = mode;
     try {
       final file = await _file();
-      await file.writeAsString(serializeThemeMode(mode), flush: true);
+      await AtomicFileWriter.writeString(file, serializeThemeMode(mode));
     } catch (_) {
       // 写入失败不影响内存中即时生效
     }

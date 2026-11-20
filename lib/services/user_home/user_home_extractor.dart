@@ -38,13 +38,14 @@ class UserHomeExtractor implements IUserHomeExtractor {
     String homeUrl, {
     void Function(int current, int total)? onProgress,
   }) async {
+    // 超时预算由 sniffer 自身控制（初始 40 秒 + 滚动失活 25 秒），此处不再叠加外层硬超时
     for (var attempt = 0; ; attempt++) {
       try {
-        return await _delegate
-            .sniffUserHomeUrl(homeUrl)
-            .timeout(const Duration(seconds: 90));
+        return await _delegate.sniffUserHomeUrl(homeUrl);
       } on TimeoutException {
         if (attempt >= 1) rethrow;
+        // 重试前彻底取消前次任务，避免两个任务争用同一 WebView
+        _delegate.cancelActiveTask();
       }
     }
   }

@@ -62,7 +62,7 @@ extension _ParseHomeParseFlow on _ParsePageState {
             continue;
           }
           worksBySecUid[secUid] = works;
-          HistoryStore.addRecord(
+          await HistoryStore.addRecord(
             HistoryItem(
               id: 'home:$secUid',
               url: 'https://www.douyin.com/user/$secUid',
@@ -176,11 +176,10 @@ extension _ParseHomeParseFlow on _ParsePageState {
         );
         if (!mounted) return;
 
-        for (final author in result.authors) {
-          if (author.success) {
-            await HistoryStore.markSaved('home:${author.secUid}', true);
-          }
-        }
+        await HistoryStore.markSavedBatch({
+          for (final author in result.authors)
+            if (author.success) 'home:${author.secUid}': null,
+        });
 
         final successCount = result.authors.where((a) => a.success).length;
         widget.logs.add(
@@ -197,6 +196,10 @@ extension _ParseHomeParseFlow on _ParsePageState {
         widget.logs.add(
           _downloadCancelToken?.isCancelled == true ? '已取消主页批量保存' : '已取消解析',
         );
+      }
+    } catch (e) {
+      if (mounted) {
+        widget.logs.add('主页捕获失败：${_friendlyError(e)}');
       }
     } finally {
       DownloadCancelRegistry.detach();

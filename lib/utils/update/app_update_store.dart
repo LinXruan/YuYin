@@ -59,4 +59,23 @@ class AppUpdateStore {
       );
 
   static void cancelDownload() => AppUpdateDownloader.cancelDownload(_state);
+
+  /// 失败横幅「重试」：复用最近一次下载请求
+  static Future<void> retryLastDownload({
+    void Function(String apkPath)? onDownloadComplete,
+  }) async {
+    final info = _state.lastInfo;
+    if (info == null) return;
+    _state.statusNotifier.value = const AppUpdateStatus();
+    await startDownload(info, onDownloadComplete: onDownloadComplete);
+  }
+
+  /// 关闭失败提示，不影响已保存的 lastInfo
+  static void dismissError() {
+    if (_state.statusNotifier.value.isDownloading) return;
+    _state.statusNotifier.value = const AppUpdateStatus();
+  }
+
+  /// 最近一次下载请求（供 UI 展示失败时的版本号）
+  static UpdateReleaseInfo? get lastRequest => _state.lastInfo;
 }

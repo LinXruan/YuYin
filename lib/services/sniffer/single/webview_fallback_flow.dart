@@ -43,7 +43,7 @@ extension SnifferWebviewFallbackFlowFlow on DouyinSniffer {
       if (_disposed || taskId != _taskId) return;
       final completer = _completer;
       if (completer == null || completer.isCompleted) return;
-      if (!_degradedVideoSeen) return;
+      // 18 秒迟到兜底对所有仍未完成的视频页生效：未触发降级提示不代表主页一定能拿到完整档位
       unawaited(
         _startWebViewShareFallback(awemeId, taskId, lateFallback: true),
       );

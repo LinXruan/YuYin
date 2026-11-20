@@ -133,9 +133,10 @@ class UpdateChecker {
         if (a is Map) {
           final name = a['name']?.toString() ?? '';
           final url = a['browser_download_url']?.toString();
-          if (name.contains('v8a') && name.endsWith('.apk')) {
+          final lower = name.toLowerCase();
+          if (lower.contains('v8a') && lower.endsWith('.apk')) {
             v8aUrl = url;
-          } else if (name.contains('Universal') && name.endsWith('.apk')) {
+          } else if (lower.contains('universal') && lower.endsWith('.apk')) {
             universalUrl = url;
           }
         }
@@ -150,6 +151,7 @@ class UpdateChecker {
       hasUpdate: hasUpdate,
       v8aDownloadUrl: v8aUrl,
       universalDownloadUrl: universalUrl,
+      tagName: tagName,
     );
   }
   /// 释放资源

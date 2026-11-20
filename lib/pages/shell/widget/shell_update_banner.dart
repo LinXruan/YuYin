@@ -5,6 +5,9 @@ part of '../page/app_shell.dart';
 /// shell update banner
 extension _ShellShellUpdateBannerFlow on _AppShellState {
   Widget _buildUpdateProgressBar(BuildContext context, AppUpdateStatus status) {
+    if (!status.isDownloading && status.errorMessage != null) {
+      return _buildFailureBar(context, status);
+    }
     final theme = Theme.of(context);
     final percent = (status.progress * 100).toInt();
     final versionStr = status.version != null ? ' v${status.version}' : '';
@@ -101,6 +104,56 @@ extension _ShellShellUpdateBannerFlow on _AppShellState {
             constraints: const BoxConstraints(),
             tooltip: '取消下载',
             onPressed: AppUpdateStore.cancelDownload,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 下载失败：保留可关闭的提示条，并提供一键重试
+  Widget _buildFailureBar(BuildContext context, AppUpdateStatus status) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.errorContainer.withValues(alpha: 0.95),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.error_outline_rounded,
+            size: 20,
+            color: theme.colorScheme.onErrorContainer,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              status.errorMessage!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 12,
+                color: theme.colorScheme.onErrorContainer,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => AppUpdateStore.retryLastDownload(),
+            style: TextButton.styleFrom(
+              foregroundColor: theme.colorScheme.onErrorContainer,
+              minimumSize: const Size(0, 32),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+            ),
+            child: const Text('重试'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close_rounded, size: 18),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            tooltip: '关闭提示',
+            color: theme.colorScheme.onErrorContainer,
+            onPressed: AppUpdateStore.dismissError,
           ),
         ],
       ),

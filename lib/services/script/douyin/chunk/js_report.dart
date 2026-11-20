@@ -74,9 +74,19 @@ const String jsReport = r'''  }
     // 主页面降级等待 12 秒；与 Dart 侧 18 秒迟到兜底、30 秒主超时独立，修改需同步检查
     // 若已确定远端未登录，无需死等完整画质列表，直接回传基础视频流！
     if (!sharePage && S.loginReported !== false && Date.now() - (window.__dyStartTime || 0) < 12000) {
+      // 暂存降级结果：静态节点可能已被标记为已扫描，等待期满后无法再次取到，必须补发
+      S.pendingVideo = { items: items, desc: customDesc || '', cover: customCover || '' };
       return false;
     }
     return sendItems(items, false, customDesc, customCover);
+  }
+  // 补发 12 秒等待期内暂存的降级视频（远端未登录或等待期满时调用）
+  function flushPendingVideo() {
+    var pending = S.pendingVideo;
+    if (!pending) return false;
+    var ok = sendItems(pending.items, false, pending.desc, pending.cover);
+    if (ok) S.pendingVideo = null;
+    return ok;
   }
   // 单地址兜底：图文页不启用，避免误抓实况视频或背景音乐
   function reportSingle(raw, trusted, w, h) {

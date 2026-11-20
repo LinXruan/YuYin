@@ -9,6 +9,7 @@ import '../../models/save_page/selection/aggregate_state.dart';
 import '../../models/save_page/selection/quality_indicator.dart';
 import '../../models/save_page/selection/terminal_seed.dart';
 import '../../models/save_page/selection/terminal_view.dart';
+import '../atomic_file_writer.dart';
 
 /// 保存页唯一记忆模板：只记录 Terminal 的 5 个值
 ///
@@ -72,8 +73,9 @@ class TerminalMemoryStore {
   static Future<void> init() async {
     try {
       final file = await _file();
-      if (!await file.exists()) return;
-      final decoded = jsonDecode(await file.readAsString());
+      final content = await AtomicFileWriter.readString(file);
+      if (content == null) return;
+      final decoded = jsonDecode(content);
       if (decoded is! Map) return;
       _picture = _readState(decoded['picture'], _picture);
       _live = _readState(decoded['live'], _live);
@@ -118,7 +120,7 @@ class TerminalMemoryStore {
         'video': _video.name,
         'quality': _quality.name,
       };
-      await file.writeAsString(jsonEncode(data), flush: true);
+      await AtomicFileWriter.writeString(file, jsonEncode(data));
     } catch (_) {
       // 写入失败不影响内存状态
     }

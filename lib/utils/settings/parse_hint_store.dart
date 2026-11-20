@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
+import '../atomic_file_writer.dart';
 
 /// 解析页功能提示的永久隐藏标记（与登录提示互不影响）。
 class ParseHintStore {
@@ -23,9 +24,9 @@ class ParseHintStore {
     try {
       final file = await _batchHintFile();
       if (dismissed) {
-        await file.writeAsString('1', flush: true);
-      } else if (await file.exists()) {
-        await file.delete();
+        await AtomicFileWriter.writeString(file, '1');
+      } else {
+        await AtomicFileWriter.delete(file);
       }
     } catch (_) {
       // 忽略存储异常

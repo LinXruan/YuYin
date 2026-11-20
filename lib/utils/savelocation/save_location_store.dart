@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../models/media_item.dart';
 import '../../models/savelocation/save_location_config.dart';
 import '../../models/savelocation/save_location_paths.dart';
+import '../atomic_file_writer.dart';
 
 export '../../models/savelocation/save_location_config.dart';
 export '../../models/savelocation/save_location_paths.dart';
@@ -46,11 +47,11 @@ class SaveLocationStore {
   static Future<void> init() async {
     try {
       final file = await _getFile();
-      if (!await file.exists()) {
+      final raw = await AtomicFileWriter.readString(file);
+      if (raw == null) {
         notifier.value = const SaveLocationConfig();
         return;
       }
-      final raw = await file.readAsString();
       final map = jsonDecode(raw);
       if (map is Map<String, dynamic>) {
         notifier.value = SaveLocationConfig.fromJson(map);
@@ -117,9 +118,7 @@ class SaveLocationStore {
     notifier.value = const SaveLocationConfig();
     try {
       final file = await _getFile();
-      if (await file.exists()) {
-        await file.delete();
-      }
+      await AtomicFileWriter.delete(file);
     } catch (_) {}
   }
 
@@ -131,7 +130,7 @@ class SaveLocationStore {
   static Future<void> _save(SaveLocationConfig config) async {
     try {
       final file = await _getFile();
-      await file.writeAsString(jsonEncode(config.toJson()), flush: true);
+      await AtomicFileWriter.writeString(file, jsonEncode(config.toJson()));
     } catch (_) {}
   }
 }

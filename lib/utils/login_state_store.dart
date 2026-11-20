@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../services/script/login/login_detector_script.dart';
+import 'atomic_file_writer.dart';
 
 /// 登录状态本地持久化：保存登录标记及简要用户公开信息（昵称、头像链接）。
 ///
@@ -83,13 +84,13 @@ class LoginStateStore {
   static Future<void> markLoggedIn({LoginProfile? profile}) async {
     try {
       final flagFile = await _flagFile();
-      await flagFile.writeAsString('1', flush: true);
+      await AtomicFileWriter.writeString(flagFile, '1');
 
       if (profile != null) {
         final profileFile = await _profileFile();
-        await profileFile.writeAsString(
+        await AtomicFileWriter.writeString(
+          profileFile,
           jsonEncode(profile.toJson()),
-          flush: true,
         );
       }
     } catch (_) {
@@ -112,9 +113,9 @@ class LoginStateStore {
     try {
       final file = await _hidePromptFile();
       if (dismissed) {
-        await file.writeAsString('1', flush: true);
-      } else if (await file.exists()) {
-        await file.delete();
+        await AtomicFileWriter.writeString(file, '1');
+      } else {
+        await AtomicFileWriter.delete(file);
       }
     } catch (_) {
       // 忽略存储异常
@@ -125,9 +126,9 @@ class LoginStateStore {
   static Future<void> clearLogin() async {
     try {
       final flag = await _flagFile();
-      if (await flag.exists()) await flag.delete();
+      await AtomicFileWriter.delete(flag);
       final profile = await _profileFile();
-      if (await profile.exists()) await profile.delete();
+      await AtomicFileWriter.delete(profile);
     } catch (_) {
       // 忽略清理异常
     }

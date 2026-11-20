@@ -7,11 +7,16 @@ const String jsLoginProbe = r'''  // 向 Flutter 回传远端登录状态（已�
       if (window.DouyinChannel && window.DouyinChannel.postMessage) {
         window.DouyinChannel.postMessage(JSON.stringify({
           type: 'login_state',
+          task: S.nonce,
           loggedIn: !!isLoggedIn,
           reason: reason || ''
         }));
       }
     } catch (e) {}
+    // 已确认未登录时无需再死等完整画质列表，立即补发暂存的降级视频
+    if (isLoggedIn === false) {
+      try { flushPendingVideo(); } catch (e) {}
+    }
   }
   // 探测视频播放页中的远端真实登录状态（DOM 状态 + 同源权威会话探测）
   function checkLoginState() {

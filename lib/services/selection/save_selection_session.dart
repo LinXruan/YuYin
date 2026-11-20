@@ -181,6 +181,7 @@ class SaveSelectionSession extends ChangeNotifier {
   // ---------- 事务与通知 ----------
 
   void _run(void Function() action) {
+    if (_closed) return;
     _depth++;
     try {
       action();

@@ -9,6 +9,7 @@ class UpdateReleaseInfo {
     required this.hasUpdate,
     this.v8aDownloadUrl,
     this.universalDownloadUrl,
+    this.tagName,
   });
 
   /// 最新发布的版本号（例如 1.2.4）
@@ -32,20 +33,24 @@ class UpdateReleaseInfo {
   /// Universal 全架构通用安装包直链 (若有)
   final String? universalDownloadUrl;
 
+  /// Release 原始 tag（可能带 v 前缀），用于拼接默认直链
+  final String? tagName;
+
   /// 获取指定架构的首选下载链接
   /// - [preferArm64] 为 true 时，仅匹配 v8a 架构包；
   /// - [preferArm64] 为 false 时，仅匹配 Universal 全架构通用包。
   String getDownloadUrl({bool preferArm64 = true}) {
+    final tag = (tagName != null && tagName!.isNotEmpty) ? tagName! : version;
     if (preferArm64) {
       if (v8aDownloadUrl != null && v8aDownloadUrl!.isNotEmpty) {
         return v8aDownloadUrl!;
       }
-      return 'https://github.com/LinXruan/YuYin/releases/download/$version/YuYin_${version}_v8a.apk';
+      return 'https://github.com/LinXruan/YuYin/releases/download/$tag/YuYin_${version}_v8a.apk';
     } else {
       if (universalDownloadUrl != null && universalDownloadUrl!.isNotEmpty) {
         return universalDownloadUrl!;
       }
-      return 'https://github.com/LinXruan/YuYin/releases/download/$version/YuYin_${version}_Universal.apk';
+      return 'https://github.com/LinXruan/YuYin/releases/download/$tag/YuYin_${version}_Universal.apk';
     }
   }
 }

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../models/media_item.dart';
+import '../atomic_file_writer.dart';
 
 /// 下载与画质过滤、自动更新相关配置持久化存储器
 class DownloadSettingsStore {
@@ -51,8 +52,9 @@ class DownloadSettingsStore {
   static Future<void> init() async {
     try {
       final file = await _file();
-      if (!await file.exists()) return;
-      final map = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      final content = await AtomicFileWriter.readString(file);
+      if (content == null) return;
+      final map = jsonDecode(content) as Map<String, dynamic>;
       final valQuality = map['onlyHighestQualityPerResolution'];
       _onlyHighestQualityPerResolution = valQuality is bool ? valQuality : true;
       onlyHighestQualityNotifier.value = _onlyHighestQualityPerResolution;
@@ -172,7 +174,7 @@ class DownloadSettingsStore {
         'onlyHighestQualityPerResolution': _onlyHighestQualityPerResolution,
         'autoCheckUpdate': _autoCheckUpdate,
       };
-      await file.writeAsString(jsonEncode(map));
+      await AtomicFileWriter.writeString(file, jsonEncode(map));
     } catch (_) {
       // 写入失败不影响内存中即时生效（如纯单元测试环境）
     }

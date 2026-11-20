@@ -26,6 +26,7 @@ class AppUpdateStatus {
     String? version,
     String? targetApkPath,
     String? errorMessage,
+    bool clearError = false,
   }) {
     return AppUpdateStatus(
       isDownloading: isDownloading ?? this.isDownloading,
@@ -34,7 +35,7 @@ class AppUpdateStatus {
       totalBytes: totalBytes ?? this.totalBytes,
       version: version ?? this.version,
       targetApkPath: targetApkPath ?? this.targetApkPath,
-      errorMessage: errorMessage ?? this.errorMessage,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
   }
 }

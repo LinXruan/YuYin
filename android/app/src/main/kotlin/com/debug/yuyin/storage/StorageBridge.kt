@@ -1,19 +1,14 @@
 package com.debug.yuyin.storage
 
 import android.content.ContentUris
-import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
-import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import androidx.documentfile.provider.DocumentFile
-import java.io.File
-import java.io.FileInputStream
-import java.io.IOException
 
 /// 原生存储辅助：主页 Download 目录保存、保存结果查询、文件夹/文件打开
 object StorageBridge {
@@ -42,62 +37,6 @@ object StorageBridge {
                     displayPath = map["displayPath"]?.toString() ?: ""
                 )
             }
-        }
-    }
-
-    /// 保存到 MediaStore.Downloads（Android 10+）或传统 Download 目录（Android 9-）
-    @Throws(IOException::class)
-    fun saveToDownloads(
-        context: Context,
-        srcFile: File,
-        fileName: String,
-        mimeType: String,
-        relativePath: String
-    ) {
-        val cleanRelative = relativePath.trim().trimStart('/')
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val values = ContentValues().apply {
-                put(MediaStore.Downloads.DISPLAY_NAME, fileName)
-                put(MediaStore.Downloads.MIME_TYPE, mimeType)
-                put(MediaStore.Downloads.RELATIVE_PATH, cleanRelative)
-                put(MediaStore.Downloads.IS_PENDING, 1)
-            }
-            val uri = context.contentResolver.insert(
-                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                values
-            ) ?: throw IOException("无法在 Download 目录创建文件记录")
-
-            context.contentResolver.openOutputStream(uri)?.use { out ->
-                FileInputStream(srcFile).use { input ->
-                    input.copyTo(out)
-                }
-            } ?: throw IOException("无法写入 Download 文件数据")
-
-            values.clear()
-            values.put(MediaStore.Downloads.IS_PENDING, 0)
-            context.contentResolver.update(uri, values, null, null)
-            return
-        }
-
-        // Android 9 及以下：直接写入公共 Download 目录
-        val legacyRelative = cleanRelative.removePrefix("Download/")
-        val root = Environment.getExternalStoragePublicDirectory(
-            Environment.DIRECTORY_DOWNLOADS
-        )
-        val targetDir = File(root, legacyRelative.trimEnd('/'))
-        if (!targetDir.exists() && !targetDir.mkdirs()) {
-            throw IOException("无法创建 Download 子目录")
-        }
-        val destFile = File(targetDir, fileName)
-        srcFile.copyTo(destFile, overwrite = true)
-        try {
-            MediaScannerConnection.scanFile(
-                context,
-                arrayOf(destFile.absolutePath),
-                arrayOf(mimeType),
-                null
-            )
-        } catch (_: Exception) {
         }
     }
 
@@ -217,6 +156,11 @@ object StorageBridge {
 
         selectionParts.add(MediaStore.MediaColumns.MIME_TYPE + " LIKE ?")
         selectionArgs.add(mimePrefix(spec.type) + "%")
+
+        // 只统计已完成写入的记录，过滤写入中断留下的 IS_PENDING=1 僵尸条目
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            selectionParts.add(MediaStore.MediaColumns.IS_PENDING + " = 0")
+        }
 
         if (!spec.namePrefix.isNullOrBlank()) {
             selectionParts.add(MediaStore.MediaColumns.DISPLAY_NAME + " LIKE ? ESCAPE '!'")

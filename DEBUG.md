@@ -47,7 +47,7 @@ adb shell am force-stop com.debug.yuyin                                     # �
 
 ## 2. Agent 控制台（Debug 专用，Port 9527）
 
-Debug 包内置轻量 HTTP 服务，用于替代坐标点击与 XML Dump；Release 包会被 Tree-shaking 移除。
+Debug 包内置轻量 HTTP 服务，用于替代坐标点击与 XML Dump；服务仅绑定 `127.0.0.1`、不开放通配跨域，Release 包会被 Tree-shaking 移除（`start()` 内 `kDebugMode` 守卫）。
 
 ### 2.1 快捷命令（推荐）
 

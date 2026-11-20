@@ -104,8 +104,8 @@ extension _AppShellScaffold on _AppShellState {
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 底部导航栏上方的悬浮应用内更新进度条
-              if (updateStatus.isDownloading)
+              // 底部导航栏上方的悬浮应用内更新进度条 / 失败重试条
+              if (updateStatus.isDownloading || updateStatus.errorMessage != null)
                 this._buildUpdateProgressBar(context, updateStatus),
               NavigationBar(
                 selectedIndex: _index,

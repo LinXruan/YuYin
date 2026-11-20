@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -35,19 +36,22 @@ class AudioPreviewService {
   final ValueNotifier<String?> errorMessage = ValueNotifier<String?>(null);
 
   Timer? _progressTimer;
+  bool _disposed = false;
+  Map<String, String>? _lastHeaders;
 
   bool get isPlaying => state.value == AudioPreviewState.playing;
   bool get isBuffering => state.value == AudioPreviewState.buffering;
 
   /// 播放指定直链音频
   Future<void> play(String url, {Map<String, String>? headers}) async {
-    if (url.isEmpty) return;
+    if (_disposed || url.isEmpty) return;
 
     if (currentUrl.value == url && state.value == AudioPreviewState.paused) {
       await resume();
       return;
     }
 
+    _lastHeaders = headers ?? _lastHeaders;
     currentUrl.value = url;
     state.value = AudioPreviewState.buffering;
     position.value = Duration.zero;
@@ -56,15 +60,18 @@ class AudioPreviewService {
 
     try {
       final args = <String, dynamic>{'url': url};
-      if (headers != null) {
-        args['headers'] = headers;
+      final merged = _lastHeaders;
+      if (merged != null && merged.isNotEmpty) {
+        args['headers'] = merged;
       }
       await _channel.invokeMethod('play', args);
     } on MissingPluginException {
+      if (_disposed) return;
       // 兼容测试环境
       state.value = AudioPreviewState.playing;
       _startProgressTimer();
     } catch (e) {
+      if (_disposed) return;
       state.value = AudioPreviewState.error;
       errorMessage.value = e.toString();
     }
@@ -72,26 +79,37 @@ class AudioPreviewService {
 
   /// 暂停播放
   Future<void> pause() async {
+    if (_disposed) return;
     _stopProgressTimer();
     try {
       await _channel.invokeMethod('pause');
+      if (_disposed) return;
       state.value = AudioPreviewState.paused;
     } on MissingPluginException {
+      if (_disposed) return;
       state.value = AudioPreviewState.paused;
     } catch (e) {
       debugPrint('[AudioPreviewService] pause error: $e');
     }
   }
 
-  /// 恢复播放
+  /// 恢复播放：携原请求头重建原生播放器时仍可正常取流
   Future<void> resume() async {
+    if (_disposed) return;
+    final url = currentUrl.value;
+    if (url == null || url.isEmpty) return;
     try {
-      await _channel.invokeMethod('play', {
-        'url': currentUrl.value,
-      });
+      final args = <String, dynamic>{'url': url};
+      final merged = _lastHeaders;
+      if (merged != null && merged.isNotEmpty) {
+        args['headers'] = merged;
+      }
+      await _channel.invokeMethod('play', args);
+      if (_disposed) return;
       state.value = AudioPreviewState.playing;
       _startProgressTimer();
     } on MissingPluginException {
+      if (_disposed) return;
       state.value = AudioPreviewState.playing;
     } catch (e) {
       debugPrint('[AudioPreviewService] resume error: $e');
@@ -100,6 +118,7 @@ class AudioPreviewService {
 
   /// 跳转到指定播放进度
   Future<void> seek(Duration target) async {
+    if (_disposed) return;
     position.value = target;
     try {
       await _channel.invokeMethod('seek', {
@@ -114,10 +133,12 @@ class AudioPreviewService {
 
   /// 停止播放并重置状态
   Future<void> stop() async {
+    if (_disposed) return;
     _stopProgressTimer();
     try {
       await _channel.invokeMethod('stop');
     } catch (_) {}
+    if (_disposed) return;
     state.value = AudioPreviewState.idle;
     currentUrl.value = null;
     position.value = Duration.zero;
@@ -125,6 +146,7 @@ class AudioPreviewService {
 
   /// 处理来自原生层的状态与进度回调
   Future<void> _handleNativeCall(MethodCall call) async {
+    if (_disposed) return;
     if (call.method == 'onPlayerStateChanged') {
       final args = call.arguments as Map?;
       final stateStr = args?['state']?.toString();
@@ -141,6 +163,7 @@ class AudioPreviewService {
           break;
         case 'playing':
           state.value = AudioPreviewState.playing;
+          errorMessage.value = null;
           _startProgressTimer();
           break;
         case 'paused':
@@ -166,21 +189,22 @@ class AudioPreviewService {
   }
 
   void _startProgressTimer() {
+    if (_disposed) return;
     _progressTimer?.cancel();
     _progressTimer = Timer.periodic(const Duration(milliseconds: 300), (_) async {
+      if (_disposed) return;
       if (state.value != AudioPreviewState.playing) {
         _stopProgressTimer();
         return;
       }
       try {
         final res = await _channel.invokeMethod<Map>('getPosition');
-        if (res != null) {
-          final posMs = res['position'] as int? ?? 0;
-          final durMs = res['duration'] as int? ?? 0;
-          position.value = Duration(milliseconds: posMs);
-          if (durMs > 0) {
-            duration.value = Duration(milliseconds: durMs);
-          }
+        if (_disposed || res == null) return;
+        final posMs = res['position'] as int? ?? 0;
+        final durMs = res['duration'] as int? ?? 0;
+        position.value = Duration(milliseconds: posMs);
+        if (durMs > 0) {
+          duration.value = Duration(milliseconds: durMs);
         }
       } catch (_) {}
     });
@@ -192,9 +216,15 @@ class AudioPreviewService {
   }
 
   /// 释放服务与原生播放器资源
+  ///
+  /// 先置销毁标记并注销 Channel，再发一次 fire-and-forget 的 stop，
+  /// 避免异步回调在 Notifier 销毁后写状态。
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     _stopProgressTimer();
-    stop();
+    _channel.setMethodCallHandler(null);
+    unawaited(_channel.invokeMethod<void>('stop').catchError((_) {}));
     state.dispose();
     position.dispose();
     duration.dispose();
