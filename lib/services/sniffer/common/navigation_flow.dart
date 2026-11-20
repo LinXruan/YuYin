@@ -18,52 +18,52 @@ extension SnifferNavigationFlowFlow on DouyinSniffer {
     if (error.isForMainFrame == false) return;
     if (error.description.contains('ERR_ABORTED')) return;
     final text = '${error.errorCode} ${error.description}';
-    if (_lastWebResourceError != text) {
-      _lastWebResourceError = text;
+    if (_session.lastWebResourceError != text) {
+      _session.lastWebResourceError = text;
       _log('网页加载错误(${error.errorCode}): ${error.description}');
     }
-    if (_loggedWebResourceError) return;
-    _loggedWebResourceError = true;
+    if (_session.loggedWebResourceError) return;
+    _session.loggedWebResourceError = true;
     _report('网页加载失败，请检查网络后重试');
   }
 
   /// 记录最终页面 URL，并在拿到 awemeId 后启动分享页并行兜底
 
   void _handlePageUrl(String? url, int taskId) {
-    if (url == null || url.isEmpty || _disposed || taskId != _taskId) return;
+    if (url == null || url.isEmpty || _disposed || taskId != _session.taskId) return;
     if (!UrlParser.isAllowedNavigationUrl(url)) {
       _logNonWebPage(url);
       return;
     }
     // 新任务尚未真正加载目标页时，旧任务作品页的迟到事件一律忽略
-    if (!_taskPageStarted &&
-        _retiredAwemeId != null &&
-        UrlParser.extractAwemeId(url) == _retiredAwemeId) {
+    if (!_session.taskPageStarted &&
+        _session.retiredAwemeId != null &&
+        UrlParser.extractAwemeId(url) == _session.retiredAwemeId) {
       return;
     }
-    _lastPageUrl = url;
+    _session.lastPageUrl = url;
 
     // 纯文章作品不进入保存页：单作品解析中一旦重定向到 /article/ 立即快速失败
-    if (!_webviewShareFallback &&
+    if (!_session.webviewShareFallback &&
         UrlParser.isArticleUrl(url) &&
-        _completer != null &&
-        !_completer!.isCompleted) {
+        _session.completer != null &&
+        !_session.completer!.isCompleted) {
       _report('检测到文章作品链接，已自动过滤');
       _finishWithError(const ArticleWorkException(), taskId: taskId);
       return;
     }
 
     // C 分享页自身的 /share/video/ 不能覆盖主页面类型
-    if (!_webviewShareFallback) {
+    if (!_session.webviewShareFallback) {
       final kind = UrlParser.classifyWorkPage(url);
       final wasNote = _isNotePage;
       if (kind != DouyinWorkPage.unknown) {
-        _workPageKind = kind;
+        _session.workPageKind = kind;
       }
 
       // 若当前为单作品解析任务，但目标页面重定向至作者主页，立即明确终止，杜绝干等 30 秒超时
-      if (_completer != null &&
-          !_completer!.isCompleted &&
+      if (_session.completer != null &&
+          !_session.completer!.isCompleted &&
           kind == DouyinWorkPage.userHome) {
         _report('检测到页面已重定向至作者主页，终止单作品解析');
         _finishWithError(
@@ -75,17 +75,17 @@ extension SnifferNavigationFlowFlow on DouyinSniffer {
 
       final awemeId = UrlParser.extractAwemeId(url);
       if (awemeId != null &&
-          (_awemePageUrl == null || kind == DouyinWorkPage.note)) {
-        _awemePageUrl = url;
+          (_session.awemePageUrl == null || kind == DouyinWorkPage.note)) {
+        _session.awemePageUrl = url;
       }
 
       // B 失败时还没识别出 /note/，随后识别到了就重新安排 3 秒 C
       if (!wasNote &&
           _isNotePage &&
-          _shareFallbackFailed &&
-          _targetAwemeId != null) {
+          _session.shareFallbackFailed &&
+          _session.targetAwemeId != null) {
         _scheduleWebViewShareFallback(
-          _targetAwemeId!,
+          _session.targetAwemeId!,
           taskId,
           DouyinSniffer._kNoteFallbackDelay,
         );
@@ -100,8 +100,8 @@ extension SnifferNavigationFlowFlow on DouyinSniffer {
   /// 同一任务只启动一次 Dio 分享页请求
 
   Future<void> _checkCaptcha(String url, int taskId) async {
-    if (_disposed || taskId != _taskId) return;
-    final completer = _completer;
+    if (_disposed || taskId != _session.taskId) return;
+    final completer = _session.completer;
     if (completer == null || completer.isCompleted) return;
 
     var hit =
@@ -115,16 +115,16 @@ extension SnifferNavigationFlowFlow on DouyinSniffer {
           "/请完成.*验证|拖动.*滑块|滑动.*滑块|安全验证/.test(b.slice(0,500));"
           "return h?(t||'验证码页面'):'';})()",
         );
-        if (taskId != _taskId) return;
+        if (taskId != _session.taskId) return;
         hit = _jsResultToString(result).isNotEmpty;
       } catch (e) {
-        if (!_loggedCaptchaFailure) {
-          _loggedCaptchaFailure = true;
+        if (!_session.loggedCaptchaFailure) {
+          _session.loggedCaptchaFailure = true;
           _log('验证码检测失败: $e');
         }
       }
     }
-    if (taskId != _taskId) return;
+    if (taskId != _session.taskId) return;
     if (hit) {
       _finishWithError(
         StateError('触发抖音滑块验证，请点击右上角【账号登录】手动滑块解锁'),

@@ -9,6 +9,7 @@ import '../../../utils/login_state_store.dart';
 import '../../../utils/url_parser.dart';
 import '../../share/client/douyin_share_api.dart';
 import '../channel/sniffer_channel_parser.dart';
+import '../session/sniff_session.dart';
 import '../common/log_message_policy.dart';
 import '../lifecycle/sniff_cancelled_exception.dart';
 import '../../script/douyin/douyin_sniff_script.dart';
@@ -88,67 +89,24 @@ class DouyinSniffer
   static const Duration _kShareImageGrace = Duration(seconds: 3);
 
   late final WebViewController _controller;
-  Completer<SniffResult>? _completer;
-  Completer<UserHomeResult>? _homeCompleter;
-  Completer<UserHomeProfile>? _profileCompleter;
-  Timer? _timeoutTimer;
-  Timer? _injectTimer;
 
-  /// 任务开始前重置页面的提交信号
-  Completer<void>? _pageReset;
+  /// 单任务共享状态（任务态字段统一收敛于此）
+  final SniffSession _session = SniffSession();
 
-  /// 无新任务时的延迟卸载
-  Timer? _unloadTimer;
-
-  /// 结果/提示只接收一次；日志只在本任务页面存续期间接收
-  bool _acceptMessages = false;
-  bool _acceptLogs = false;
+  final DouyinShareApi _shareApi = DouyinShareApi();
+  final Set<String> _blockedSchemes = <String>{};
   bool _disposed = false;
 
-  /// 任务序号：异步回调返回时用它丢弃旧任务结果
-  int _taskId = 0;
-  String? _lastPageUrl;
-
-  /// 上一个任务结束时的作品 id：用于挡住旧文档迟到的导航事件
-  String? _retiredAwemeId;
-
-  /// 当前任务是否已经真正加载了目标页面（空白页不算）
-  bool _taskPageStarted = false;
-  String? _targetAwemeId;
-  bool _shareFallbackStarted = false;
-  DouyinShareResult? _shareVideoFallback;
-  DouyinShareResult? _pendingImageResult;
-  Timer? _imageGraceTimer;
-  final DouyinShareApi _shareApi = DouyinShareApi();
-  bool _webviewShareFallback = false;
-  Timer? _webviewFallbackDelay;
-  Timer? _webviewFallbackTimer;
-  Timer? _lateFallbackTimer;
-
-  /// 主页面类型（URL 只用于选择 C 的延迟，不代表作品内容）
-  DouyinWorkPage _workPageKind = DouyinWorkPage.unknown;
-  bool _degradedVideoSeen = false;
-  bool _shareFallbackFailed = false;
-  String? _sourceUrl;
-  String? _awemePageUrl;
-  DateTime _taskStartedAt = DateTime.now();
-  final Set<String> _blockedSchemes = <String>{};
-  String? _lastWebResourceError;
-  bool _loggedWebResourceError = false;
-  bool _loggedNonWebPage = false;
-  bool _loggedInjectFailure = false;
-  bool _loggedCaptchaFailure = false;
-
-  bool get _isNotePage => _workPageKind == DouyinWorkPage.note;
+  bool get _isNotePage => _session.workPageKind == DouyinWorkPage.note;
 
   /// 当前是否仍在等待解析结果；任务完成后不再重新注入脚本或接收结果
   bool get _isTaskActive {
     if (_disposed) return false;
-    final completer = _completer;
+    final completer = _session.completer;
     if (completer != null && !completer.isCompleted) return true;
-    final homeCompleter = _homeCompleter;
+    final homeCompleter = _session.homeCompleter;
     if (homeCompleter != null && !homeCompleter.isCompleted) return true;
-    final profileCompleter = _profileCompleter;
+    final profileCompleter = _session.profileCompleter;
     if (profileCompleter != null && !profileCompleter.isCompleted) return true;
     return false;
   }
@@ -173,7 +131,7 @@ class DouyinSniffer
   /// 内部诊断日志：仅 debug 版输出，正式版不进入界面日志
   void _log(String message) {
     if (!kDebugMode) return;
-    final ms = DateTime.now().difference(_taskStartedAt).inMilliseconds;
+    final ms = DateTime.now().difference(_session.taskStartedAt).inMilliseconds;
     debugPrint('[JS-Sniffer] [+${(ms / 1000).toStringAsFixed(2)}s] $message');
     onLog?.call(message);
   }
@@ -207,23 +165,23 @@ class DouyinSniffer
             }
             // 旧作品页迟到的导航开始：不解除上一任务的屏障
             final startedId = UrlParser.extractAwemeId(url);
-            if (_retiredAwemeId != null &&
+            if (_session.retiredAwemeId != null &&
                 startedId != null &&
-                startedId == _retiredAwemeId) {
+                startedId == _session.retiredAwemeId) {
               return;
             }
-            _taskPageStarted = true;
+            _session.taskPageStarted = true;
             // 新页面开始加载后才接受回传，避免旧页面的延迟消息
-            _acceptMessages = true;
-            _acceptLogs = true;
-            _handlePageUrl(url, _taskId);
+            _session.acceptMessages = true;
+            _session.acceptLogs = true;
+            _handlePageUrl(url, _session.taskId);
             _injectScript();
           },
           onUrlChange: (change) {
             if (change.url?.startsWith('about:') ?? false) return;
             if (!_isTaskActive) return;
             // 重定向/SPA history 变化时补一次最终 URL 识别
-            _handlePageUrl(change.url, _taskId);
+            _handlePageUrl(change.url, _session.taskId);
           },
           onPageFinished: (url) {
             _markPageReset(url);
@@ -233,9 +191,9 @@ class DouyinSniffer
               _logNonWebPage(url);
               return;
             }
-            _handlePageUrl(url, _taskId);
+            _handlePageUrl(url, _session.taskId);
             _injectScript();
-            _checkCaptcha(url, _taskId);
+            _checkCaptcha(url, _session.taskId);
           },
         ),
       );
@@ -245,10 +203,10 @@ class DouyinSniffer
   WebViewController get controller => _controller;
 
   /// 用户输入的原始链接
-  String? get sourceUrl => _sourceUrl;
+  String? get sourceUrl => _session.sourceUrl;
 
   /// 第一次带 awemeId 的主页面 URL（不会记录 C 分享页，仅调试展示）
-  String? get awemePageUrl => _awemePageUrl;
+  String? get awemePageUrl => _session.awemePageUrl;
 
   /// 加载分享链接并等待 JS 回传，最长等待 30 秒
   /// 按作品链接解析的便捷入口
@@ -290,22 +248,22 @@ class DouyinSniffer
   @override
   void cancelActiveTask() {
     _cancelScheduledUnload();
-    _taskId++;
-    _acceptMessages = false;
-    _acceptLogs = false;
+    _session.taskId++;
+    _session.acceptMessages = false;
+    _session.acceptLogs = false;
 
-    final completer = _completer;
-    _completer = null;
+    final completer = _session.completer;
+    _session.completer = null;
     if (completer != null && !completer.isCompleted) {
       completer.completeError(const SniffCancelledException());
     }
-    final homeCompleter = _homeCompleter;
-    _homeCompleter = null;
+    final homeCompleter = _session.homeCompleter;
+    _session.homeCompleter = null;
     if (homeCompleter != null && !homeCompleter.isCompleted) {
       homeCompleter.completeError(const SniffCancelledException());
     }
-    final profileCompleter = _profileCompleter;
-    _profileCompleter = null;
+    final profileCompleter = _session.profileCompleter;
+    _session.profileCompleter = null;
     if (profileCompleter != null && !profileCompleter.isCompleted) {
       profileCompleter.completeError(const SniffCancelledException());
     }
@@ -322,9 +280,9 @@ class DouyinSniffer
   void dispose() {
     _disposed = true;
     _cancelScheduledUnload();
-    _taskId++;
-    _acceptMessages = false;
-    _acceptLogs = false;
+    _session.taskId++;
+    _session.acceptMessages = false;
+    _session.acceptLogs = false;
     _finishWithError(StateError('捕获服务已释放'));
     _finishHomeWithError(StateError('捕获服务已释放'));
     _finishProfileWithError(StateError('捕获服务已释放'));

@@ -13,8 +13,8 @@ extension SnifferLifecycleFlow on DouyinSniffer {
 
   /// 非网页协议地址：停止注入和消息接收，只记录一次
   void _logNonWebPage(String url) {
-    if (_loggedNonWebPage) return;
-    _loggedNonWebPage = true;
+    if (_session.loggedNonWebPage) return;
+    _session.loggedNonWebPage = true;
     _log('页面不是网页地址，已停止注入');
   }
 
@@ -28,29 +28,29 @@ extension SnifferLifecycleFlow on DouyinSniffer {
   /// 先同步占位（关消息、停定时器、取消分享页请求），再 await Cookie，
   /// 保证 JS 结果与分享页结果只完成一次。
   void _stopTimers() {
-    _timeoutTimer?.cancel();
-    _timeoutTimer = null;
-    _injectTimer?.cancel();
-    _injectTimer = null;
-    _webviewFallbackDelay?.cancel();
-    _webviewFallbackDelay = null;
-    _webviewFallbackTimer?.cancel();
-    _webviewFallbackTimer = null;
-    _lateFallbackTimer?.cancel();
-    _lateFallbackTimer = null;
-    _imageGraceTimer?.cancel();
-    _imageGraceTimer = null;
-    _pendingImageResult = null;
+    _session.timeoutTimer?.cancel();
+    _session.timeoutTimer = null;
+    _session.injectTimer?.cancel();
+    _session.injectTimer = null;
+    _session.webviewFallbackDelay?.cancel();
+    _session.webviewFallbackDelay = null;
+    _session.webviewFallbackTimer?.cancel();
+    _session.webviewFallbackTimer = null;
+    _session.lateFallbackTimer?.cancel();
+    _session.lateFallbackTimer = null;
+    _session.imageGraceTimer?.cancel();
+    _session.imageGraceTimer = null;
+    _session.pendingImageResult = null;
     _cancelScheduledUnload();
     _shareApi.cancelPending();
-    if (_webviewShareFallback) {
-      _webviewShareFallback = false;
+    if (_session.webviewShareFallback) {
+      _session.webviewShareFallback = false;
       unawaited(_restoreDesktopUserAgent());
     }
   }
 
   /// 当前任务标识：脚本与回传消息共用，旧文档的迟到消息据此丢弃
-  String get _taskNonce => 't$_taskId';
+  String get _taskNonce => 't${_session.taskId}';
 
   /// 轻量 tick：脚本已就绪时只触发一次页内扫描，未就绪才重传完整脚本。
   ///
@@ -66,8 +66,8 @@ extension SnifferLifecycleFlow on DouyinSniffer {
         "return false;})();",
       );
       if (result.toString() == 'true') {
-        _acceptMessages = true;
-        _acceptLogs = true;
+        _session.acceptMessages = true;
+        _session.acceptLogs = true;
         return;
       }
     } catch (_) {
@@ -83,11 +83,11 @@ extension SnifferLifecycleFlow on DouyinSniffer {
       await _controller.runJavaScript(
         "window.__dyTaskNonce='$_taskNonce';\n$kDouyinSniffJs",
       );
-      _acceptMessages = true;
-      _acceptLogs = true;
+      _session.acceptMessages = true;
+      _session.acceptLogs = true;
     } catch (e) {
-      if (!_loggedInjectFailure) {
-        _loggedInjectFailure = true;
+      if (!_session.loggedInjectFailure) {
+        _session.loggedInjectFailure = true;
         _log('注入捕获脚本失败: $e');
       }
     }

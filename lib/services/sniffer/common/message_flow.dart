@@ -13,13 +13,13 @@ extension SnifferMessageFlowFlow on DouyinSniffer {
 
       // 日志与结果分开接收：结果只处理一次，日志覆盖到任务收尾
       if (data['type'] == 'log') {
-        if (!_acceptLogs) return;
+        if (!_session.acceptLogs) return;
         final msg = data['msg']?.toString() ?? '';
         if (msg.isNotEmpty) {
           if (LogMessagePolicy.classify(msg) == SnifferLogKind.homeProgress) {
             // 主页进度日志即视为滚动存活信号，刷新失活定时器
             _report(LogMessagePolicy.formatHomeProgress(msg));
-            _refreshHomeInactivityTimer(_taskId);
+            _refreshHomeInactivityTimer(_session.taskId);
           } else {
             _log(msg);
           }
@@ -28,18 +28,18 @@ extension SnifferMessageFlowFlow on DouyinSniffer {
       }
 
       // hint/result 只在当前任务等待结果期间接收
-      if (!_acceptMessages || !_isTaskActive) return;
+      if (!_session.acceptMessages || !_isTaskActive) return;
       if (data['type'] == 'login_state') {
         final remoteLoggedIn = data['loggedIn'] == true;
         final reason = data['reason']?.toString() ?? '';
-        _handleLoginStateDetected(remoteLoggedIn, reason, _taskId);
+        _handleLoginStateDetected(remoteLoggedIn, reason, _session.taskId);
         return;
       }
       if (data['type'] == 'hint') {
         if (data['kind'] == 'video-waiting') {
           final hintId = data['awemeId']?.toString() ?? '';
-          if (hintId.isNotEmpty && hintId == _targetAwemeId) {
-            _degradedVideoSeen = true;
+          if (hintId.isNotEmpty && hintId == _session.targetAwemeId) {
+            _session.degradedVideoSeen = true;
           }
         }
         return;
@@ -54,7 +54,7 @@ extension SnifferMessageFlowFlow on DouyinSniffer {
           nickname: nickname,
           avatarUrl: avatarUrl,
         );
-        _finishProfileWithResult(profile, _taskId);
+        _finishProfileWithResult(profile, _session.taskId);
         return;
       }
       if (data['type'] == 'user_home_result') {
@@ -111,10 +111,10 @@ extension SnifferMessageFlowFlow on DouyinSniffer {
           filteredArticleCount: articleUrls.length,
           partial: data['partial'] == true,
         );
-        if (_profileCompleter != null && !_profileCompleter!.isCompleted) {
-          _finishProfileWithResult(homeResult.profile, _taskId);
+        if (_session.profileCompleter != null && !_session.profileCompleter!.isCompleted) {
+          _finishProfileWithResult(homeResult.profile, _session.taskId);
         }
-        _finishHomeWithResult(homeResult, _taskId);
+        _finishHomeWithResult(homeResult, _session.taskId);
         return;
       }
 
@@ -127,7 +127,7 @@ extension SnifferMessageFlowFlow on DouyinSniffer {
         _finishWithItems(
           items,
           data['isImagePost'] == true,
-          _taskId,
+          _session.taskId,
           desc: desc?.trim().isNotEmpty == true ? desc!.trim() : null,
           coverUrl: coverUrl?.trim().isNotEmpty == true ? coverUrl!.trim() : null,
           // 空串归一化为 null，避免多个短链作品被同一个空 id 误去重

@@ -19,7 +19,7 @@ extension SnifferPageLifecycleFlow on DouyinSniffer {
     _cancelScheduledUnload();
     if (_disposed) return;
     final pending = Completer<void>();
-    _pageReset = pending;
+    _session.pageReset = pending;
     unawaited(
       _controller.loadRequest(Uri.parse('about:blank')).catchError((Object error) {
         debugPrint('重置页面失败: $error');
@@ -28,15 +28,15 @@ extension SnifferPageLifecycleFlow on DouyinSniffer {
     try {
       await pending.future.timeout(_kResetWait, onTimeout: () {});
     } finally {
-      if (identical(_pageReset, pending)) _pageReset = null;
+      if (identical(_session.pageReset, pending)) _session.pageReset = null;
     }
   }
 
   /// 完成后安排卸载；若紧接着开始新任务，会在重置前被取消
   void _schedulePageUnload() {
-    _unloadTimer?.cancel();
-    _unloadTimer = Timer(_kIdleUnloadDelay, () {
-      _unloadTimer = null;
+    _session.unloadTimer?.cancel();
+    _session.unloadTimer = Timer(_kIdleUnloadDelay, () {
+      _session.unloadTimer = null;
       if (_disposed || _isTaskActive) return;
       unawaited(
         _controller.loadRequest(Uri.parse('about:blank')).catchError((Object error) {
@@ -47,14 +47,14 @@ extension SnifferPageLifecycleFlow on DouyinSniffer {
   }
 
   void _cancelScheduledUnload() {
-    _unloadTimer?.cancel();
-    _unloadTimer = null;
+    _session.unloadTimer?.cancel();
+    _session.unloadTimer = null;
   }
 
   /// 空白页的导航回调只用于放行重置信号，不做任何捕获动作
   void _markPageReset(String url) {
     if (!url.startsWith('about:')) return;
-    final pending = _pageReset;
+    final pending = _session.pageReset;
     if (pending != null && !pending.isCompleted) pending.complete();
   }
 }

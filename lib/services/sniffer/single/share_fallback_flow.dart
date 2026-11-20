@@ -3,13 +3,13 @@ part of '../facade/douyin_sniffer.dart';
 /// share fallback flow
 extension SnifferShareFallbackFlowFlow on DouyinSniffer {
   void _maybeStartShareFallback(String awemeId, int taskId) {
-    if (_shareFallbackStarted || _webviewShareFallback) return;
-    final completer = _completer;
+    if (_session.shareFallbackStarted || _session.webviewShareFallback) return;
+    final completer = _session.completer;
     if (completer == null || completer.isCompleted) return;
-    if (taskId != _taskId) return;
+    if (taskId != _session.taskId) return;
 
-    _targetAwemeId = awemeId;
-    _shareFallbackStarted = true;
+    _session.targetAwemeId = awemeId;
+    _session.shareFallbackStarted = true;
     unawaited(_runShareFallback(awemeId, taskId));
   }
 
@@ -23,10 +23,10 @@ extension SnifferShareFallbackFlowFlow on DouyinSniffer {
         awemeId,
         totalTimeout: DouyinSniffer._kShareFallbackBudget,
       );
-      if (_disposed || taskId != _taskId) return;
-      final completer = _completer;
+      if (_disposed || taskId != _session.taskId) return;
+      final completer = _session.completer;
       if (completer == null || completer.isCompleted) return;
-      if (_targetAwemeId != null && _targetAwemeId != awemeId) return;
+      if (_session.targetAwemeId != null && _session.targetAwemeId != awemeId) return;
 
       if (result.isImagePost && result.items.isNotEmpty) {
         _log('分享页兜底命中，等待实况补充');
@@ -45,18 +45,18 @@ extension SnifferShareFallbackFlowFlow on DouyinSniffer {
             ),
           );
         } else {
-          _shareVideoFallback = result;
+          _session.shareVideoFallback = result;
         }
       }
     } on DouyinShareCancelledException {
       // WebView 先完成或新任务开始时会被主动取消，不必显示为失败
       return;
     } on DouyinShareException catch (e) {
-      if (taskId == _taskId && !(_completer?.isCompleted ?? true)) {
+      if (taskId == _session.taskId && !(_session.completer?.isCompleted ?? true)) {
         _handleShareFallbackFailure(awemeId, taskId, e.message);
       }
     } catch (e) {
-      if (taskId == _taskId && !(_completer?.isCompleted ?? true)) {
+      if (taskId == _session.taskId && !(_session.completer?.isCompleted ?? true)) {
         _handleShareFallbackFailure(awemeId, taskId, '$e');
       }
     }
@@ -66,16 +66,16 @@ extension SnifferShareFallbackFlowFlow on DouyinSniffer {
   /// 宽限期内其他来源完成会取消候选；到期仍无结果才用 B 的图片兜底。
 
   void _scheduleImageFallback(DouyinShareResult result, int taskId) {
-    if (_disposed || taskId != _taskId) return;
-    _pendingImageResult = result;
-    _imageGraceTimer?.cancel();
-    _imageGraceTimer = Timer(DouyinSniffer._kShareImageGrace, () {
-      if (_disposed || taskId != _taskId) return;
-      final completer = _completer;
+    if (_disposed || taskId != _session.taskId) return;
+    _session.pendingImageResult = result;
+    _session.imageGraceTimer?.cancel();
+    _session.imageGraceTimer = Timer(DouyinSniffer._kShareImageGrace, () {
+      if (_disposed || taskId != _session.taskId) return;
+      final completer = _session.completer;
       if (completer == null || completer.isCompleted) return;
-      final pending = _pendingImageResult;
-      _pendingImageResult = null;
-      _imageGraceTimer = null;
+      final pending = _session.pendingImageResult;
+      _session.pendingImageResult = null;
+      _session.imageGraceTimer = null;
       if (pending == null || pending.items.isEmpty) return;
       unawaited(
         _finishWithItems(
@@ -85,7 +85,7 @@ extension SnifferShareFallbackFlowFlow on DouyinSniffer {
           title: pending.title,
           desc: pending.desc,
           coverUrl: pending.coverUrl,
-          awemeId: _targetAwemeId,
+          awemeId: _session.targetAwemeId,
         ),
       );
     });
@@ -98,7 +98,7 @@ extension SnifferShareFallbackFlowFlow on DouyinSniffer {
     int taskId,
     String message,
   ) {
-    _shareFallbackFailed = true;
+    _session.shareFallbackFailed = true;
     _log('分享页兜底失败: $message');
     if (_isNotePage || !_isLoggedIn) {
       _scheduleWebViewShareFallback(

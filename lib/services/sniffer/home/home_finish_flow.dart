@@ -3,16 +3,16 @@ part of '../facade/douyin_sniffer.dart';
 /// home finish flow
 extension SnifferHomeFinishFlowFlow on DouyinSniffer {
   void _finishHomeWithResult(UserHomeResult result, int taskId) {
-    if (taskId != _taskId) return;
-    if (_profileCompleter != null && !_profileCompleter!.isCompleted) {
+    if (taskId != _session.taskId) return;
+    if (_session.profileCompleter != null && !_session.profileCompleter!.isCompleted) {
       _finishProfileWithResult(result.profile, taskId);
     }
-    final completer = _homeCompleter;
+    final completer = _session.homeCompleter;
     if (completer == null || completer.isCompleted) return;
 
-    _acceptMessages = false;
-    _acceptLogs = false;
-    _retiredAwemeId = null;
+    _session.acceptMessages = false;
+    _session.acceptLogs = false;
+    _session.retiredAwemeId = null;
     _stopTimers();
 
     final author = result.nickname.isNotEmpty ? result.nickname : '未知作者';
@@ -32,12 +32,12 @@ extension SnifferHomeFinishFlowFlow on DouyinSniffer {
         ? '（未登录首屏，主页标注 ${result.worksTotalTag > 0 ? result.worksTotalTag : '未知'} 条）'
         : '';
     _log('主页捕获成功$modeText：作者【$author】，共 ${result.count} 条作品$metaText');
-    if (_profileCompleter != null && !_profileCompleter!.isCompleted) {
-      _profileCompleter!.complete(result.profile);
-      _profileCompleter = null;
+    if (_session.profileCompleter != null && !_session.profileCompleter!.isCompleted) {
+      _session.profileCompleter!.complete(result.profile);
+      _session.profileCompleter = null;
     }
     completer.complete(result);
-    if (identical(_homeCompleter, completer)) _homeCompleter = null;
+    if (identical(_session.homeCompleter, completer)) _session.homeCompleter = null;
 
     _schedulePageUnload();
   }
@@ -45,20 +45,20 @@ extension SnifferHomeFinishFlowFlow on DouyinSniffer {
   /// 主页作者资料捕获成功完成当前任务
 
   void _finishProfileWithResult(UserHomeProfile profile, int taskId) {
-    if (taskId != _taskId) return;
-    final completer = _profileCompleter;
+    if (taskId != _session.taskId) return;
+    final completer = _session.profileCompleter;
     if (completer == null || completer.isCompleted) return;
 
-    _acceptMessages = false;
-    _acceptLogs = false;
-    _retiredAwemeId = null;
+    _session.acceptMessages = false;
+    _session.acceptLogs = false;
+    _session.retiredAwemeId = null;
     _stopTimers();
 
     final author = profile.nickname.isNotEmpty ? profile.nickname : '未知作者';
     final hasAvatar = profile.avatarUrl.isNotEmpty;
     _log('主页作者信息捕获成功：作者【$author】（${hasAvatar ? "已获取头像" : "未获取头像"}）');
     completer.complete(profile);
-    if (identical(_profileCompleter, completer)) _profileCompleter = null;
+    if (identical(_session.profileCompleter, completer)) _session.profileCompleter = null;
 
     _schedulePageUnload();
   }
@@ -66,11 +66,11 @@ extension SnifferHomeFinishFlowFlow on DouyinSniffer {
   /// 超时、取消或异常时结束当前主页作者资料任务
 
   void _finishProfileWithError(Object error, {int? taskId}) {
-    if (taskId != null && taskId != _taskId) return;
-    _acceptMessages = false;
-    _acceptLogs = false;
-    final completer = _profileCompleter;
-    _profileCompleter = null;
+    if (taskId != null && taskId != _session.taskId) return;
+    _session.acceptMessages = false;
+    _session.acceptLogs = false;
+    final completer = _session.profileCompleter;
+    _session.profileCompleter = null;
     _stopTimers();
     if (completer == null || completer.isCompleted) return;
     completer.completeError(error);
@@ -79,11 +79,11 @@ extension SnifferHomeFinishFlowFlow on DouyinSniffer {
   /// 超时、取消或异常时结束当前主页任务
 
   void _finishHomeWithError(Object error, {int? taskId}) {
-    if (taskId != null && taskId != _taskId) return;
-    _acceptMessages = false;
-    _acceptLogs = false;
-    final completer = _homeCompleter;
-    _homeCompleter = null;
+    if (taskId != null && taskId != _session.taskId) return;
+    _session.acceptMessages = false;
+    _session.acceptLogs = false;
+    final completer = _session.homeCompleter;
+    _session.homeCompleter = null;
     _stopTimers();
     if (completer == null || completer.isCompleted) return;
     completer.completeError(error);
@@ -92,10 +92,10 @@ extension SnifferHomeFinishFlowFlow on DouyinSniffer {
   /// 主页滚动翻页期间，每次检测到作品进度推进即刷新超时定时器
 
   void _refreshHomeInactivityTimer(int taskId) {
-    if (taskId != _taskId || _homeCompleter == null || _disposed) return;
-    _timeoutTimer?.cancel();
-    _timeoutTimer = Timer(DouyinSniffer._kHomeInactivityTimeout, () {
-      if (taskId != _taskId) return;
+    if (taskId != _session.taskId || _session.homeCompleter == null || _disposed) return;
+    _session.timeoutTimer?.cancel();
+    _session.timeoutTimer = Timer(DouyinSniffer._kHomeInactivityTimeout, () {
+      if (taskId != _session.taskId) return;
       _finishHomeWithError(
         TimeoutException('主页滚动加载作品超时（连续无新作品），请检查网络或稍后重试'),
         taskId: taskId,

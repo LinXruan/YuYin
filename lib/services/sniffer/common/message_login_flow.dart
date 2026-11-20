@@ -9,7 +9,7 @@ extension SnifferMessageLoginFlow on DouyinSniffer {
     String reason,
     int taskId,
   ) {
-    if (taskId != _taskId || !_isTaskActive) return;
+    if (taskId != _session.taskId || !_isTaskActive) return;
 
     if (!remoteLoggedIn) {
       _log('检测到远端登录状态: 未登录 (原因: $reason)');
@@ -19,7 +19,7 @@ extension SnifferMessageLoginFlow on DouyinSniffer {
       if (wasLoggedIn) {
         onLoginStateDetected?.call(false);
         // 若之前分享页兜底已经拿到了无水印视频（此前被暂存等待完整画质），立即结束解析！
-        final cached = _shareVideoFallback;
+        final cached = _session.shareVideoFallback;
         if (cached != null && cached.items.isNotEmpty) {
           unawaited(
             _finishWithItems(
@@ -29,7 +29,7 @@ extension SnifferMessageLoginFlow on DouyinSniffer {
               title: cached.title,
               desc: cached.desc,
               coverUrl: cached.coverUrl,
-              awemeId: _targetAwemeId,
+              awemeId: _session.targetAwemeId,
             ),
           );
         }

@@ -10,34 +10,34 @@ extension SnifferProfileSniffFlowFlow on DouyinSniffer {
     // 任务边界：旧任务结束后先拆掉旧文档，再让新任务接管
     await _resetPageBeforeStart();
 
-    final taskId = ++_taskId;
+    final taskId = ++_session.taskId;
     final completer = Completer<UserHomeProfile>();
-    _profileCompleter = completer;
-    _acceptMessages = false;
-    _acceptLogs = false;
-    _lastPageUrl = null;
-    _targetAwemeId = null;
-    _shareFallbackStarted = false;
-    _shareVideoFallback = null;
-    _pendingImageResult = null;
-    _imageGraceTimer?.cancel();
-    _imageGraceTimer = null;
-    _webviewShareFallback = false;
-    _workPageKind = DouyinWorkPage.userHome;
-    _degradedVideoSeen = false;
-    _shareFallbackFailed = false;
-    _sourceUrl = homeUrl;
-    _awemePageUrl = null;
-    _taskStartedAt = DateTime.now();
-    _taskPageStarted = false;
+    _session.profileCompleter = completer;
+    _session.acceptMessages = false;
+    _session.acceptLogs = false;
+    _session.lastPageUrl = null;
+    _session.targetAwemeId = null;
+    _session.shareFallbackStarted = false;
+    _session.shareVideoFallback = null;
+    _session.pendingImageResult = null;
+    _session.imageGraceTimer?.cancel();
+    _session.imageGraceTimer = null;
+    _session.webviewShareFallback = false;
+    _session.workPageKind = DouyinWorkPage.userHome;
+    _session.degradedVideoSeen = false;
+    _session.shareFallbackFailed = false;
+    _session.sourceUrl = homeUrl;
+    _session.awemePageUrl = null;
+    _session.taskStartedAt = DateTime.now();
+    _session.taskPageStarted = false;
     _blockedSchemes.clear();
-    _lastWebResourceError = null;
-    _loggedWebResourceError = false;
-    _loggedNonWebPage = false;
-    _loggedInjectFailure = false;
-    _loggedCaptchaFailure = false;
-    _lateFallbackTimer?.cancel();
-    _lateFallbackTimer = null;
+    _session.lastWebResourceError = null;
+    _session.loggedWebResourceError = false;
+    _session.loggedNonWebPage = false;
+    _session.loggedInjectFailure = false;
+    _session.loggedCaptchaFailure = false;
+    _session.lateFallbackTimer?.cancel();
+    _session.lateFallbackTimer = null;
 
     if (isLoggedIn != null) {
       _isLoggedIn = isLoggedIn!();
@@ -51,22 +51,22 @@ extension SnifferProfileSniffFlowFlow on DouyinSniffer {
       }
     }
 
-    _timeoutTimer?.cancel();
-    _timeoutTimer = Timer(const Duration(seconds: 15), () {
-      if (taskId != _taskId) return;
+    _session.timeoutTimer?.cancel();
+    _session.timeoutTimer = Timer(const Duration(seconds: 15), () {
+      if (taskId != _session.taskId) return;
       _finishProfileWithError(
         TimeoutException('未捕获到主页作者信息，请检查网络或主页链接有效性'),
         taskId: taskId,
       );
     });
 
-    _injectTimer?.cancel();
-    _injectTimer = Timer.periodic(DouyinSniffer._kInjectInterval, (_) {
-      if (taskId != _taskId) {
+    _session.injectTimer?.cancel();
+    _session.injectTimer = Timer.periodic(DouyinSniffer._kInjectInterval, (_) {
+      if (taskId != _session.taskId) {
         _stopTimers();
         return;
       }
-      if (_profileCompleter?.isCompleted ?? true) {
+      if (_session.profileCompleter?.isCompleted ?? true) {
         _stopTimers();
       } else {
         _tickScript();
@@ -90,7 +90,7 @@ extension SnifferProfileSniffFlowFlow on DouyinSniffer {
       _log('设置桌面 UA 失败: $e');
     }
 
-    if (taskId != _taskId) return completer.future;
+    if (taskId != _session.taskId) return completer.future;
 
     try {
       await _controller
@@ -100,11 +100,11 @@ extension SnifferProfileSniffFlowFlow on DouyinSniffer {
           .timeout(const Duration(seconds: 3));
     } catch (_) {}
 
-    if (taskId != _taskId) return completer.future;
+    if (taskId != _session.taskId) return completer.future;
 
     unawaited(
       _controller.loadRequest(uri).catchError((Object e) {
-        if (taskId == _taskId) _finishProfileWithError(e, taskId: taskId);
+        if (taskId == _session.taskId) _finishProfileWithError(e, taskId: taskId);
       }),
     );
     unawaited(_injectScript());

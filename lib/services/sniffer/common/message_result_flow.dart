@@ -12,12 +12,12 @@ extension SnifferMessageResultFlow on DouyinSniffer {
     String? coverUrl,
     String? awemeId,
   }) async {
-    if (taskId != _taskId) return;
-    final completer = _completer;
+    if (taskId != _session.taskId) return;
+    final completer = _session.completer;
     if (completer == null || completer.isCompleted) return;
 
     // 结果只处理一次；日志继续接收，等待 Cookie 读取期间的 JS 收尾日志
-    _acceptMessages = false;
+    _session.acceptMessages = false;
     _stopTimers();
 
     var cookie = '';
@@ -32,17 +32,17 @@ extension SnifferMessageResultFlow on DouyinSniffer {
     }
 
     // 等待期间可能已开始新任务：此时不能清状态或关闭新任务的日志
-    if (taskId != _taskId ||
-        !identical(_completer, completer) ||
+    if (taskId != _session.taskId ||
+        !identical(_session.completer, completer) ||
         completer.isCompleted) {
       return;
     }
 
-    _acceptLogs = false;
+    _session.acceptLogs = false;
     // 主 WebView 结果缺失封面时，使用并行分享页兜底结果中的封面
     var effectiveCover = coverUrl?.trim() ?? '';
     if (effectiveCover.isEmpty) {
-      final fallbackCover = _shareVideoFallback?.coverUrl?.trim() ?? '';
+      final fallbackCover = _session.shareVideoFallback?.coverUrl?.trim() ?? '';
       if (fallbackCover.isNotEmpty) {
         effectiveCover = fallbackCover;
         if (kDebugMode) {
@@ -59,8 +59,8 @@ extension SnifferMessageResultFlow on DouyinSniffer {
       coverUrl: effectiveCover.isEmpty ? null : effectiveCover,
       awemeId: awemeId,
     );
-    _retiredAwemeId =
-        awemeId ?? UrlParser.extractAwemeId(_lastPageUrl ?? '');
+    _session.retiredAwemeId =
+        awemeId ?? UrlParser.extractAwemeId(_session.lastPageUrl ?? '');
     final audioPart =
         result.audioCount > 0 ? '、${result.audioCount} 首配乐音频' : '';
     final summary = isImagePost
@@ -68,7 +68,7 @@ extension SnifferMessageResultFlow on DouyinSniffer {
         : '解析成功：共发现 ${result.items.length} 个清晰度档位';
     _report(summary);
     completer.complete(result);
-    if (identical(_completer, completer)) _completer = null;
+    if (identical(_session.completer, completer)) _session.completer = null;
 
     // 无新任务时延迟卸载；批量下一条会先取消
     _schedulePageUnload();
@@ -93,11 +93,11 @@ extension SnifferMessageResultFlow on DouyinSniffer {
 
   void _finishWithError(Object error, {int? taskId}) {
     // 过期任务不能停掉新任务的定时器或分享页请求
-    if (taskId != null && taskId != _taskId) return;
-    _acceptMessages = false;
-    _acceptLogs = false;
-    final completer = _completer;
-    _completer = null;
+    if (taskId != null && taskId != _session.taskId) return;
+    _session.acceptMessages = false;
+    _session.acceptLogs = false;
+    final completer = _session.completer;
+    _session.completer = null;
     _stopTimers();
     if (completer == null || completer.isCompleted) return;
     completer.completeError(error);
