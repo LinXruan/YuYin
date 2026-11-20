@@ -5,17 +5,17 @@ extension AgentParseWorksHandlers on AgentAutomationServer {
   /// POST /api/parse-works：多作品链接逐条捕获封面（中层保存页后端验证）
   Future<void> _handleParseWorks(HttpRequest request) async {
     if (busy.value) {
-      _sendJson(request, HttpStatus.conflict, {
+      sendJson(request, HttpStatus.conflict, {
         'error': '应用正在执行其他任务，请稍候',
         'code': 409,
       });
       return;
     }
 
-    final body = await _readJsonBody(request);
+    final body = await readJsonBody(request);
     final text = body['text']?.toString() ?? body['url']?.toString() ?? '';
     if (text.trim().isEmpty) {
-      _sendJson(request, HttpStatus.badRequest, {
+      sendJson(request, HttpStatus.badRequest, {
         'error': '缺少必要参数: text 或 url',
         'code': 400,
       });
@@ -25,7 +25,7 @@ extension AgentParseWorksHandlers on AgentAutomationServer {
     final batch = UrlParser.parseBatchInput(text);
     if (batch.kind == ParsedBatchKind.empty ||
         batch.kind == ParsedBatchKind.articlesOnly) {
-      _sendJson(request, HttpStatus.badRequest, {
+      sendJson(request, HttpStatus.badRequest, {
         'error': '未识别到可下载的视频/图文作品',
         'code': 400,
         'filteredArticles': batch.filteredArticleCount,
@@ -34,7 +34,7 @@ extension AgentParseWorksHandlers on AgentAutomationServer {
     }
     if (batch.kind == ParsedBatchKind.userHomes ||
         batch.kind == ParsedBatchKind.mixed) {
-      _sendJson(request, HttpStatus.badRequest, {
+      sendJson(request, HttpStatus.badRequest, {
         'error': '该接口仅支持作品链接（singleWork / multiWork）',
         'code': 400,
       });
@@ -57,7 +57,7 @@ extension AgentParseWorksHandlers on AgentAutomationServer {
         onLog: logs.add,
       );
       _lastRawInput = text;
-      _sendJson(request, HttpStatus.ok, {
+      sendJson(request, HttpStatus.ok, {
         'success': true,
         'kind': batch.kind.name,
         'count': result.works.length,
@@ -80,7 +80,7 @@ extension AgentParseWorksHandlers on AgentAutomationServer {
       });
     } catch (e) {
       logs.add('多作品封面捕获失败: $e');
-      _sendJson(request, HttpStatus.internalServerError, {
+      sendJson(request, HttpStatus.internalServerError, {
         'error': '$e',
         'code': 500,
       });

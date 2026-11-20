@@ -6,7 +6,7 @@ extension AgentDownloadHandlers on AgentAutomationServer {
   Future<void> _handleDownload(HttpRequest request) async {
     final result = _lastResult;
     if (result == null || result.items.isEmpty) {
-      _sendJson(
+      sendJson(
         request,
         HttpStatus.badRequest,
         {'error': '尚未成功解析作品，无可用下载资源', 'code': 400},
@@ -14,7 +14,7 @@ extension AgentDownloadHandlers on AgentAutomationServer {
       return;
     }
     if (busy.value) {
-      _sendJson(
+      sendJson(
         request,
         HttpStatus.conflict,
         {'error': '当前有任务正在执行', 'code': 409},
@@ -22,7 +22,7 @@ extension AgentDownloadHandlers on AgentAutomationServer {
       return;
     }
 
-    final body = await _readJsonBody(request);
+    final body = await readJsonBody(request);
     final dynamic rawIndices = body['indices'];
     final List<MediaItem> selected;
 
@@ -51,7 +51,7 @@ extension AgentDownloadHandlers on AgentAutomationServer {
     }
 
     if (selected.isEmpty) {
-      _sendJson(
+      sendJson(
         request,
         HttpStatus.badRequest,
         {'error': '选中的资源列表为空', 'code': 400},
@@ -61,7 +61,7 @@ extension AgentDownloadHandlers on AgentAutomationServer {
 
     busy.value = true;
     final token = CancelToken();
-    _activeDownloadToken = token;
+    activeDownloadToken = token;
 
     final candidateDesc = (result.desc?.trim().isNotEmpty ?? false)
         ? result.desc!.trim()
@@ -108,7 +108,7 @@ extension AgentDownloadHandlers on AgentAutomationServer {
         );
       }
 
-      _sendJson(request, HttpStatus.ok, {
+      sendJson(request, HttpStatus.ok, {
         'success': true,
         'downloadedCount': selected.length,
         'savedTypes': savedTypes.map((t) => t.name).toList(),
@@ -116,13 +116,13 @@ extension AgentDownloadHandlers on AgentAutomationServer {
         'expectedFiles': expectedFiles,
       });
     } catch (e) {
-      _sendJson(
+      sendJson(
         request,
         HttpStatus.internalServerError,
         {'error': '下载失败: $e', 'code': 500},
       );
     } finally {
-      _activeDownloadToken = null;
+      activeDownloadToken = null;
       busy.value = false;
     }
   }

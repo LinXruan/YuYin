@@ -7,11 +7,11 @@ extension AgentSelectionHandlers on AgentAutomationServer {
 
     if (path == '/api/selection/state') {
       if (request.method != 'GET') {
-        _sendJson(request, HttpStatus.methodNotAllowed, {'error': '仅支持 GET'});
+        sendJson(request, HttpStatus.methodNotAllowed, {'error': '仅支持 GET'});
         return;
       }
       final withCells = request.uri.queryParameters['cells'] != '0';
-      _sendJson(
+      sendJson(
         request,
         HttpStatus.ok,
         SelectionDebugBridge.state(withCells: withCells),
@@ -21,10 +21,10 @@ extension AgentSelectionHandlers on AgentAutomationServer {
 
     if (path == '/api/selection/verify') {
       if (request.method != 'GET') {
-        _sendJson(request, HttpStatus.methodNotAllowed, {'error': '仅支持 GET'});
+        sendJson(request, HttpStatus.methodNotAllowed, {'error': '仅支持 GET'});
         return;
       }
-      _sendJson(
+      sendJson(
         request,
         HttpStatus.ok,
         SelectionDebugBridge.verify(),
@@ -34,11 +34,11 @@ extension AgentSelectionHandlers on AgentAutomationServer {
 
     if (path == '/api/selection/quality-options') {
       if (request.method != 'GET') {
-        _sendJson(request, HttpStatus.methodNotAllowed, {'error': '仅支持 GET'});
+        sendJson(request, HttpStatus.methodNotAllowed, {'error': '仅支持 GET'});
         return;
       }
       final workUrl = request.uri.queryParameters['workUrl'] ?? '';
-      _sendJson(
+      sendJson(
         request,
         HttpStatus.ok,
         SelectionDebugBridge.qualityOptions(workUrl),
@@ -47,16 +47,16 @@ extension AgentSelectionHandlers on AgentAutomationServer {
     }
 
     if (request.method != 'POST') {
-      _sendJson(request, HttpStatus.methodNotAllowed, {'error': '仅支持 POST'});
+      sendJson(request, HttpStatus.methodNotAllowed, {'error': '仅支持 POST'});
       return;
     }
 
     final action = path.substring('/api/selection/'.length);
-    final body = await _readJsonBody(request);
+    final body = await readJsonBody(request);
 
     if (action == 'load') {
       final result = await _loadSelection(body);
-      _sendJson(
+      sendJson(
         request,
         result['success'] == true ? HttpStatus.ok : HttpStatus.badRequest,
         result,
@@ -68,7 +68,7 @@ extension AgentSelectionHandlers on AgentAutomationServer {
       final workUrl = body['workUrl']?.toString() ?? '';
       final sniffer = this.sniffer;
       if (sniffer == null) {
-        _sendJson(request, HttpStatus.serviceUnavailable, {
+        sendJson(request, HttpStatus.serviceUnavailable, {
           'error': '捕获服务未初始化',
         });
         return;
@@ -77,7 +77,7 @@ extension AgentSelectionHandlers on AgentAutomationServer {
         workUrl,
         () => sniffer.sniffVideoUrl(workUrl),
       );
-      _sendJson(request, ok ? HttpStatus.ok : HttpStatus.badRequest, {
+      sendJson(request, ok ? HttpStatus.ok : HttpStatus.badRequest, {
         'success': ok,
         if (!ok) 'error': '解析失败或没有可用资源',
       });
@@ -85,7 +85,7 @@ extension AgentSelectionHandlers on AgentAutomationServer {
     }
 
     final result = SelectionDebugBridge.run(action, body);
-    _sendJson(
+    sendJson(
       request,
       result['success'] == true ? HttpStatus.ok : HttpStatus.badRequest,
       result,

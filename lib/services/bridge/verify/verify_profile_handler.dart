@@ -6,7 +6,7 @@ extension AgentVerifyProfileHandlers on AgentAutomationServer {
   Future<void> _handleVerifyHomeProfile(HttpRequest request) async {
     final profile = _lastUserHomeProfile ?? _lastUserHomeResult?.profile;
     if (profile == null) {
-      _sendJson(
+      sendJson(
         request,
         HttpStatus.badRequest,
         {
@@ -52,7 +52,7 @@ extension AgentVerifyProfileHandlers on AgentAutomationServer {
         ? (nicknameMatched && hasAvatar)
         : (hasNickname && hasAvatar);
 
-    _sendJson(request, HttpStatus.ok, {
+    sendJson(request, HttpStatus.ok, {
       'status': 'ok',
       'matched': overallMatched,
       'hasNickname': hasNickname,

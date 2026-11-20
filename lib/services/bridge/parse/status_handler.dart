@@ -21,7 +21,7 @@ extension AgentStatusHandlers on AgentAutomationServer {
       lastResultJson = null;
     }
 
-    _sendJson(request, HttpStatus.ok, {
+    sendJson(request, HttpStatus.ok, {
       'app': appName,
       'version': appVersion,
       'busy': busy.value,

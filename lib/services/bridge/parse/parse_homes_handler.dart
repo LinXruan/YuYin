@@ -5,18 +5,18 @@ extension AgentParseHomesHandlers on AgentAutomationServer {
   /// POST /api/parse-homes：多主页顺序解析，返回作者与作品数（调试专用）
   Future<void> _handleParseHomes(HttpRequest request) async {
     if (busy.value) {
-      _sendJson(request, HttpStatus.conflict, {
+      sendJson(request, HttpStatus.conflict, {
         'error': '应用正在执行其他任务，请稍候',
         'code': 409,
       });
       return;
     }
 
-    final body = await _readJsonBody(request);
+    final body = await readJsonBody(request);
     final text = body['text']?.toString() ?? body['url']?.toString() ?? '';
     final batch = UrlParser.parseBatchInput(text);
     if (batch.homeUrls.isEmpty) {
-      _sendJson(request, HttpStatus.badRequest, {
+      sendJson(request, HttpStatus.badRequest, {
         'error': '未识别到主页链接',
         'code': 400,
       });
@@ -59,7 +59,7 @@ extension AgentParseHomesHandlers on AgentAutomationServer {
         }
       }
 
-      _sendJson(request, HttpStatus.ok, {
+      sendJson(request, HttpStatus.ok, {
         'success': true,
         'count': authors.length,
         'authors': authors,
@@ -68,7 +68,7 @@ extension AgentParseHomesHandlers on AgentAutomationServer {
       });
     } catch (e) {
       logs.add('多主页捕获失败: $e');
-      _sendJson(request, HttpStatus.internalServerError, {
+      sendJson(request, HttpStatus.internalServerError, {
         'error': '$e',
         'code': 500,
       });

@@ -7,16 +7,16 @@ extension AgentSaveHomeHandlers on AgentAutomationServer {
     final sniffer = this.sniffer;
     final downloader = this.downloader;
     if (sniffer == null || downloader == null) {
-      _sendJson(request, HttpStatus.serviceUnavailable, {
+      sendJson(request, HttpStatus.serviceUnavailable, {
         'error': '捕获服务未初始化',
       });
       return;
     }
 
-    final body = await _readJsonBody(request);
+    final body = await readJsonBody(request);
     final url = body['url']?.toString() ?? '';
     if (url.trim().isEmpty) {
-      _sendJson(request, HttpStatus.badRequest, {'error': 'url is required'});
+      sendJson(request, HttpStatus.badRequest, {'error': 'url is required'});
       return;
     }
 
@@ -47,7 +47,7 @@ extension AgentSaveHomeHandlers on AgentAutomationServer {
       }
 
       if (works.isEmpty) {
-        _sendJson(request, HttpStatus.ok, {
+        sendJson(request, HttpStatus.ok, {
           'secUid': home.secUid,
           'nickname': home.nickname,
           'count': 0,
@@ -106,7 +106,7 @@ extension AgentSaveHomeHandlers on AgentAutomationServer {
       if (results.any((item) => item.success)) {
         await HistoryStore.markSaved('home:${home.secUid}', true);
       }
-      _sendJson(request, HttpStatus.ok, {
+      sendJson(request, HttpStatus.ok, {
         'secUid': home.secUid,
         'nickname': home.nickname,
         'authorFolder': authorFolder,
@@ -117,7 +117,7 @@ extension AgentSaveHomeHandlers on AgentAutomationServer {
       });
     } catch (e) {
       logs.add('主页批量保存失败: $e');
-      _sendJson(request, HttpStatus.internalServerError, {
+      sendJson(request, HttpStatus.internalServerError, {
         'error': '$e',
       });
     } finally {

@@ -6,7 +6,7 @@ extension AgentVerifyCoversHandlers on AgentAutomationServer {
   Future<void> _handleVerifyHomeCovers(HttpRequest request) async {
     final homeResult = _lastUserHomeResult;
     if (homeResult == null) {
-      _sendJson(
+      sendJson(
         request,
         HttpStatus.badRequest,
         {'error': '尚未执行主页解析，请先调用 /api/parse 解析主页链接', 'code': 400},
@@ -60,7 +60,7 @@ extension AgentVerifyCoversHandlers on AgentAutomationServer {
 
     logs.add('167 样本比对完成: 匹配 $matchedCount / ${AgentAutomationServer.kReference167Map.length} (${(rate * 100).toStringAsFixed(1)}%)');
 
-    _sendJson(request, HttpStatus.ok, {
+    sendJson(request, HttpStatus.ok, {
       'status': 'ok',
       'matchRate': rate,
       'totalExpected': AgentAutomationServer.kReference167Map.length,

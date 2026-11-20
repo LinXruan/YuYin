@@ -33,41 +33,41 @@ extension AgentRouting on AgentAutomationServer {
       } else if (path == '/api/download' && request.method == 'POST') {
         await _handleDownload(request);
       } else if (path == '/api/logs' && request.method == 'GET') {
-        await _handleGetLogs(request);
+        await logHandler.handleGet(request);
       } else if (path == '/api/logs/clear' && request.method == 'POST') {
-        await _handleClearLogs(request);
+        await logHandler.handleClear(request);
       } else if (path == '/api/cancel' && request.method == 'POST') {
-        await _handleCancel(request);
+        await system.handleCancel(request);
       } else if (path == '/api/eval' && request.method == 'POST') {
-        await _handleEval(request);
+        await system.handleEval(request);
       } else if (path == '/api/settings/quality' && request.method == 'POST') {
-        await _handleSetQualitySetting(request);
+        await system.handleQualitySetting(request);
       } else if (path.startsWith('/api/selection/')) {
         await _handleSelection(request);
       } else if (path == '/api/save-debug' && request.method == 'GET') {
-        _sendJson(request, HttpStatus.ok, {
+        sendJson(request, HttpStatus.ok, {
           'snapshot': SavePageDebugStore.snapshot ?? {'layer': 'none'},
         });
       } else if (path == '/api/history' && request.method == 'GET') {
-        await _handleGetHistory(request);
+        await historyHandler.handleQuery(request);
       } else if (path == '/api/history/seed' && request.method == 'POST') {
-        await _handleSeedHistory(request);
+        await historyHandler.handleSeed(request);
       } else if (path == '/api/history/scan' && request.method == 'POST') {
-        await _handleScanHistory(request);
+        await historyHandler.handleScan(request);
       } else if (path == '/api/history/open' && request.method == 'POST') {
-        await _handleOpenHistory(request);
+        await historyHandler.handleOpen(request);
       } else if (path == '/api/history/clear' && request.method == 'POST') {
-        await _handleClearHistory(request);
+        await historyHandler.handleClear(request);
       } else if (path == '/api/login/mock' && request.method == 'POST') {
-        await _handleMockLogin(request);
+        await system.handleMockLogin(request);
       } else if (path == '/api/display' && request.method == 'GET') {
-        await _handleGetDisplay(request);
+        await mediaHandler.handleDisplay(request);
       } else if (path == '/api/thumbnails' && request.method == 'GET') {
-        await _handleGetThumbnails(request);
+        await mediaHandler.handleGetThumbnails(request);
       } else if (path == '/api/thumbnails/clear' && request.method == 'POST') {
-        await _handleClearThumbnails(request);
+        await mediaHandler.handleClearThumbnails(request);
       } else if (path == '/api/thumbnails/preload' && request.method == 'POST') {
-        await _handlePreloadThumbnails(request);
+        await mediaHandler.handlePreloadThumbnails(request);
       } else if (path == '/api/verify/home-covers' && request.method == 'POST') {
         await _handleVerifyHomeCovers(request);
       } else if (path == '/api/verify/home-titles' && request.method == 'POST') {
@@ -77,7 +77,7 @@ extension AgentRouting on AgentAutomationServer {
       } else if (path == '/api/verify/home-profile' && request.method == 'POST') {
         await _handleVerifyHomeProfile(request);
       } else {
-        _sendJson(
+        sendJson(
           request,
           HttpStatus.notFound,
           {'error': '未找到路由: $path', 'code': 404},
@@ -85,7 +85,7 @@ extension AgentRouting on AgentAutomationServer {
       }
     } catch (e, stack) {
       debugPrint('[AgentBridge] 处理请求 $path 异常: $e\n$stack');
-      _sendJson(
+      sendJson(
         request,
         HttpStatus.internalServerError,
         {'error': e.toString(), 'code': 500},

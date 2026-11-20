@@ -7,22 +7,22 @@ extension AgentSaveWorksHandlers on AgentAutomationServer {
     final sniffer = this.sniffer;
     final downloader = this.downloader;
     if (sniffer == null || downloader == null) {
-      _sendJson(request, HttpStatus.serviceUnavailable, {
+      sendJson(request, HttpStatus.serviceUnavailable, {
         'error': '捕获服务未初始化',
       });
       return;
     }
 
-    final body = await _readJsonBody(request);
+    final body = await readJsonBody(request);
     final text = body['text']?.toString() ?? '';
     if (text.trim().isEmpty) {
-      _sendJson(request, HttpStatus.badRequest, {'error': 'text is required'});
+      sendJson(request, HttpStatus.badRequest, {'error': 'text is required'});
       return;
     }
 
     final batch = UrlParser.parseBatchInput(text);
     if (batch.workUrls.isEmpty) {
-      _sendJson(request, HttpStatus.badRequest, {
+      sendJson(request, HttpStatus.badRequest, {
         'error': '未识别到作品链接',
       });
       return;
@@ -81,7 +81,7 @@ extension AgentSaveWorksHandlers on AgentAutomationServer {
           );
         }
       }
-      _sendJson(request, HttpStatus.ok, {
+      sendJson(request, HttpStatus.ok, {
         'count': results.length,
         'successCount': results.where((item) => item.success).length,
         'results': results.map(_serializeWorkSaveResult).toList(),
@@ -89,7 +89,7 @@ extension AgentSaveWorksHandlers on AgentAutomationServer {
       });
     } catch (e) {
       logs.add('批量保存作品失败: $e');
-      _sendJson(request, HttpStatus.internalServerError, {
+      sendJson(request, HttpStatus.internalServerError, {
         'error': '$e',
       });
     } finally {

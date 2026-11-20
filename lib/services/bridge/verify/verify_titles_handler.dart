@@ -6,7 +6,7 @@ extension AgentVerifyTitlesHandlers on AgentAutomationServer {
   Future<void> _handleVerifyHomeTitles(HttpRequest request) async {
     final homeResult = _lastUserHomeResult;
     if (homeResult == null) {
-      _sendJson(
+      sendJson(
         request,
         HttpStatus.badRequest,
         {'error': '尚未执行主页解析，请先调用 /api/parse 解析主页链接', 'code': 400},
@@ -75,7 +75,7 @@ extension AgentVerifyTitlesHandlers on AgentAutomationServer {
 
     logs.add('168 样本比对完成: 匹配 $matchedCount / ${AgentAutomationServer.kReference168TitlesMap.length} (${(rate * 100).toStringAsFixed(1)}%)');
 
-    _sendJson(request, HttpStatus.ok, {
+    sendJson(request, HttpStatus.ok, {
       'status': 'ok',
       'matchRate': rate,
       'totalExpected': AgentAutomationServer.kReference168TitlesMap.length,

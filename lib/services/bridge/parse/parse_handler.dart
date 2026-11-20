@@ -5,7 +5,7 @@ extension AgentParseHandlers on AgentAutomationServer {
   /// POST /api/parse：执行作品捕获解析
   Future<void> _handleParse(HttpRequest request) async {
     if (busy.value) {
-      _sendJson(
+      sendJson(
         request,
         HttpStatus.conflict,
         {'error': '应用正在执行其他任务，请稍候', 'code': 409},
@@ -13,10 +13,10 @@ extension AgentParseHandlers on AgentAutomationServer {
       return;
     }
 
-    final body = await _readJsonBody(request);
+    final body = await readJsonBody(request);
     final text = body['text']?.toString() ?? body['url']?.toString() ?? '';
     if (text.trim().isEmpty) {
-      _sendJson(
+      sendJson(
         request,
         HttpStatus.badRequest,
         {'error': '缺少必要参数: text 或 url', 'code': 400},
@@ -26,7 +26,7 @@ extension AgentParseHandlers on AgentAutomationServer {
 
     final batch = UrlParser.parseBatchInput(text);
     if (batch.kind == ParsedBatchKind.empty) {
-      _sendJson(request, HttpStatus.badRequest, {
+      sendJson(request, HttpStatus.badRequest, {
         'error': '未识别到有效的抖音链接',
         'code': 400,
         'raw': text,
@@ -34,7 +34,7 @@ extension AgentParseHandlers on AgentAutomationServer {
       return;
     }
     if (batch.kind == ParsedBatchKind.articlesOnly) {
-      _sendJson(request, HttpStatus.badRequest, {
+      sendJson(request, HttpStatus.badRequest, {
         'error': '仅识别到文章作品，暂不支持下载',
         'code': 400,
         'filteredArticles': batch.filteredArticleCount,
@@ -42,14 +42,14 @@ extension AgentParseHandlers on AgentAutomationServer {
       return;
     }
     if (batch.kind == ParsedBatchKind.mixed) {
-      _sendJson(request, HttpStatus.badRequest, {
+      sendJson(request, HttpStatus.badRequest, {
         'error': '检测到主页链接与作品链接混合，请分开粘贴解析',
         'code': 400,
       });
       return;
     }
     if (batch.kind == ParsedBatchKind.multiWork) {
-      _sendJson(request, HttpStatus.badRequest, {
+      sendJson(request, HttpStatus.badRequest, {
         'error': '多作品链接请使用 /api/parse-works 逐条捕获封面',
         'code': 400,
       });
@@ -86,14 +86,14 @@ extension AgentParseHandlers on AgentAutomationServer {
             ? ' (已关联封面: ${homeResult.coversCount} 条)'
             : '';
         logs.add('成功捕获作者【$author】主页作品 ${homeResult.count} 条$tagText$coverText');
-        _sendJson(request, HttpStatus.ok, {
+        sendJson(request, HttpStatus.ok, {
           'type': 'user_home',
           'result': homeResult.toMap(),
           'logs': logs.logs,
         });
       } catch (e) {
         logs.add('主页解析失败: $e');
-        _sendJson(
+        sendJson(
           request,
           HttpStatus.internalServerError,
           {'error': '$e', 'code': 500},
@@ -162,7 +162,7 @@ extension AgentParseHandlers on AgentAutomationServer {
         );
       }
 
-      _sendJson(request, HttpStatus.ok, {
+      sendJson(request, HttpStatus.ok, {
         'success': true,
         'title': result.title,
         'desc': result.desc,
@@ -174,7 +174,7 @@ extension AgentParseHandlers on AgentAutomationServer {
         'items': _serializeItems(result.items),
       });
     } catch (e) {
-      _sendJson(
+      sendJson(
         request,
         HttpStatus.badRequest,
         {'error': '解析失败: $e', 'code': 400},

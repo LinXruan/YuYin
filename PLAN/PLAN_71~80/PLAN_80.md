@@ -49,7 +49,10 @@
 - 新增 `channel/StorageChannel.kt`（SAF 选择、落盘、查询、权限）与 `channel/UiChannel.kt`，结果统一回主线程。
 - 移除 `gal` 依赖，改用自有通道 `hasStorageAccess/requestStorageAccess`；删除 `VideoQualitySheet` 与其测试。
 
+已开始拆解调试桥：27 → 16 个 `part`，系统/日志/媒体/历史端点改为 `SystemHandler`/`LogHandler`/`MediaHandler`/`HistoryHandler` 独立类（1.6.1+197，真机验证 8 个端点）。
+
 未落地（顺延）：
+- 其余 16 个调试桥 `part`（parse/save/download/verify/selection/protocol/路由）。
 - 拆解 5 个 `part` 巨石库（Sniffer/Selection/Parse/History/Bridge）与 `_FlowFlow` 命名。
 - 删除 `models/media_item.dart` 聚合导出、`url_parser.dart` 转发壳。
 - 静态 Store 改为显式注入。

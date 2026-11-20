@@ -12,9 +12,7 @@ import '../../../utils/settings/display_mode_service.dart';
 import '../../../utils/settings/download_settings_store.dart';
 import '../../../utils/save/file_name_formatter.dart';
 import '../../../utils/history/history_store.dart';
-import '../../../utils/thumbnail/history_thumbnail_cache.dart';
 import '../../../utils/debug/log_controller.dart';
-import '../../../utils/login_state_store.dart';
 import '../../../utils/savelocation/save_location_store.dart';
 import '../../../utils/debug/save_page_debug_store.dart';
 import '../../../utils/save/author_folder_name.dart';
@@ -26,9 +24,11 @@ import '../../selection/debug/selection_debug_bridge.dart';
 import '../../selection/save_selection_session.dart';
 import '../../selection/session_work_preparer.dart';
 import '../../sniffer/facade/douyin_sniffer.dart';
-import '../../history/album_locator.dart';
-import '../../download/download_cancel_registry.dart';
 import '../../media/video_downloader.dart';
+import '../handler/history_handler.dart';
+import '../handler/log_handler.dart';
+import '../handler/media_handler.dart';
+import '../handler/system_handler.dart';
 
 part '../parse/parse_handler.dart';
 
@@ -43,28 +43,6 @@ part '../save/save_works_handler.dart';
 part '../save/save_home_handler.dart';
 
 part '../download/download_handler.dart';
-
-part '../log/log_handler.dart';
-
-part '../system/cancel_handler.dart';
-
-part '../system/eval_handler.dart';
-
-part '../system/quality_handler.dart';
-
-part '../history/history_query_handler.dart';
-
-part '../history/history_scan_handler.dart';
-
-part '../history/history_open_handler.dart';
-
-part '../history/history_clear_handler.dart';
-
-part '../system/mock_login_handler.dart';
-
-part '../media/display_handler.dart';
-
-part '../media/thumbnail_handler.dart';
 
 part '../verify/verify_covers_handler.dart';
 
@@ -108,7 +86,13 @@ class AgentAutomationServer {
   UserHomeProfile? _lastUserHomeProfile;
   String? _lastRawInput;
   String? _lastParsedUrl;
-  CancelToken? _activeDownloadToken;
+  CancelToken? activeDownloadToken;
+
+  /// 端点处理器：门面只负责生命周期与分发
+  late final SystemHandler system = SystemHandler(this);
+  late final LogHandler logHandler = LogHandler(this);
+  late final MediaHandler mediaHandler = MediaHandler(this);
+  late final HistoryHandler historyHandler = HistoryHandler(this);
 
   /// 供单元测试注入模拟的主页捕获结果
   @visibleForTesting
@@ -146,8 +130,8 @@ class AgentAutomationServer {
 
   /// 停止服务并释放端口
   Future<void> stop() async {
-    _activeDownloadToken?.cancel('服务已停止');
-    _activeDownloadToken = null;
+    activeDownloadToken?.cancel('服务已停止');
+    activeDownloadToken = null;
     await _server?.close(force: true);
     _server = null;
     debugPrint('[AgentBridge] 自动化控制台已关闭');
