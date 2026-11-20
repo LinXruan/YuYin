@@ -1,13 +1,13 @@
-# 余音交接清单（截至 1.6.1+218）
+# 余音交接清单（截至 1.6.1+219）
 
 > 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_81~90/PLAN_83.md`。
-> 工作区干净，最近提交为 218_pl83。
+> 工作区干净，最近提交为 219_pl83。
 
 ---
 
 ## 0. 一句话现状
 
-- 版本：`1.6.1+218`（版本名冻结，只递增 build 号）。
+- 版本：`1.6.1+219`（版本名冻结，只递增 build 号）。
 - 门禁：`flutter analyze` 0 issues；`flutter test` 403 全绿；结构门禁 `part` 上限 **70**。
 - 已完成大重构：**调试桥 0 part、Selection 0 part、Shell 0 part、Sniffer 0 part、ParsePage 0 part**。
 - 未完成大重构：HistoryPage（16 条）、widgets/save_page（42 条）。
@@ -54,6 +54,7 @@
 | 216 | 83 | ParsePage 阶段 2：辅助逻辑与保存流程独立化（ParseFlowHelper + ParseSaveCoordinator），part 上限 75 |
 | 217 | 83 | ParsePage 阶段 3：三大解析编排器独立化（SingleParseCoordinator + MultiParseCoordinator + HomeParseCoordinator），part 上限 72 |
 | 218 | 83 | ParsePage 阶段 4：骨架与输入卡片解耦（ParseFrame 独立组件），ParsePage 彻底 0 part，part 上限 70 |
+| 219 | 83 | 修复 Sniffer _controller 初始化时序（真机/模拟器启动异常），模拟器带窗口三链路回归全通 |
 
 ---
 

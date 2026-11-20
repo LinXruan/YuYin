@@ -104,7 +104,9 @@ class DouyinSniffer
   void Function(bool loggedIn)? onLoginStateDetected;
 
   DouyinSniffer() {
-    _controller = WebViewController()
+    final controller = WebViewController();
+    _controller = controller;
+    controller
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setUserAgent(desktopUserAgent)
       ..addJavaScriptChannel(
