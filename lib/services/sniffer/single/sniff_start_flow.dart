@@ -90,7 +90,7 @@ extension SnifferSniffStartFlowFlow on DouyinSniffer {
       if (_session.completer?.isCompleted ?? true) {
         _stopTimers();
       } else {
-        _tickScript();
+        _scriptInjector.tick();
       }
     });
 
@@ -128,7 +128,7 @@ extension SnifferSniffStartFlowFlow on DouyinSniffer {
         if (taskId == _session.taskId) _finishWithError(e, taskId: taskId);
       }),
     );
-    unawaited(_injectScript());
+    unawaited(_scriptInjector.injectFull());
     return completer.future;
   }
 }

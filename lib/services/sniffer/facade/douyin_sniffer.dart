@@ -10,10 +10,11 @@ import '../../../utils/url_parser.dart';
 import '../../share/client/douyin_share_api.dart';
 import '../channel/sniffer_channel_parser.dart';
 import '../message/sniffer_message_router.dart';
+import '../script/sniffer_script_host.dart';
+import '../script/sniffer_script_injector.dart';
 import '../message/sniffer_message_host.dart';
 import '../session/sniff_session.dart';
 import '../lifecycle/sniff_cancelled_exception.dart';
-import '../../script/douyin/douyin_sniff_script.dart';
 import '../../multi_work/article_work_exception.dart';
 import '../../multi_work/i_multi_work_extractor.dart';
 import '../../multi_work/multi_work_extractor.dart';
@@ -56,7 +57,8 @@ class DouyinSniffer
         ISingleWorkSnifferDelegate,
         IUserHomeSnifferDelegate,
         IMultiWorkSnifferDelegate,
-        SnifferMessageHost {
+        SnifferMessageHost,
+        SnifferScriptHost {
   /// 单作品解析领域提取器
   late final ISingleWorkExtractor singleWork = SingleWorkExtractor(this);
 
@@ -88,29 +90,23 @@ class DouyinSniffer
 
   late final WebViewController _controller;
 
-  /// 单任务共享状态（任务态字段统一收敛于此）
   final SniffSession _session = SniffSession();
 
   late final SnifferMessageRouter _messageRouter = SnifferMessageRouter(this);
+  late final SnifferScriptInjector _scriptInjector = SnifferScriptInjector(this);
 
   @override
   SniffSession get session => _session;
-
   @override
   bool get isTaskActive => _isTaskActive;
-
   @override
   bool get snifferLoggedIn => _isLoggedIn;
-
   @override
   set snifferLoggedIn(bool value) => _isLoggedIn = value;
-
   @override
   void notifyLoginState(bool loggedIn) => onLoginStateDetected?.call(loggedIn);
-
   @override
   void logDiagnostic(String message) => _log(message);
-
   @override
   void reportUserLog(String message) => _report(message);
   @override
@@ -118,14 +114,22 @@ class DouyinSniffer
   @override
   String get taskNonce => _taskNonce;
   @override
+  void markScriptAccepted() {
+    _session.acceptMessages = true;
+    _session.acceptLogs = true;
+  }
+  @override
+  void logInjectFailure(String error) {
+    if (_session.loggedInjectFailure) return;
+    _session.loggedInjectFailure = true;
+    _log('注入捕获脚本失败: $error');
+  }
+  @override
   void refreshHomeInactivity(int taskId) => _refreshHomeInactivityTimer(taskId);
   @override
-  void finishProfile(UserHomeProfile profile, int taskId) =>
-      _finishProfileWithResult(profile, taskId);
+  void finishProfile(UserHomeProfile profile, int taskId) => _finishProfileWithResult(profile, taskId);
   @override
-  void finishHome(UserHomeResult home, int taskId) =>
-      _finishHomeWithResult(home, taskId);
-
+  void finishHome(UserHomeResult home, int taskId) => _finishHomeWithResult(home, taskId);
   @override
   Future<void> finishResultItems(
     List<MediaItem> items,
@@ -134,8 +138,7 @@ class DouyinSniffer
     String? desc,
     String? coverUrl,
     String? awemeId,
-  }) =>
-      _finishWithItems(
+  }) => _finishWithItems(
         items,
         isImagePost,
         taskId,
@@ -143,7 +146,6 @@ class DouyinSniffer
         coverUrl: coverUrl,
         awemeId: awemeId,
       );
-
   @override
   Future<void> finishWithFallbackItems(
     List<MediaItem> items,
@@ -152,17 +154,16 @@ class DouyinSniffer
     String? desc,
     String? coverUrl,
     String? awemeId,
-  }) {
-    return _finishWithItems(
-      items,
-      false,
-      taskId,
-      title: title,
-      desc: desc,
-      coverUrl: coverUrl,
-      awemeId: awemeId,
-    );
-  }
+  }) =>
+      _finishWithItems(
+        items,
+        false,
+        taskId,
+        title: title,
+        desc: desc,
+        coverUrl: coverUrl,
+        awemeId: awemeId,
+      );
 
   final DouyinShareApi _shareApi = DouyinShareApi();
   final Set<String> _blockedSchemes = <String>{};
@@ -246,7 +247,7 @@ class DouyinSniffer
             _session.acceptMessages = true;
             _session.acceptLogs = true;
             _handlePageUrl(url, _session.taskId);
-            _injectScript();
+            _scriptInjector.injectFull();
           },
           onUrlChange: (change) {
             if (change.url?.startsWith('about:') ?? false) return;
@@ -263,7 +264,7 @@ class DouyinSniffer
               return;
             }
             _handlePageUrl(url, _session.taskId);
-            _injectScript();
+            _scriptInjector.injectFull();
             _checkCaptcha(url, _session.taskId);
           },
         ),
@@ -271,6 +272,7 @@ class DouyinSniffer
   }
 
   /// 供主界面挂载隐藏 WebViewWidget 使用
+  @override
   WebViewController get controller => _controller;
 
   /// 用户输入的原始链接

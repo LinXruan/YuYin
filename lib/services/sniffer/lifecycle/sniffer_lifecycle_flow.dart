@@ -51,45 +51,4 @@ extension SnifferLifecycleFlow on DouyinSniffer {
 
   /// 当前任务标识：脚本与回传消息共用，旧文档的迟到消息据此丢弃
   String get _taskNonce => 't${_session.taskId}';
-
-  /// 轻量 tick：脚本已就绪时只触发一次页内扫描，未就绪才重传完整脚本。
-  ///
-  /// 旧实现每 800ms 重传约 25KB 脚本并重新解析，长时间任务会持续占用主线程。
-  Future<void> _tickScript() async {
-    if (_disposed || !_isTaskActive) return;
-    final nonce = _taskNonce;
-    try {
-      final result = await _controller.runJavaScriptReturningResult(
-        "window.__dyTaskNonce='$nonce';"
-        "(function(){var S=window.__dyState;"
-        "if(window.__dySniffTick&&S&&S.nonce==='$nonce'){window.__dySniffTick();return true;}"
-        "return false;})();",
-      );
-      if (result.toString() == 'true') {
-        _session.acceptMessages = true;
-        _session.acceptLogs = true;
-        return;
-      }
-    } catch (_) {
-      // 页面尚未就绪或不是网页地址，回退到完整注入
-    }
-    await _injectScript();
-  }
-
-  /// 注入捕获脚本；脚本在 nonce 不一致或 about: 页时自行返回
-  Future<void> _injectScript() async {
-    if (_disposed || !_isTaskActive) return;
-    try {
-      await _controller.runJavaScript(
-        "window.__dyTaskNonce='$_taskNonce';\n$kDouyinSniffJs",
-      );
-      _session.acceptMessages = true;
-      _session.acceptLogs = true;
-    } catch (e) {
-      if (!_session.loggedInjectFailure) {
-        _session.loggedInjectFailure = true;
-        _log('注入捕获脚本失败: $e');
-      }
-    }
-  }
 }

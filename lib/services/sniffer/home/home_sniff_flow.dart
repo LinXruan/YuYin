@@ -69,7 +69,7 @@ extension SnifferHomeSniffFlowFlow on DouyinSniffer {
       if (_session.homeCompleter?.isCompleted ?? true) {
         _stopTimers();
       } else {
-        _tickScript();
+        _scriptInjector.tick();
       }
     });
 
@@ -107,7 +107,7 @@ extension SnifferHomeSniffFlowFlow on DouyinSniffer {
         if (taskId == _session.taskId) _finishHomeWithError(e, taskId: taskId);
       }),
     );
-    unawaited(_injectScript());
+    unawaited(_scriptInjector.injectFull());
 
     return completer.future;
   }
