@@ -1,8 +1,108 @@
-part of '../../page/parse_page.dart';
+import 'dart:async';
 
-/// 解析页骨架：输入、状态与保存入口。
-extension _ParsePageFrame on _ParsePageState {
-  Widget _buildParsePage(BuildContext context) {
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+
+import '../../../../utils/debug/log_controller.dart';
+import '../banner/batch_support_banner.dart';
+import '../banner/login_prompt_banner.dart';
+import '../status/status_card.dart';
+import 'parse_action_button.dart';
+
+/// 解析页纯 UI 骨架：输入框、定制滑动指示器、操作按钮、进度条与提示横幅
+class ParseFrame extends StatefulWidget {
+  const ParseFrame({
+    super.key,
+    required this.inputController,
+    required this.inputScrollController,
+    required this.busy,
+    required this.downloadProgress,
+    required this.downloadToken,
+    required this.logs,
+    required this.loggedIn,
+    required this.isParsing,
+    required this.onStartParse,
+    required this.onCancelParse,
+    required this.onCancelDownload,
+    required this.onPasteFromClipboard,
+    this.onTapAccount,
+  });
+
+  final TextEditingController inputController;
+  final ScrollController inputScrollController;
+  final ValueNotifier<bool> busy;
+  final ValueNotifier<double?> downloadProgress;
+  final ValueNotifier<CancelToken?> downloadToken;
+  final LogController logs;
+  final ValueNotifier<bool> loggedIn;
+  final bool isParsing;
+  final VoidCallback onStartParse;
+  final VoidCallback onCancelParse;
+  final VoidCallback onCancelDownload;
+  final VoidCallback onPasteFromClipboard;
+  final VoidCallback? onTapAccount;
+
+  @override
+  State<ParseFrame> createState() => _ParseFrameState();
+}
+
+class _ParseFrameState extends State<ParseFrame> {
+  Timer? _hideScrollTimer;
+  bool _showScrollIndicator = false;
+  double _scrollProgress = 0.0;
+  double _thumbHeight = 40.0;
+
+  @override
+  void dispose() {
+    _hideScrollTimer?.cancel();
+    super.dispose();
+  }
+
+  void _handleScrollNotification(ScrollNotification notification) {
+    final metrics = notification.metrics;
+    if (metrics.maxScrollExtent <= 0) {
+      if (_showScrollIndicator) {
+        setState(() => _showScrollIndicator = false);
+      }
+      return;
+    }
+
+    const double containerHeight = 120.0;
+    const double topPadding = 8.0;
+    const double bottomPadding = 8.0;
+    const double trackHeight = containerHeight - topPadding - bottomPadding;
+
+    final double totalContentHeight =
+        metrics.viewportDimension + metrics.maxScrollExtent;
+    final double viewRatio = totalContentHeight > 0
+        ? (metrics.viewportDimension / totalContentHeight).clamp(0.0, 1.0)
+        : 1.0;
+    final double computedThumbHeight = (trackHeight * viewRatio).clamp(
+      20.0,
+      trackHeight - 12.0,
+    );
+
+    final double progress = (metrics.pixels / metrics.maxScrollExtent).clamp(
+      0.0,
+      1.0,
+    );
+
+    setState(() {
+      _scrollProgress = progress;
+      _thumbHeight = computedThumbHeight;
+      _showScrollIndicator = true;
+    });
+
+    _hideScrollTimer?.cancel();
+    _hideScrollTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) {
+        setState(() => _showScrollIndicator = false);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Column(
       children: [
@@ -25,8 +125,8 @@ extension _ParsePageFrame on _ParsePageState {
                             return false;
                           },
                           child: TextField(
-                            controller: _inputController,
-                            scrollController: _inputScrollController,
+                            controller: widget.inputController,
+                            scrollController: widget.inputScrollController,
                             maxLines: null,
                             expands: true,
                             textAlignVertical: TextAlignVertical.top,
@@ -39,7 +139,6 @@ extension _ParsePageFrame on _ParsePageState {
                             ),
                           ),
                         ),
-                        // 悬浮定制滑动指示器：无手势劫持、向左微调防遮挡边框、不滑动渐隐
                         Positioned(
                           top: 8.0 + (_scrollProgress * (104.0 - _thumbHeight)),
                           right: 7.0,
@@ -68,7 +167,7 @@ extension _ParsePageFrame on _ParsePageState {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       FilledButton.tonalIcon(
-                        onPressed: _pasteFromClipboard,
+                        onPressed: widget.onPasteFromClipboard,
                         icon: const Icon(Icons.paste_rounded, size: 18),
                         label: const Text('清除并粘贴'),
                       ),
@@ -79,7 +178,7 @@ extension _ParsePageFrame on _ParsePageState {
                     children: [
                       Expanded(
                         child: FilledButton.icon(
-                          onPressed: busy ? null : _startParse,
+                          onPressed: busy ? null : widget.onStartParse,
                           icon: const Icon(Icons.download),
                           label: Text(busy ? '处理中...' : '解析作品'),
                           style: FilledButton.styleFrom(
@@ -88,16 +187,16 @@ extension _ParsePageFrame on _ParsePageState {
                         ),
                       ),
                       ParseActionButton(
-                        token: _downloadToken,
-                        isParsing: _isParsing,
-                        onCancelParse: _cancelParse,
-                        onCancelDownload: _cancelDownload,
+                        token: widget.downloadToken,
+                        isParsing: widget.isParsing,
+                        onCancelParse: widget.onCancelParse,
+                        onCancelDownload: widget.onCancelDownload,
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
                   ValueListenableBuilder<double?>(
-                    valueListenable: _downloadProgress,
+                    valueListenable: widget.downloadProgress,
                     builder: (context, progress, _) {
                       return LinearProgressIndicator(
                         value: busy ? progress : 0,
@@ -119,7 +218,6 @@ extension _ParsePageFrame on _ParsePageState {
             },
           ),
         ),
-        // 页面底部标识文字（仅展示，不可点击）
         Padding(
           padding: const EdgeInsets.only(top: 8, bottom: 10),
           child: Text(

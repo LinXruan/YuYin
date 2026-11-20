@@ -1,16 +1,16 @@
-# 余音交接清单（截至 1.6.1+214）
+# 余音交接清单（截至 1.6.1+218）
 
-> 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_81~90/PLAN_82.md`。
-> 工作区干净，最近提交为 214_pl82。
+> 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_81~90/PLAN_83.md`。
+> 工作区干净，最近提交为 218_pl83。
 
 ---
 
 ## 0. 一句话现状
 
-- 版本：`1.6.1+214`（版本名冻结，只递增 build 号）。
-- 门禁：`flutter analyze` 0 issues；`flutter test` 402 全绿；结构门禁 `part` 上限 **82**。
-- 已完成大重构：**调试桥 0 part、Selection 0 part、Shell 0 part、Sniffer 0 part**。
-- 未完成大重构：ParsePage（24 条）、HistoryPage（16 条）、widgets/save_page（42 条）。
+- 版本：`1.6.1+218`（版本名冻结，只递增 build 号）。
+- 门禁：`flutter analyze` 0 issues；`flutter test` 403 全绿；结构门禁 `part` 上限 **70**。
+- 已完成大重构：**调试桥 0 part、Selection 0 part、Shell 0 part、Sniffer 0 part、ParsePage 0 part**。
+- 未完成大重构：HistoryPage（16 条）、widgets/save_page（42 条）。
 
 ---
 
@@ -50,6 +50,10 @@
 | 212 | 82 | 单作品策略独立（SingleSniffStrategy + ShareFallbackStrategy + WebviewFallbackStrategy），删除 4 个 part，门面 344 行 |
 | 213 | 82 | 主页与资料策略独立（HomeSniffStrategy + ProfileSniffStrategy），删除 3 个 part，门面 334 行 |
 | 214 | 82 | Sniffer 0 part 收官（SnifferNavigationPolicy + SnifferPageLifecycle），删除最后 3 个 part，门面 278 行，Sniffer 彻底 0 part |
+| 215 | 83 | ParsePage 阶段 1：5 个 UI 展示组件独立化（PromptSurface、LoginPromptBanner、BatchSupportBanner、StatusCard、ParseActionButton），part 上限 77 |
+| 216 | 83 | ParsePage 阶段 2：辅助逻辑与保存流程独立化（ParseFlowHelper + ParseSaveCoordinator），part 上限 75 |
+| 217 | 83 | ParsePage 阶段 3：三大解析编排器独立化（SingleParseCoordinator + MultiParseCoordinator + HomeParseCoordinator），part 上限 72 |
+| 218 | 83 | ParsePage 阶段 4：骨架与输入卡片解耦（ParseFrame 独立组件），ParsePage 彻底 0 part，part 上限 70 |
 
 ---
 
@@ -160,7 +164,7 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 
 ### B. PLAN_80 · 剩余架构债
 
-- [ ] **ParsePage（24 条）**：`lib/pages/parse/page/parse_page.dart` + 12 个 flow；拆为解析编排器（single/multi/home 三条 flow 组）与纯 UI，禁止 `part`。
+- [x] **ParsePage（24 条）**：`lib/pages/parse/page/parse_page.dart` + 12 个分片彻底消除；拆为 Single/Multi/Home 三大 Coordinator、ParseSaveCoordinator、ParseFlowHelper 与纯 UI ParseFrame，彻底 **0 part**。
 - [ ] **HistoryPage（16 条）**：`lib/pages/history/page/history_page.dart` + 8 个 part；拆为 HistoryCard/HistoryFrame/HistoryActions 独立组件，消除整页重建。
 - [ ] **widgets/save_page（42 条）**：top/middle/bottom 三个 sheet 的 part 拆为独立 Widget + 选择视图模型。
 - [ ] **删除聚合导出壳**：`lib/models/media_item.dart`（几十处 import 改为按域导入）、`lib/utils/url_parser.dart`（转发到 `utils/url/`）。

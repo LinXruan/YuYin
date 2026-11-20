@@ -15,13 +15,7 @@ import '../flow/common/parse_save_coordinator.dart';
 import '../flow/home/home_parse_coordinator.dart';
 import '../flow/multi/multi_parse_coordinator.dart';
 import '../flow/single/single_parse_coordinator.dart';
-import '../widget/banner/batch_support_banner.dart';
-import '../widget/banner/login_prompt_banner.dart';
-import '../widget/frame/parse_action_button.dart';
-import '../widget/status/status_card.dart';
-
-part '../flow/common/parse_input_flow.dart';
-part '../widget/frame/parse_frame.dart';
+import '../widget/frame/parse_frame.dart';
 
 /// 解析页：粘贴链接 -> 捕获 -> 选择画质/图片 -> 下载
 class ParsePage extends StatefulWidget {
@@ -58,6 +52,7 @@ class _ParsePageState extends State<ParsePage>
   final ValueNotifier<CancelToken?> _downloadToken = ValueNotifier(null);
   bool _downloadTokenDisposed = false;
   String _lastProgressKey = '';
+  bool _isParsing = false;
 
   /// 下载/保存中的取消令牌：由 notifier 承载，变化即触发按钮重建
   CancelToken? get _downloadCancelToken => _downloadToken.value;
@@ -66,12 +61,6 @@ class _ParsePageState extends State<ParsePage>
     if (_downloadTokenDisposed) return;
     _downloadToken.value = token;
   }
-
-  Timer? _hideScrollTimer;
-  bool _showScrollIndicator = false;
-  double _scrollProgress = 0.0;
-  double _thumbHeight = 40.0;
-  bool _isParsing = false;
 
   /// 批量作品保存器（下载器与嗅探器均实现对应代理）
   WorkBatchSaver get _workBatchSaver =>
@@ -124,8 +113,30 @@ class _ParsePageState extends State<ParsePage>
     }
   }
 
-  /// 供流程分片调用的状态刷新入口（setState 受保护，扩展无法直接调用）
-  void _refresh(VoidCallback fn) => setState(fn);
+  void _cancelParse() {
+    if (!_isParsing) return;
+    _isParsing = false;
+    if (mounted) setState(() {});
+    widget.sniffer.cancelActiveTask();
+  }
+
+  void _cancelDownload() {
+    final token = _downloadCancelToken;
+    if (token == null) return;
+    token.cancel('用户取消保存');
+    widget.sniffer.cancelActiveTask();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _pasteFromClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (data?.text != null && mounted) {
+      _inputController.text = data!.text!;
+      if (_inputScrollController.hasClients) {
+        _inputScrollController.jumpTo(0.0);
+      }
+    }
+  }
 
   void _updateBatchSaveProgress(int current, int total, String message) {
     if (!mounted) return;
@@ -184,14 +195,14 @@ class _ParsePageState extends State<ParsePage>
     _lastProgressKey = '';
     widget.busy.value = true;
     _isParsing = true;
-    if (mounted) _refresh(() {});
+    if (mounted) setState(() {});
 
     final batch = UrlParser.parseBatchInput(_inputController.text);
     if (batch.kind == ParsedBatchKind.empty) {
       widget.logs.add('未识别到有效的抖音链接，请检查粘贴内容');
       widget.busy.value = false;
       _isParsing = false;
-      if (mounted) _refresh(() {});
+      if (mounted) setState(() {});
       return;
     }
 
@@ -203,7 +214,7 @@ class _ParsePageState extends State<ParsePage>
       widget.logs.add('未识别到可下载的视频/图文作品（文章作品暂不支持）');
       widget.busy.value = false;
       _isParsing = false;
-      if (mounted) _refresh(() {});
+      if (mounted) setState(() {});
       return;
     }
 
@@ -211,7 +222,7 @@ class _ParsePageState extends State<ParsePage>
       widget.logs.add('检测到同时包含主页链接和作品链接，请分开粘贴解析');
       widget.busy.value = false;
       _isParsing = false;
-      if (mounted) _refresh(() {});
+      if (mounted) setState(() {});
       return;
     }
 
@@ -238,7 +249,6 @@ class _ParsePageState extends State<ParsePage>
   @override
   void dispose() {
     widget.externalUrlNotifier?.removeListener(_onExternalUrlChanged);
-    _hideScrollTimer?.cancel();
     if (_isParsing) {
       widget.sniffer.cancelActiveTask();
     }
@@ -254,6 +264,20 @@ class _ParsePageState extends State<ParsePage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return _buildParsePage(context);
+    return ParseFrame(
+      inputController: _inputController,
+      inputScrollController: _inputScrollController,
+      busy: widget.busy,
+      downloadProgress: _downloadProgress,
+      downloadToken: _downloadToken,
+      logs: widget.logs,
+      loggedIn: widget.loggedIn,
+      isParsing: _isParsing,
+      onStartParse: _startParse,
+      onCancelParse: _cancelParse,
+      onCancelDownload: _cancelDownload,
+      onPasteFromClipboard: _pasteFromClipboard,
+      onTapAccount: widget.onTapAccount,
+    );
   }
 }

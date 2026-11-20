@@ -112,3 +112,13 @@ lib/pages/parse/
 1. **BuildContext 跨 await 使用风险**：Coordinator 类在弹出 Dialog/BottomSheet 或获取上下文时，必须校验 `mounted`。
 2. **模拟器性能卡顿**：模拟器性能较弱（冷启动约 20s，主页 300 条约 24s），若测试响应稍慢需根据 DEBUG.md 耐心等待，避免误判为逻辑缺陷。
 3. **回退策略**：每个阶段作为独立提交，若某阶段出现未预期回归，可立即回退该 commit。
+
+---
+
+## 七、落地进度
+
+- **阶段 1（1.6.1+215）已完成**：5 个纯展示组件（PromptSurface、LoginPromptBanner、BatchSupportBanner、StatusCard、ParseActionButton）彻底消除 `part`/`part of`，公开组件类与样式；测试直接按域导入；门禁 part 上限收紧为 77；402 测试全绿，analyze 0 issues。
+- **阶段 2（1.6.1+216）已完成**：抽离 `ParseFlowHelper` 纯函数与 `ParseSaveCoordinator` 独立保存流程协调器，删除 `parse_progress_flow.dart` 与 `save_page_flow.dart` 及其 4 条 `part` 声明；门禁 part 上限收紧为 75；402 测试全绿，analyze 0 issues。
+- **阶段 3（1.6.1+217）已完成**：引入 `ParseFlowContext`，将单作品、多作品、主页解析彻底解耦为独立协调器（`SingleParseCoordinator`、`MultiParseCoordinator`、`HomeParseCoordinator`），删除对应 3 个旧 flow 及其 6 条 `part` 声明；门禁 part 上限收紧为 72；402 测试全绿，analyze 0 issues。
+- **阶段 4（1.6.1+218）已完成**：重构 `ParseFrame` 为独立纯 UI 组件，收纳输入滚动指示器；删除 `parse_input_flow.dart`；`parse_page.dart` 删除最后 2 条 `part` 声明，实现 **ParsePage 彻底 0 part**；新增 `parse_frame_widget_test.dart`；门禁 part 上限收紧为 70；403 测试全绿，analyze 0 issues。PLAN_83 圆满达成！
+
