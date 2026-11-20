@@ -40,3 +40,16 @@
 - [ ] `MainActivity.kt` ≤200 行，5 个 Channel 独立可测。
 - [ ] 全库无 `gal` 依赖，权限查询走自有通道。
 - [ ] `analyze` 0 issues、`test` 全绿、真机验收通过。
+---
+
+## 五、落地状态（2026-11-20，1.6.0+195）
+
+已落地：
+- `MainActivity.kt` 708 → 86 行：音频、安装、存储、UI（主题/跳转/显示）拆为独立类。
+- 新增 `channel/StorageChannel.kt`（SAF 选择、落盘、查询、权限）与 `channel/UiChannel.kt`，结果统一回主线程。
+- 移除 `gal` 依赖，改用自有通道 `hasStorageAccess/requestStorageAccess`；删除 `VideoQualitySheet` 与其测试。
+
+未落地（顺延）：
+- 拆解 5 个 `part` 巨石库（Sniffer/Selection/Parse/History/Bridge）与 `_FlowFlow` 命名。
+- 删除 `models/media_item.dart` 聚合导出、`url_parser.dart` 转发壳。
+- 静态 Store 改为显式注入。

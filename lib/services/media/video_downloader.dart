@@ -1,10 +1,10 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../models/media_item.dart';
+import '../../utils/permission/storage_permission_service.dart';
 import '../../utils/save/file_name_formatter.dart';
 import '../../utils/savelocation/save_location_store.dart';
 import '../batch_work/i_work_batch_saver.dart';
@@ -177,14 +177,9 @@ class VideoDownloader implements IWorkDownloadDelegate {
 
   /// Android 9 及以下需要运行时存储权限；Android 10+ 自动返回 true
   Future<void> _ensureGalleryAccess() async {
-    try {
-      if (await Gal.hasAccess()) return;
-      final granted = await Gal.requestAccess();
-      if (!granted) {
-        throw Exception('未获得存储写入权限，无法保存文件');
-      }
-    } on GalException catch (e) {
-      throw Exception('申请存储权限失败: ${e.type.name}');
+    final granted = await StoragePermissionService.ensureAccess();
+    if (!granted) {
+      throw Exception('未获得存储写入权限，无法保存文件');
     }
   }
 
