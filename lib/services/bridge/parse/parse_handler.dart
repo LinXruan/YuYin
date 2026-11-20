@@ -73,10 +73,10 @@ extension AgentParseHandlers on AgentAutomationServer {
           throw StateError('捕获服务未初始化');
         }
         final homeResult = await currentSniffer.sniffUserHomeUrl(url);
-        _lastUserHomeResult = homeResult;
-        _lastUserHomeProfile = homeResult.profile;
-        _lastRawInput = text;
-        _lastParsedUrl = url;
+        lastUserHomeResult = homeResult;
+        lastUserHomeProfile = homeResult.profile;
+        lastRawInput = text;
+        lastParsedUrl = url;
         final author =
             homeResult.nickname.isNotEmpty ? homeResult.nickname : '未知作者';
         final tagText = (homeResult.tabCount != null && homeResult.tabCount! > 0)
@@ -114,9 +114,9 @@ extension AgentParseHandlers on AgentAutomationServer {
         throw StateError('捕获服务未初始化');
       }
       final result = await currentSniffer.sniffVideoUrl(url);
-      _lastResult = result;
-      _lastRawInput = text;
-      _lastParsedUrl = url;
+      lastResult = result;
+      lastRawInput = text;
+      lastParsedUrl = url;
 
       // 成功解析后自动计入历史记录
       if (result.items.isNotEmpty) {
@@ -171,7 +171,7 @@ extension AgentParseHandlers on AgentAutomationServer {
         'imageCount': result.imageCount,
         'videoCount': result.videoCount,
         'audioCount': result.audioCount,
-        'items': _serializeItems(result.items),
+        'items': serializeItems(result.items),
       });
     } catch (e) {
       sendJson(

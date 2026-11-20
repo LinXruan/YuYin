@@ -43,9 +43,9 @@ extension AgentParseProfileHandlers on AgentAutomationServer {
         throw StateError('捕获服务未初始化');
       }
       final profile = await currentSniffer.sniffUserProfile(url);
-      _lastUserHomeProfile = profile;
-      _lastRawInput = text;
-      _lastParsedUrl = url;
+      lastUserHomeProfile = profile;
+      lastRawInput = text;
+      lastParsedUrl = url;
       final author = profile.nickname.isNotEmpty ? profile.nickname : '未知作者';
       final hasAvatar = profile.avatarUrl.isNotEmpty;
       logs.add('成功捕获作者【$author】基础资料（${hasAvatar ? "已获取头像" : "未获取头像"}）');

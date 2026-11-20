@@ -4,7 +4,7 @@ part of '../server/agent_automation_server.dart';
 extension AgentStatusHandlers on AgentAutomationServer {
   /// GET /api/status：查询当前应用状态
   Future<void> _handleStatus(HttpRequest request) async {
-    final result = _lastResult;
+    final result = lastResult;
     final Map<String, dynamic>? lastResultJson;
     if (result != null) {
       lastResultJson = {
@@ -15,7 +15,7 @@ extension AgentStatusHandlers on AgentAutomationServer {
         'imageCount': result.imageCount,
         'videoCount': result.videoCount,
         'audioCount': result.audioCount,
-        'items': _serializeItems(result.items),
+        'items': serializeItems(result.items),
       };
     } else {
       lastResultJson = null;
@@ -28,26 +28,26 @@ extension AgentStatusHandlers on AgentAutomationServer {
       'loggedIn': loggedIn.value,
       'snifferLoggedIn': sniffer?.isUserLoggedIn ?? false,
       'hasParsedResult': result != null,
-      'lastInput': _lastRawInput,
+      'lastInput': lastRawInput,
       'lastResult': lastResultJson,
-      'lastUserHomeResult': _lastUserHomeResult == null
+      'lastUserHomeResult': lastUserHomeResult == null
           ? null
           : {
-              'secUid': _lastUserHomeResult!.secUid,
-              'nickname': _lastUserHomeResult!.nickname,
-              'avatarUrl': _lastUserHomeResult!.avatarUrl,
-              'hasAvatar': _lastUserHomeResult!.avatarUrl.isNotEmpty,
-              'count': _lastUserHomeResult!.count,
-              'tabCount': _lastUserHomeResult!.tabCount,
-              'worksTotalTag': _lastUserHomeResult!.worksTotalTag,
-              'coversCount': _lastUserHomeResult!.coversCount,
-              'hasCovers': _lastUserHomeResult!.workCovers.isNotEmpty,
-              'titlesCount': _lastUserHomeResult!.titlesCount,
-              'hasTitles': _lastUserHomeResult!.workTitles.isNotEmpty,
-              'filteredArticleCount': _lastUserHomeResult!.filteredArticleCount,
+              'secUid': lastUserHomeResult!.secUid,
+              'nickname': lastUserHomeResult!.nickname,
+              'avatarUrl': lastUserHomeResult!.avatarUrl,
+              'hasAvatar': lastUserHomeResult!.avatarUrl.isNotEmpty,
+              'count': lastUserHomeResult!.count,
+              'tabCount': lastUserHomeResult!.tabCount,
+              'worksTotalTag': lastUserHomeResult!.worksTotalTag,
+              'coversCount': lastUserHomeResult!.coversCount,
+              'hasCovers': lastUserHomeResult!.workCovers.isNotEmpty,
+              'titlesCount': lastUserHomeResult!.titlesCount,
+              'hasTitles': lastUserHomeResult!.workTitles.isNotEmpty,
+              'filteredArticleCount': lastUserHomeResult!.filteredArticleCount,
             },
-      'lastUserHomeProfile': _lastUserHomeProfile?.toMap() ??
-          _lastUserHomeResult?.profile.toMap(),
+      'lastUserHomeProfile': lastUserHomeProfile?.toMap() ??
+          lastUserHomeResult?.profile.toMap(),
       'logsCount': logs.logs.length,
       'downloadSettings': {
         'onlyHighestQualityPerResolution':

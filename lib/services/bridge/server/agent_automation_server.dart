@@ -10,7 +10,6 @@ import '../../../models/history_item.dart';
 import '../../../models/media_item.dart';
 import '../../../utils/settings/display_mode_service.dart';
 import '../../../utils/settings/download_settings_store.dart';
-import '../../../utils/save/file_name_formatter.dart';
 import '../../../utils/history/history_store.dart';
 import '../../../utils/debug/log_controller.dart';
 import '../../../utils/savelocation/save_location_store.dart';
@@ -25,10 +24,12 @@ import '../../selection/save_selection_session.dart';
 import '../../selection/session_work_preparer.dart';
 import '../../sniffer/facade/douyin_sniffer.dart';
 import '../../media/video_downloader.dart';
+import '../handler/download_handler.dart';
 import '../handler/history_handler.dart';
 import '../handler/log_handler.dart';
 import '../handler/media_handler.dart';
 import '../handler/system_handler.dart';
+import '../handler/verify_handler.dart';
 
 part '../parse/parse_handler.dart';
 
@@ -42,15 +43,7 @@ part '../save/save_works_handler.dart';
 
 part '../save/save_home_handler.dart';
 
-part '../download/download_handler.dart';
-
-part '../verify/verify_covers_handler.dart';
-
-part '../verify/verify_titles_handler.dart';
-
 part '../parse/parse_profile_handler.dart';
-
-part '../verify/verify_profile_handler.dart';
 
 part '../handler/save/selection_handler.dart';
 
@@ -81,11 +74,11 @@ class AgentAutomationServer {
   final int port;
 
   HttpServer? _server;
-  SniffResult? _lastResult;
-  UserHomeResult? _lastUserHomeResult;
-  UserHomeProfile? _lastUserHomeProfile;
-  String? _lastRawInput;
-  String? _lastParsedUrl;
+  SniffResult? lastResult;
+  UserHomeResult? lastUserHomeResult;
+  UserHomeProfile? lastUserHomeProfile;
+  String? lastRawInput;
+  String? lastParsedUrl;
   CancelToken? activeDownloadToken;
 
   /// 端点处理器：门面只负责生命周期与分发
@@ -93,18 +86,20 @@ class AgentAutomationServer {
   late final LogHandler logHandler = LogHandler(this);
   late final MediaHandler mediaHandler = MediaHandler(this);
   late final HistoryHandler historyHandler = HistoryHandler(this);
+  late final VerifyHandler verifyHandler = VerifyHandler(this);
+  late final DownloadHandler downloadHandler = DownloadHandler(this);
 
   /// 供单元测试注入模拟的主页捕获结果
   @visibleForTesting
   void setLastUserHomeResultForTesting(UserHomeResult result) {
-    _lastUserHomeResult = result;
-    _lastUserHomeProfile = result.profile;
+    lastUserHomeResult = result;
+    lastUserHomeProfile = result.profile;
   }
 
   /// 供单元测试注入模拟的主页作者基础信息
   @visibleForTesting
   void setLastUserHomeProfileForTesting(UserHomeProfile profile) {
-    _lastUserHomeProfile = profile;
+    lastUserHomeProfile = profile;
   }
 
   /// 服务实际绑定的端口（未启动时为 null）

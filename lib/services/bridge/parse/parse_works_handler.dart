@@ -56,7 +56,7 @@ extension AgentParseWorksHandlers on AgentAutomationServer {
         },
         onLog: logs.add,
       );
-      _lastRawInput = text;
+      lastRawInput = text;
       sendJson(request, HttpStatus.ok, {
         'success': true,
         'kind': batch.kind.name,

@@ -3,13 +3,13 @@ part of '../server/agent_automation_server.dart';
 /// 端点序列化：保存结果、媒体条目与画质模式。
 extension AgentSerialization on AgentAutomationServer {
   /// 将画质字符串转换为批量保存模式
-  BatchVideoQualityMode _qualityModeFrom(String? raw) {
+  BatchVideoQualityMode qualityModeFrom(String? raw) {
     if (raw == 'lowest') return BatchVideoQualityMode.lowest;
     if (raw == 'mixed') return BatchVideoQualityMode.mixed;
     return BatchVideoQualityMode.highest;
   }
 
-  Map<String, dynamic> _serializeWorkSaveResult(WorkSaveResult result) {
+  Map<String, dynamic> serializeWorkSaveResult(WorkSaveResult result) {
     return {
       'url': result.url,
       'success': result.success,
@@ -18,7 +18,7 @@ extension AgentSerialization on AgentAutomationServer {
       if (result.error != null) 'error': result.error,
     };
   }
-  List<Map<String, dynamic>> _serializeItems(List<MediaItem> items) {
+  List<Map<String, dynamic>> serializeItems(List<MediaItem> items) {
     return items.asMap().entries.map((entry) {
       final i = entry.key;
       final item = entry.value;

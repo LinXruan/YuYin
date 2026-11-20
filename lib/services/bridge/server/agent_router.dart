@@ -31,7 +31,7 @@ extension AgentRouting on AgentAutomationServer {
       } else if (path == '/api/save/home' && request.method == 'POST') {
         await _handleSaveHome(request);
       } else if (path == '/api/download' && request.method == 'POST') {
-        await _handleDownload(request);
+        await downloadHandler.handleDownload(request);
       } else if (path == '/api/logs' && request.method == 'GET') {
         await logHandler.handleGet(request);
       } else if (path == '/api/logs/clear' && request.method == 'POST') {
@@ -69,13 +69,13 @@ extension AgentRouting on AgentAutomationServer {
       } else if (path == '/api/thumbnails/preload' && request.method == 'POST') {
         await mediaHandler.handlePreloadThumbnails(request);
       } else if (path == '/api/verify/home-covers' && request.method == 'POST') {
-        await _handleVerifyHomeCovers(request);
+        await verifyHandler.handleHomeCovers(request);
       } else if (path == '/api/verify/home-titles' && request.method == 'POST') {
-        await _handleVerifyHomeTitles(request);
+        await verifyHandler.handleHomeTitles(request);
       } else if (path == '/api/parse-profile' && request.method == 'POST') {
         await _handleParseProfile(request);
       } else if (path == '/api/verify/home-profile' && request.method == 'POST') {
-        await _handleVerifyHomeProfile(request);
+        await verifyHandler.handleHomeProfile(request);
       } else {
         sendJson(
           request,

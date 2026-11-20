@@ -77,7 +77,7 @@ extension AgentSaveHomeHandlers on AgentAutomationServer {
         home.secUid,
       );
       final config = SaveLocationStore.current;
-      final quality = _qualityModeFrom(body['quality']?.toString());
+      final quality = qualityModeFrom(body['quality']?.toString());
       final memory = TerminalMemoryStore.seed;
       final session = SaveSelectionSession.home(
         profiles: [home.profile],
@@ -112,7 +112,7 @@ extension AgentSaveHomeHandlers on AgentAutomationServer {
         'authorFolder': authorFolder,
         'count': results.length,
         'successCount': results.where((item) => item.success).length,
-        'results': results.map(_serializeWorkSaveResult).toList(),
+        'results': results.map(serializeWorkSaveResult).toList(),
         'logs': logs.logs,
       });
     } catch (e) {

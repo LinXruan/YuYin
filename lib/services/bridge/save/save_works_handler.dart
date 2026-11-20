@@ -54,7 +54,7 @@ extension AgentSaveWorksHandlers on AgentAutomationServer {
           ),
         );
       }
-      final quality = _qualityModeFrom(body['quality']?.toString());
+      final quality = qualityModeFrom(body['quality']?.toString());
       final session = SaveSelectionSession.multiWork(
         works: extract.works,
         seed: TerminalSeed(
@@ -84,7 +84,7 @@ extension AgentSaveWorksHandlers on AgentAutomationServer {
       sendJson(request, HttpStatus.ok, {
         'count': results.length,
         'successCount': results.where((item) => item.success).length,
-        'results': results.map(_serializeWorkSaveResult).toList(),
+        'results': results.map(serializeWorkSaveResult).toList(),
         'logs': logs.logs,
       });
     } catch (e) {
