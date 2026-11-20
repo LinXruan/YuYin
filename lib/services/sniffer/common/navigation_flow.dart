@@ -87,7 +87,7 @@ extension SnifferNavigationFlowFlow on DouyinSniffer {
         _scheduleWebViewShareFallback(
           _session.targetAwemeId!,
           taskId,
-          DouyinSniffer._kNoteFallbackDelay,
+          SnifferTimeBudget.noteFallbackDelay,
         );
       }
     }

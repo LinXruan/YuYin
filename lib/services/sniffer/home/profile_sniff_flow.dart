@@ -61,7 +61,7 @@ extension SnifferProfileSniffFlowFlow on DouyinSniffer {
     });
 
     _session.injectTimer?.cancel();
-    _session.injectTimer = Timer.periodic(DouyinSniffer._kInjectInterval, (_) {
+    _session.injectTimer = Timer.periodic(SnifferTimeBudget.injectInterval, (_) {
       if (taskId != _session.taskId) {
         _stopTimers();
         return;

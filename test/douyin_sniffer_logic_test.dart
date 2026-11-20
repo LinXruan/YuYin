@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
 import 'package:yuyin/services/sniffer/facade/douyin_sniffer.dart';
+import 'package:yuyin/services/sniffer/sniffer_time_budget.dart';
 
 void main() {
   group('parseChannelItems', () {
@@ -33,32 +34,32 @@ void main() {
   group('webViewFallbackTimeoutFor', () {
     test('时间充足时使用 12 秒默认值', () {
       expect(
-        DouyinSniffer.webViewFallbackTimeoutFor(Duration.zero),
+        SnifferTimeBudget.webViewFallbackTimeoutFor(Duration.zero),
         const Duration(seconds: 12),
       );
     });
 
     test('剩余 10 秒时压缩到 8 秒', () {
       expect(
-        DouyinSniffer.webViewFallbackTimeoutFor(const Duration(seconds: 20)),
+        SnifferTimeBudget.webViewFallbackTimeoutFor(const Duration(seconds: 20)),
         const Duration(seconds: 8),
       );
     });
 
     test('剩余 7 秒时保底 5 秒', () {
       expect(
-        DouyinSniffer.webViewFallbackTimeoutFor(const Duration(seconds: 23)),
+        SnifferTimeBudget.webViewFallbackTimeoutFor(const Duration(seconds: 23)),
         const Duration(seconds: 5),
       );
     });
 
     test('剩余不足 6 秒时跳过 C 兜底', () {
       expect(
-        DouyinSniffer.webViewFallbackTimeoutFor(const Duration(seconds: 24)),
+        SnifferTimeBudget.webViewFallbackTimeoutFor(const Duration(seconds: 24)),
         isNull,
       );
       expect(
-        DouyinSniffer.webViewFallbackTimeoutFor(const Duration(seconds: 30)),
+        SnifferTimeBudget.webViewFallbackTimeoutFor(const Duration(seconds: 30)),
         isNull,
       );
     });

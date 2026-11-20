@@ -54,7 +54,7 @@ extension SnifferSniffStartFlowFlow on DouyinSniffer {
     _log('开始解析作品（${_isLoggedIn ? '已登录' : '未登录'}）');
 
     _session.timeoutTimer?.cancel();
-    _session.timeoutTimer = Timer(DouyinSniffer._kTaskTimeout, () {
+    _session.timeoutTimer = Timer(SnifferTimeBudget.taskTimeout, () {
       if (taskId != _session.taskId) return;
       // 30 秒超时仅管控单作品链接解析流程
       if (_session.completer == null || _session.completer!.isCompleted) return;
@@ -82,7 +82,7 @@ extension SnifferSniffStartFlowFlow on DouyinSniffer {
 
     // 多图页会因加载 10+ 张大图导致 onPageFinished 延迟，主动轮询注入兜底
     _session.injectTimer?.cancel();
-    _session.injectTimer = Timer.periodic(DouyinSniffer._kInjectInterval, (_) {
+    _session.injectTimer = Timer.periodic(SnifferTimeBudget.injectInterval, (_) {
       if (taskId != _session.taskId) {
         _stopTimers();
         return;

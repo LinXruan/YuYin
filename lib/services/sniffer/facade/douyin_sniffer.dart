@@ -14,6 +14,7 @@ import '../script/sniffer_script_host.dart';
 import '../script/sniffer_script_injector.dart';
 import '../message/sniffer_message_host.dart';
 import '../session/sniff_session.dart';
+import '../sniffer_time_budget.dart';
 import '../lifecycle/sniff_cancelled_exception.dart';
 import '../../multi_work/article_work_exception.dart';
 import '../../multi_work/i_multi_work_extractor.dart';
@@ -72,21 +73,6 @@ class DouyinSniffer
   static const String desktopUserAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
-
-  // 主任务与 A/B/C 兜底的时间预算
-  static const Duration _kTaskTimeout = Duration(seconds: 30);
-  static const Duration _kHomeInactivityTimeout = Duration(seconds: 25);
-  static const Duration _kHomeInitialTimeout = Duration(seconds: 40);
-  static const Duration _kInjectInterval = Duration(milliseconds: 800);
-  static const Duration _kNoteFallbackDelay = Duration(seconds: 3);
-  static const Duration _kVideoFallbackDelay = Duration(seconds: 8);
-  static const Duration _kLateFallbackAt = Duration(seconds: 18);
-  static const Duration _kWebViewFallbackTimeout = Duration(seconds: 12);
-  static const Duration _kFallbackSafetyMargin = Duration(seconds: 2);
-  static const Duration _kFallbackMinTimeout = Duration(seconds: 5);
-  static const Duration _kFallbackMinRemaining = Duration(seconds: 6);
-  static const Duration _kShareFallbackBudget = Duration(seconds: 10);
-  static const Duration _kShareImageGrace = Duration(seconds: 3);
 
   late final WebViewController _controller;
 
@@ -284,18 +270,7 @@ class DouyinSniffer
   /// 加载分享链接并等待 JS 回传，最长等待 30 秒
   /// 按作品链接解析的便捷入口
   Future<SingleWorkResult> sniffWork(String url) => sniffVideoUrl(url);
-  static Duration? webViewFallbackTimeoutFor(Duration elapsed) {
-    final remaining = _kTaskTimeout - elapsed;
-    if (remaining <= _kFallbackMinRemaining) return null;
-    var timeout = _kWebViewFallbackTimeout;
-    if (remaining - timeout < _kFallbackSafetyMargin) {
-      timeout = remaining - _kFallbackSafetyMargin;
-      if (timeout < _kFallbackMinTimeout) {
-        timeout = _kFallbackMinTimeout;
-      }
-    }
-    return timeout;
-  }
+
 
   /// 区分深链中断和无数据，避免统一误报“风控”
   @visibleForTesting

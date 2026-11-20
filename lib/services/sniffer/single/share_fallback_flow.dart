@@ -21,7 +21,7 @@ extension SnifferShareFallbackFlowFlow on DouyinSniffer {
     try {
       final result = await _shareApi.fetchShareItem(
         awemeId,
-        totalTimeout: DouyinSniffer._kShareFallbackBudget,
+        totalTimeout: SnifferTimeBudget.shareFallbackBudget,
       );
       if (_disposed || taskId != _session.taskId) return;
       final completer = _session.completer;
@@ -69,7 +69,7 @@ extension SnifferShareFallbackFlowFlow on DouyinSniffer {
     if (_disposed || taskId != _session.taskId) return;
     _session.pendingImageResult = result;
     _session.imageGraceTimer?.cancel();
-    _session.imageGraceTimer = Timer(DouyinSniffer._kShareImageGrace, () {
+    _session.imageGraceTimer = Timer(SnifferTimeBudget.shareImageGrace, () {
       if (_disposed || taskId != _session.taskId) return;
       final completer = _session.completer;
       if (completer == null || completer.isCompleted) return;
@@ -104,13 +104,13 @@ extension SnifferShareFallbackFlowFlow on DouyinSniffer {
       _scheduleWebViewShareFallback(
         awemeId,
         taskId,
-        DouyinSniffer._kNoteFallbackDelay,
+        SnifferTimeBudget.noteFallbackDelay,
       );
     } else {
       _scheduleWebViewShareFallback(
         awemeId,
         taskId,
-        DouyinSniffer._kVideoFallbackDelay,
+        SnifferTimeBudget.videoFallbackDelay,
       );
     }
   }

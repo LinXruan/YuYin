@@ -36,7 +36,7 @@ extension SnifferWebviewFallbackFlowFlow on DouyinSniffer {
     _session.lateFallbackTimer?.cancel();
 
     final elapsed = DateTime.now().difference(_session.taskStartedAt);
-    final remaining = DouyinSniffer._kLateFallbackAt - elapsed;
+    final remaining = SnifferTimeBudget.lateFallbackAt - elapsed;
     final delay = remaining.isNegative ? Duration.zero : remaining;
 
     _session.lateFallbackTimer = Timer(delay, () {
@@ -68,7 +68,7 @@ extension SnifferWebviewFallbackFlowFlow on DouyinSniffer {
 
     // 时间预算：C 必须在主 30 秒超时前结束
     final elapsed = DateTime.now().difference(_session.taskStartedAt);
-    final timeout = DouyinSniffer.webViewFallbackTimeoutFor(elapsed);
+    final timeout = SnifferTimeBudget.webViewFallbackTimeoutFor(elapsed);
     if (timeout == null) return;
 
     _session.webviewShareFallback = true;

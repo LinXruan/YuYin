@@ -52,7 +52,7 @@ extension SnifferHomeSniffFlowFlow on DouyinSniffer {
     }
 
     _session.timeoutTimer?.cancel();
-    _session.timeoutTimer = Timer(DouyinSniffer._kHomeInitialTimeout, () {
+    _session.timeoutTimer = Timer(SnifferTimeBudget.homeInitialTimeout, () {
       if (taskId != _session.taskId) return;
       _finishHomeWithError(
         TimeoutException('未捕获到主页作品列表，请检查网络或主页链接有效性'),
@@ -61,7 +61,7 @@ extension SnifferHomeSniffFlowFlow on DouyinSniffer {
     });
 
     _session.injectTimer?.cancel();
-    _session.injectTimer = Timer.periodic(DouyinSniffer._kInjectInterval, (_) {
+    _session.injectTimer = Timer.periodic(SnifferTimeBudget.injectInterval, (_) {
       if (taskId != _session.taskId) {
         _stopTimers();
         return;

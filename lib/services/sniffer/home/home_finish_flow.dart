@@ -94,7 +94,7 @@ extension SnifferHomeFinishFlowFlow on DouyinSniffer {
   void _refreshHomeInactivityTimer(int taskId) {
     if (taskId != _session.taskId || _session.homeCompleter == null || _disposed) return;
     _session.timeoutTimer?.cancel();
-    _session.timeoutTimer = Timer(DouyinSniffer._kHomeInactivityTimeout, () {
+    _session.timeoutTimer = Timer(SnifferTimeBudget.homeInactivityTimeout, () {
       if (taskId != _session.taskId) return;
       _finishHomeWithError(
         TimeoutException('主页滚动加载作品超时（连续无新作品），请检查网络或稍后重试'),
