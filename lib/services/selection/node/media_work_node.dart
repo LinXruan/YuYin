@@ -1,7 +1,12 @@
-part of '../save_selection_session.dart';
+import 'dart:collection';
+import '../selection_aggregator.dart';
 
-class _MediaWorkNode extends _WorkNode {
-  _MediaWorkNode({
+import '../../../models/media_item.dart';
+import 'resource_node.dart';
+import 'work_node.dart';
+
+class MediaWorkNode extends WorkNode {
+  MediaWorkNode({
     required super.work,
     required TerminalSeed seed,
   })  : _intents = {
@@ -18,7 +23,7 @@ class _MediaWorkNode extends _WorkNode {
   SelectionState selectionState;
   bool _parsed = false;
   final Map<MediaType, AggregateState> _intents;
-  final List<_ResourceNode> _resources = <_ResourceNode>[];
+  final List<ResourceNode> _resources = <ResourceNode>[];
 
   static SelectionState _selectionOfIntents(
     Iterable<AggregateState> states,
@@ -56,7 +61,7 @@ class _MediaWorkNode extends _WorkNode {
       UnmodifiableListView(_resources);
 
   @override
-  List<_ResourceNode> get resourceNodes => _resources;
+  List<ResourceNode> get resourceNodes => _resources;
 
   @override
   AggregateState resourceState(MediaType type) {
@@ -128,12 +133,12 @@ class _MediaWorkNode extends _WorkNode {
     final previous = {
       for (final resource in _resources) resource.key: resource.selected,
     };
-    final next = <_ResourceNode>[];
+    final next = <ResourceNode>[];
     for (final item in parsed.items) {
       final selected = previous[item.url] ??
           (_intents[item.type] == AggregateState.all);
       next.add(
-        _ResourceNode(key: item.url, type: item.type, selected: selected),
+        ResourceNode(key: item.url, type: item.type, selected: selected),
       );
     }
     _resources

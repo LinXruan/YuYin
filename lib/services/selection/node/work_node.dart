@@ -1,8 +1,9 @@
-part of '../save_selection_session.dart';
+import '../../../models/media_item.dart';
+import 'resource_node.dart';
 
 /// 作品节点契约：视频作品与图文作品共用只读视图，写入只允许会话命令调用。
-abstract class _WorkNode implements WorkSelectionView {
-  _WorkNode({required this.work});
+abstract class WorkNode implements WorkSelectionView {
+  WorkNode({required this.work});
 
   @override
   SaveWorkItem work;
@@ -19,7 +20,7 @@ abstract class _WorkNode implements WorkSelectionView {
   @override
   List<MediaItem> get tiers;
 
-  List<_ResourceNode> get resourceNodes;
+  List<ResourceNode> get resourceNodes;
 
   @override
   int get tierCount => tiers.length;

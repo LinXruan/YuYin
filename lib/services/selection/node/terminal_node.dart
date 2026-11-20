@@ -1,12 +1,16 @@
-part of '../save_selection_session.dart';
+import 'dart:collection';
+
+import '../../../models/media_item.dart';
+import '../selection_aggregator.dart';
+import 'author_node.dart';
 
 /// Terminal 内部节点：缓存全部 Author 的 7 个聚合维度
-class _TerminalNode implements TerminalSelectionView {
-  _TerminalNode(this._authors) {
+class TerminalNode implements TerminalSelectionView {
+  TerminalNode(this._authors) {
     refresh();
   }
 
-  final List<_AuthorNode> _authors;
+  final List<AuthorNode> _authors;
 
   late final List<AuthorSelectionView> _views =
       UnmodifiableListView(_authors);

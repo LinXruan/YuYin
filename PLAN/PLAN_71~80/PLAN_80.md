@@ -51,8 +51,7 @@
 
 调试桥已完成零 `part` 化（27 → 0）：系统/日志/媒体/历史（+197）、下载/校验（+198）、保存/选择（+199）、解析/批量解析（+200），协议与序列化内联进门面，路由独立为 `BridgeRouter`。处理器按域放在 `handler/system|parse|save/`，真机验证解析、保存、下载、选择矩阵、历史与状态端点。
 
-未落地（顺延）：
-- 其余 16 个调试桥 `part`（parse/save/download/verify/selection/protocol/路由）。
 - 拆解 5 个 `part` 巨石库（Sniffer/Selection/Parse/History/Bridge）与 `_FlowFlow` 命名。
 - 删除 `models/media_item.dart` 聚合导出、`url_parser.dart` 转发壳。
 - 静态 Store 改为显式注入。
+- 1.6.1+201：Selection 节点独立成类（`TerminalNode`/`AuthorNode`/`WorkNode`/`VideoWorkNode`/`MediaWorkNode`/`ResourceNode`），`part` 13 → 7；真机验证选择矩阵装载与状态。

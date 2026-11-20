@@ -9,7 +9,6 @@ import '../../models/save_page/selection/aggregate_state.dart';
 import '../../models/save_page/selection/author_selection_view.dart';
 import '../../models/save_page/selection/quality_indicator.dart';
 import '../../models/save_page/selection/quality_preference.dart';
-import '../../models/save_page/selection/resource_selection_view.dart';
 import '../../models/save_page/selection/selected_work.dart';
 import '../../models/save_page/selection/selection_source.dart';
 import '../../models/save_page/selection/selection_state.dart';
@@ -23,19 +22,12 @@ import '../../models/single_work/single_work_result.dart';
 import '../../models/user_home/user_home_profile.dart';
 import '../../utils/memory/terminal_memory_store.dart';
 import '../../utils/settings/video_quality_utils.dart';
-import 'selection_aggregator.dart';
-
-part 'internal/terminal_node.dart';
-
-part 'internal/author_node.dart';
-
-part 'internal/work_node.dart';
-
-part 'internal/video_work_node.dart';
-
-part 'internal/media_work_node.dart';
-
-part 'internal/resource_node.dart';
+import 'node/author_node.dart';
+import 'node/resource_node.dart';
+import 'node/terminal_node.dart';
+import 'node/work_node.dart';
+import 'node/video_work_node.dart';
+import 'node/media_work_node.dart';
 
 part 'flow/selection_command_flow.dart';
 
@@ -57,9 +49,9 @@ part 'session/session_query.dart';
 class SaveSelectionSession extends ChangeNotifier {
   SaveSelectionSession._({
     required this.source,
-    required List<_AuthorNode> authors,
+    required List<AuthorNode> authors,
   })  : _authors = authors,
-        _terminal = _TerminalNode(authors) {
+        _terminal = TerminalNode(authors) {
     for (final author in authors) {
       _authorBySecUid[author.secUid] = author;
       for (final work in author.nodes) {
@@ -76,12 +68,12 @@ class SaveSelectionSession extends ChangeNotifier {
     required Map<String, List<SaveWorkItem>> worksBySecUid,
     required TerminalSeed seed,
   }) {
-    final authors = <_AuthorNode>[];
+    final authors = <AuthorNode>[];
     final seenUrls = <String>{};
     for (final profile in profiles) {
       final secUid = profile.secUid.trim();
       if (secUid.isEmpty) continue;
-      final nodes = <_WorkNode>[];
+      final nodes = <WorkNode>[];
       for (final work in worksBySecUid[secUid] ?? const <SaveWorkItem>[]) {
         if (!work.kind.isSaveable) continue;
         if (!seenUrls.add(work.url)) continue;
@@ -100,7 +92,7 @@ class SaveSelectionSession extends ChangeNotifier {
     required List<SaveWorkItem> works,
     required TerminalSeed seed,
   }) {
-    final nodes = <_WorkNode>[];
+    final nodes = <WorkNode>[];
     final seenUrls = <String>{};
     for (final work in works) {
       if (!work.kind.isSaveable) continue;
@@ -142,13 +134,13 @@ class SaveSelectionSession extends ChangeNotifier {
 
   final SelectionSource source;
 
-  final List<_AuthorNode> _authors;
-  final _TerminalNode _terminal;
+  final List<AuthorNode> _authors;
+  final TerminalNode _terminal;
 
-  final List<_WorkNode> _allWorks = <_WorkNode>[];
-  final Map<String, _AuthorNode> _authorBySecUid = <String, _AuthorNode>{};
-  final Map<String, _WorkNode> _workByUrl = <String, _WorkNode>{};
-  final Map<String, _AuthorNode> _authorOfWork = <String, _AuthorNode>{};
+  final List<WorkNode> _allWorks = <WorkNode>[];
+  final Map<String, AuthorNode> _authorBySecUid = <String, AuthorNode>{};
+  final Map<String, WorkNode> _workByUrl = <String, WorkNode>{};
+  final Map<String, AuthorNode> _authorOfWork = <String, AuthorNode>{};
 
   late final List<WorkSelectionView> _allWorkViews =
       UnmodifiableListView(_allWorks);
@@ -197,10 +189,10 @@ class SaveSelectionSession extends ChangeNotifier {
 
   void _touch() => _mutated = true;
 
-  static _WorkNode _createWork(SaveWorkItem work, TerminalSeed seed) {
-    final _WorkNode node;
+  static WorkNode _createWork(SaveWorkItem work, TerminalSeed seed) {
+    final WorkNode node;
     if (work.isVideo) {
-      node = _VideoWorkNode(
+      node = VideoWorkNode(
         work: work,
         selected: seed.videoSelected,
         qualityPreference: EdgeQualityPreference(
@@ -208,14 +200,14 @@ class SaveSelectionSession extends ChangeNotifier {
         ),
       );
     } else {
-      node = _MediaWorkNode(work: work, seed: seed);
+      node = MediaWorkNode(work: work, seed: seed);
     }
     _materializePreloaded(node);
     return node;
   }
 
   /// 预载解析结果在构造时立即物化，避免二次嗅探
-  static void _materializePreloaded(_WorkNode node) {
+  static void _materializePreloaded(WorkNode node) {
     final parsed = node.work.parsedResult;
     if (parsed == null) return;
     final cover = node.work.coverUrl.trim();
@@ -225,12 +217,12 @@ class SaveSelectionSession extends ChangeNotifier {
     node.ingest(parsed);
   }
 
-  static _AuthorNode _authorNode(
+  static AuthorNode _authorNode(
     UserHomeProfile profile,
-    List<_WorkNode> nodes, {
+    List<WorkNode> nodes, {
     bool synthetic = false,
   }) {
-    return _AuthorNode(
+    return AuthorNode(
       secUid: profile.secUid.trim(),
       profile: profile,
       synthetic: synthetic,

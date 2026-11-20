@@ -1,7 +1,7 @@
-part of '../save_selection_session.dart';
+import '../../../models/media_item.dart';
 
-class _ResourceNode implements ResourceSelectionView {
-  _ResourceNode({
+class ResourceNode implements ResourceSelectionView {
+  ResourceNode({
     required this.key,
     required this.type,
     required this.selected,

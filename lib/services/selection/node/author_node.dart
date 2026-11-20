@@ -1,7 +1,11 @@
-part of '../save_selection_session.dart';
+import 'dart:collection';
 
-class _AuthorNode implements AuthorSelectionView {
-  _AuthorNode({
+import '../../../models/media_item.dart';
+import '../selection_aggregator.dart';
+import 'work_node.dart';
+
+class AuthorNode implements AuthorSelectionView {
+  AuthorNode({
     required this.secUid,
     required this.profile,
     required this.synthetic,
@@ -19,7 +23,7 @@ class _AuthorNode implements AuthorSelectionView {
   @override
   final bool synthetic;
 
-  final List<_WorkNode> nodes;
+  final List<WorkNode> nodes;
 
   @override
   AggregateState selection = AggregateState.empty;

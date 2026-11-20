@@ -1,7 +1,13 @@
-part of '../save_selection_session.dart';
+import 'dart:collection';
+import '../../../utils/settings/video_quality_utils.dart';
+import '../selection_aggregator.dart';
 
-class _VideoWorkNode extends _WorkNode {
-  _VideoWorkNode({
+import '../../../models/media_item.dart';
+import 'resource_node.dart';
+import 'work_node.dart';
+
+class VideoWorkNode extends WorkNode {
+  VideoWorkNode({
     required super.work,
     required this.selected,
     required this.qualityPreference,
@@ -10,7 +16,7 @@ class _VideoWorkNode extends _WorkNode {
   bool selected;
   QualityPreference qualityPreference;
   List<MediaItem> _tiers = const <MediaItem>[];
-  final List<_ResourceNode> _fallbackResources = <_ResourceNode>[];
+  final List<ResourceNode> _fallbackResources = <ResourceNode>[];
   bool _parsed = false;
   bool _mediaFallback = false;
 
@@ -54,7 +60,7 @@ class _VideoWorkNode extends _WorkNode {
       UnmodifiableListView(_fallbackResources);
 
   @override
-  List<_ResourceNode> get resourceNodes => _fallbackResources;
+  List<ResourceNode> get resourceNodes => _fallbackResources;
 
   @override
   AggregateState resourceState(MediaType type) {
@@ -163,7 +169,7 @@ class _VideoWorkNode extends _WorkNode {
     _fallbackResources.clear();
     for (final item in items) {
       _fallbackResources.add(
-        _ResourceNode(
+        ResourceNode(
           key: item.url,
           type: item.type,
           selected: previous[item.url] ?? selected,

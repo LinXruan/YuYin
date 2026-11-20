@@ -113,7 +113,7 @@ extension SelectionCommands on SaveSelectionSession {
     _touch();
   }
 
-  void _applyAuthorSelection(_AuthorNode author, SelectionState target) {
+  void _applyAuthorSelection(AuthorNode author, SelectionState target) {
     if (target == SelectionState.partial) return;
     var changed = false;
     for (final work in author.nodes) {
@@ -124,7 +124,7 @@ extension SelectionCommands on SaveSelectionSession {
     _touch();
   }
 
-  void _applyWorkSelection(_WorkNode work, SelectionState target) {
+  void _applyWorkSelection(WorkNode work, SelectionState target) {
     if (target == SelectionState.partial) return;
     if (!work.applySelection(target)) return;
     _terminal.refresh();
@@ -132,8 +132,8 @@ extension SelectionCommands on SaveSelectionSession {
   }
 
   void _applyResourceSelection(
-    _WorkNode work,
-    _ResourceNode resource,
+    WorkNode work,
+    ResourceNode resource,
     bool selected,
   ) {
     if (resource.selected == selected) return;
@@ -143,7 +143,7 @@ extension SelectionCommands on SaveSelectionSession {
     _touch();
   }
 
-  void _applyResourceCategory(_WorkNode work, MediaType type, bool selected) {
+  void _applyResourceCategory(WorkNode work, MediaType type, bool selected) {
     var changed = false;
     for (final resource in work.resourceNodes) {
       if (resource.type != type || resource.selected == selected) continue;
