@@ -1,0 +1,60 @@
+# PLAN_82：Sniffer 状态机解耦（12 个 part → 0）
+
+- 版本：`1.6.1+205` 起（版本名冻结，仅递增 build）
+- 主题：把「单任务状态 + 三条捕获策略 + 消息路由 + 脚本注入」从 `part` 扩展拆成可独立测试的领域对象
+- 前置：`PLAN_80`（调试桥、Selection、Shell 已零 part）
+
+---
+
+## 一、根因
+
+`lib/services/sniffer/facade/douyin_sniffer.dart` 以 `part` 挂载 12 个文件（共 24 条 `part`/`part of`），
+所有扩展直接读写 40+ 个私有成员（`_taskId`、`_completer`、`_timeoutTimer`、`_injectTimer`、`_webviewShareFallback` …）。
+单任务状态与单作品/主页/资料三条策略、消息分发、脚本注入、导航拦截全部纠缠在一个库内，
+既无法单独测试，也无法安全修改任意一条路径。
+
+## 二、目标结构
+
+| 对象 | 职责 | 关键约束 |
+| --- | --- | --- |
+| `SnifferCoordinator`（门面） | 唯一生命周期入口，创建/取消任务，向 UI 暴露 `sniffVideoUrl` / `sniffUserHomeUrl` / `sniffUserProfile` | 不写业务判断 |
+| `SniffSession` | 单任务全部可变状态（taskId、nonce、completer、定时器、降级标记、日志开关） | 所有状态只存一份；`dispose()` 幂等 |
+| `SnifferMessageRouter` | Channel 消息解析与分发（log/hint/result/home/profile/login） | 无定时器，无导航 |
+| `SnifferScriptInjector` | 完整脚本注入 + `__dySniffTick` 轻量轮询 | 每个文档只注入一次 |
+| `SingleSniffStrategy` | 单作品主流程、分享页兜底、迟到兜底 | 只依赖 `SniffSession` 与注入器 |
+| `HomeSniffStrategy` / `ProfileSniffStrategy` | 主页滚动与资料抓取 | 复用同一个 `SniffSession` 协议 |
+| `SnifferNavigationPolicy` | UA 切换、非网页协议拦截、导航白名单 | 纯函数优先 |
+
+## 三、分阶段实施（每阶段独立提交 + 真机回归）
+
+| 阶段 | 内容 | 验收 |
+| --- | --- | --- |
+| 1（+205） | 引入 `SniffSession`，把 12 个文件里的任务态字段迁入；门面保留同名 getter 过渡，行为不变 | analyze 0 / 402 测试 / 单视频、图文、主页真机回归 |
+| 2（+206） | `SnifferMessageRouter` 独立类，替换 `message_flow` 与 `message_login_flow` | 同上 + `login_state`/`hint`/`result` 消息单测 |
+| 3（+207） | `SnifferScriptInjector` 独立，替换 `sniffer_lifecycle_flow` 的注入部分 | 主页 300+ 条不超时；单页只注入一次 |
+| 4（+208） | `SingleSniffStrategy`（主流程 + 分享页 + 迟到兜底） | 未登录/已登录视频各 3 次；图文 3 次 |
+| 5（+209） | `HomeSniffStrategy` / `ProfileSniffStrategy` | 已登录主页全量、未登录首屏、资料页 |
+| 6（+210） | 删除 `part` 与门面过渡 getter，结构门禁上限降为 94 | `grep '^part ' lib/services/sniffer` 为 0 |
+
+## 四、文件清单（目标态）
+
+| 文件 | 预估行数 |
+| --- | --- |
+| `sniffer/session/sniff_session.dart` | ≤220 |
+| `sniffer/message/sniffer_message_router.dart` | ≤200 |
+| `sniffer/script/sniffer_script_injector.dart` | ≤120 |
+| `sniffer/single/single_sniff_strategy.dart` | ≤260 |
+| `sniffer/single/webview_fallback_strategy.dart` | ≤150 |
+| `sniffer/home/home_sniff_strategy.dart` | ≤200 |
+| `sniffer/home/profile_sniff_strategy.dart` | ≤150 |
+| `sniffer/navigation/sniffer_navigation_policy.dart` | ≤90 |
+| `sniffer/facade/douyin_sniffer.dart` | ≤200 |
+
+## 五、风险与回退
+
+| 风险 | 对策 |
+| --- | --- |
+| 单任务状态迁移遗漏导致取消/超时错乱 | 阶段 1 只做字段搬迁 + 同名转发，不改任何判断；真机跑取消与 30 秒超时 |
+| 分享页兜底时序变化 | 阶段 4 保留原定时器常量与顺序，逐条对照日志 |
+| 主页滚动并发 | 阶段 5 前先补一个 500 条主页压测记录，作为回归基线 |
+| 回归失败 | 每阶段独立提交，可直接回退该 build |
