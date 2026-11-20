@@ -45,7 +45,7 @@ extension _HistoryPageFrame on _HistoryPageState {
                     const Spacer(),
                     if (hasAnyRecord && _isSelectionMode) ...[
                       // 多选模式：全选（紧贴已保存按钮左侧，样式与边框高光对齐保存页）
-                      _HistoryFilterButton(
+                      HistoryFilterButton(
                         label: allSelected ? '取消全选' : '全选',
                         isSelected: allSelected,
                         hasItems: displayedItems.isNotEmpty,
@@ -57,7 +57,7 @@ extension _HistoryPageFrame on _HistoryPageState {
                     ],
                     if (hasAnyRecord)
                       // 已保存筛选切换按钮
-                      _HistoryFilterButton(
+                      HistoryFilterButton(
                         label: '已保存',
                         isSelected: _filterOnlySaved,
                         onTap: _toggleFilterOnlySaved,
@@ -107,12 +107,23 @@ extension _HistoryPageFrame on _HistoryPageState {
                 !_isSelectionMode &&
                 !_sessionDismissed &&
                 !_permanentlyDismissed)
-              _buildPromptBanner(theme),
+              HistoryPromptBanner(
+                onDismiss: () {
+                  _refresh(() => _sessionDismissed = true);
+                },
+                onPermanentlyDismiss: () async {
+                  _refresh(() => _permanentlyDismissed = true);
+                  await HistoryStore.setPromptDismissed(true);
+                },
+              ),
 
             // 3. 上下滑动的内容列表流
             Expanded(
               child: displayedItems.isEmpty
-                  ? _buildEmptyState(theme, hasAnyRecord)
+                  ? HistoryEmptyView(
+                      hasAnyRecord: hasAnyRecord,
+                      filterOnlySaved: _filterOnlySaved,
+                    )
                   : ListView.builder(
                       padding: const EdgeInsets.only(top: 6, bottom: 24),
                       itemCount: displayedItems.length,

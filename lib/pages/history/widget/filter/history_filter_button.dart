@@ -1,7 +1,9 @@
-part of '../../page/history_page.dart';
+import 'package:flutter/material.dart';
 
-class _HistoryFilterButton extends StatelessWidget {
-  const _HistoryFilterButton({
+/// 历史记录页胶囊过滤按钮组件（支持全选、取消全选、已保存切换等）
+class HistoryFilterButton extends StatelessWidget {
+  const HistoryFilterButton({
+    super.key,
     required this.label,
     required this.isSelected,
     required this.onTap,
@@ -77,5 +79,3 @@ class _HistoryFilterButton extends StatelessWidget {
     );
   }
 }
-
-/// 历史记录卡片组件（严格遵照设计：不含“抖音”二字，圆角缩略图与作品文案）
