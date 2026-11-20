@@ -1,21 +1,48 @@
-part of '../../page/history_page.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-/// 历史页骨架：顶部操作栏、列表与空态。
-extension _HistoryPageFrame on _HistoryPageState {
-  Widget _buildHistoryPage(BuildContext context) {
+import '../../../../models/history_item.dart';
+import '../../flow/action/history_action_helper.dart';
+import '../../flow/search/history_search_coordinator.dart';
+import '../../flow/selection/history_selection_coordinator.dart';
+import '../banner/history_prompt_banner.dart';
+import '../card/history_card.dart';
+import '../empty/history_empty_view.dart';
+import '../filter/history_filter_button.dart';
+
+/// 历史页骨架组件：顶部标题与操作栏、搜索框、提示条、列表视图与底栏删除按钮
+class HistoryFrame extends StatelessWidget {
+  const HistoryFrame({
+    super.key,
+    required this.selection,
+    required this.search,
+    required this.displayedItems,
+    required this.hasAnyRecord,
+    required this.sessionDismissed,
+    required this.permanentlyDismissed,
+    required this.onDismissSession,
+    required this.onPermanentlyDismiss,
+  });
+
+  final HistorySelectionCoordinator selection;
+  final HistorySearchCoordinator search;
+  final List<HistoryItem> displayedItems;
+  final bool hasAnyRecord;
+  final bool sessionDismissed;
+  final bool permanentlyDismissed;
+  final VoidCallback onDismissSession;
+  final VoidCallback onPermanentlyDismiss;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final displayedItems = HistoryStore.search(
-      _search.searchQuery,
-      onlySaved: _search.filterOnlySaved,
-    );
-    final hasAnyRecord = HistoryStore.records.isNotEmpty;
-    final allSelected = _selection.isAllSelected(displayedItems);
+    final allSelected = selection.isAllSelected(displayedItems);
 
     return PopScope(
-      canPop: !_selection.isSelectionMode,
+      canPop: !selection.isSelectionMode,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _selection.isSelectionMode) {
-          _selection.exitSelectionMode();
+        if (!didPop && selection.isSelectionMode) {
+          selection.exitSelectionMode();
         }
       },
       child: Scaffold(
@@ -27,19 +54,19 @@ extension _HistoryPageFrame on _HistoryPageState {
                 padding: const EdgeInsets.fromLTRB(20, 12, 16, 8),
                 child: Row(
                   children: [
-                    if (_selection.isSelectionMode) ...[
+                    if (selection.isSelectionMode) ...[
                       IconButton(
                         icon: const Icon(Icons.close_rounded, size: 22),
                         visualDensity: VisualDensity.compact,
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
-                        onPressed: _selection.exitSelectionMode,
+                        onPressed: selection.exitSelectionMode,
                       ),
                       const SizedBox(width: 8),
                     ],
                     Text(
-                      _selection.isSelectionMode
-                          ? '已选 ${_selection.selectedIds.length} 项'
+                      selection.isSelectionMode
+                          ? '已选 ${selection.selectedIds.length} 项'
                           : '历史',
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
@@ -47,14 +74,14 @@ extension _HistoryPageFrame on _HistoryPageState {
                       ),
                     ),
                     const Spacer(),
-                    if (hasAnyRecord && _selection.isSelectionMode) ...[
+                    if (hasAnyRecord && selection.isSelectionMode) ...[
                       // 多选模式：全选
                       HistoryFilterButton(
                         label: allSelected ? '取消全选' : '全选',
                         isSelected: allSelected,
                         hasItems: displayedItems.isNotEmpty,
                         onTap: displayedItems.isNotEmpty
-                            ? () => _selection.toggleSelectAll(displayedItems)
+                            ? () => selection.toggleSelectAll(displayedItems)
                             : () {},
                       ),
                       const SizedBox(width: 8),
@@ -63,21 +90,21 @@ extension _HistoryPageFrame on _HistoryPageState {
                       // 已保存筛选切换按钮
                       HistoryFilterButton(
                         label: '已保存',
-                        isSelected: _search.filterOnlySaved,
-                        onTap: _search.toggleFilterOnlySaved,
+                        isSelected: search.filterOnlySaved,
+                        onTap: search.toggleFilterOnlySaved,
                       ),
                   ],
                 ),
               ),
 
               // 2. 搜索框（匹配作品完整文案）
-              if (hasAnyRecord || _search.searchQuery.isNotEmpty)
+              if (hasAnyRecord || search.searchQuery.isNotEmpty)
                 Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   child: TextField(
-                    controller: _search.textController,
-                    onChanged: _search.onSearchChanged,
+                    controller: search.textController,
+                    onChanged: search.onSearchChanged,
                     decoration: InputDecoration(
                       hintText: '搜索作品完整文案...',
                       hintStyle: TextStyle(
@@ -85,10 +112,10 @@ extension _HistoryPageFrame on _HistoryPageState {
                         color: theme.colorScheme.outline,
                       ),
                       prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                      suffixIcon: _search.textController.text.isNotEmpty
+                      suffixIcon: search.textController.text.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear_rounded, size: 18),
-                              onPressed: _search.clearSearch,
+                              onPressed: search.clearSearch,
                             )
                           : null,
                       isDense: true,
@@ -109,17 +136,12 @@ extension _HistoryPageFrame on _HistoryPageState {
 
               // 2.5 提示栏：在至少存在 1 条历史记录且非多选态时展示
               if (hasAnyRecord &&
-                  !_selection.isSelectionMode &&
-                  !_sessionDismissed &&
-                  !_permanentlyDismissed)
+                  !selection.isSelectionMode &&
+                  !sessionDismissed &&
+                  !permanentlyDismissed)
                 HistoryPromptBanner(
-                  onDismiss: () {
-                    _refresh(() => _sessionDismissed = true);
-                  },
-                  onPermanentlyDismiss: () async {
-                    _refresh(() => _permanentlyDismissed = true);
-                    await HistoryStore.setPromptDismissed(true);
-                  },
+                  onDismiss: onDismissSession,
+                  onPermanentlyDismiss: onPermanentlyDismiss,
                 ),
 
               // 3. 上下滑动的内容列表流
@@ -127,7 +149,7 @@ extension _HistoryPageFrame on _HistoryPageState {
                 child: displayedItems.isEmpty
                     ? HistoryEmptyView(
                         hasAnyRecord: hasAnyRecord,
-                        filterOnlySaved: _search.filterOnlySaved,
+                        filterOnlySaved: search.filterOnlySaved,
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.only(top: 6, bottom: 24),
@@ -135,26 +157,26 @@ extension _HistoryPageFrame on _HistoryPageState {
                         itemBuilder: (context, index) {
                           final item = displayedItems[index];
                           final isSelected =
-                              _selection.selectedIds.contains(item.id);
+                              selection.selectedIds.contains(item.id);
 
                           return HistoryCard(
                             key: ValueKey(item.id),
                             item: item,
-                            isSelectionMode: _selection.isSelectionMode,
+                            isSelectionMode: selection.isSelectionMode,
                             isSelected: isSelected,
                             onTap: () {
-                              if (_selection.isSelectionMode) {
-                                _selection.toggleItem(item.id);
+                              if (selection.isSelectionMode) {
+                                selection.toggleItem(item.id);
                               } else {
                                 HistoryActionHelper.copyLink(context, item);
                               }
                             },
                             onLongPress: () {
                               HapticFeedback.selectionClick();
-                              if (!_selection.isSelectionMode) {
-                                _selection.enterSelectionMode(item.id);
+                              if (!selection.isSelectionMode) {
+                                selection.enterSelectionMode(item.id);
                               } else {
-                                _selection.toggleItem(item.id);
+                                selection.toggleItem(item.id);
                               }
                             },
                           );
@@ -163,7 +185,7 @@ extension _HistoryPageFrame on _HistoryPageState {
               ),
 
               // 4. 多选模式底部大删除按钮
-              if (_selection.isSelectionMode)
+              if (selection.isSelectionMode)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
                   child: SizedBox(
@@ -173,11 +195,11 @@ extension _HistoryPageFrame on _HistoryPageState {
                         backgroundColor: theme.colorScheme.error,
                         foregroundColor: theme.colorScheme.onError,
                       ),
-                      onPressed: _selection.selectedIds.isEmpty
+                      onPressed: selection.selectedIds.isEmpty
                           ? null
-                          : () => _selection.confirmDeleteSelected(context),
+                          : () => selection.confirmDeleteSelected(context),
                       icon: const Icon(Icons.delete_outline_rounded),
-                      label: Text('删除选中项 (${_selection.selectedIds.length})'),
+                      label: Text('删除选中项 (${selection.selectedIds.length})'),
                     ),
                   ),
                 ),

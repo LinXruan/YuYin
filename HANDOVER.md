@@ -1,16 +1,16 @@
-# 余音交接清单（截至 1.6.1+219）
+# 余音交接清单（截至 1.6.1+223）
 
-> 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_81~90/PLAN_83.md`。
-> 工作区干净，最近提交为 219_pl83。
+> 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_81~90/PLAN_84.md`。
+> 工作区干净，最近提交为 223_pl84。
 
 ---
 
 ## 0. 一句话现状
 
-- 版本：`1.6.1+219`（版本名冻结，只递增 build 号）。
-- 门禁：`flutter analyze` 0 issues；`flutter test` 403 全绿；结构门禁 `part` 上限 **70**。
-- 已完成大重构：**调试桥 0 part、Selection 0 part、Shell 0 part、Sniffer 0 part、ParsePage 0 part**。
-- 未完成大重构：HistoryPage（16 条）、widgets/save_page（42 条）。
+- 版本：`1.6.1+223`（版本名冻结，只递增 build 号）。
+- 门禁：`flutter analyze` 0 issues；`flutter test` 403 全绿；结构门禁 `part` 上限 **42**。
+- 已完成大重构：**调试桥 0 part、Selection 0 part、Shell 0 part、Sniffer 0 part、ParsePage 0 part、HistoryPage 0 part**。
+- 未完成大重构：widgets/save_page（38 条）、widgets/update（4 条）。
 
 ---
 
@@ -55,6 +55,10 @@
 | 217 | 83 | ParsePage 阶段 3：三大解析编排器独立化（SingleParseCoordinator + MultiParseCoordinator + HomeParseCoordinator），part 上限 72 |
 | 218 | 83 | ParsePage 阶段 4：骨架与输入卡片解耦（ParseFrame 独立组件），ParsePage 彻底 0 part，part 上限 70 |
 | 219 | 83 | 修复 Sniffer _controller 初始化时序（真机/模拟器启动异常），模拟器带窗口三链路回归全通 |
+| 220 | 84 | HistoryPage 阶段 1：过滤按钮与空态/提示横幅独立组件化（HistoryFilterButton + HistoryPromptBanner + HistoryEmptyView），part 上限 66 |
+| 221 | 84 | HistoryPage 阶段 2：历史卡片与封面缩略图独立化（HistoryCard + HistoryCardThumbnail），part 上限 62 |
+| 222 | 84 | HistoryPage 阶段 3：操作辅助与选择流程协同器独立化（HistoryActionHelper + HistorySelectionCoordinator + HistorySearchCoordinator），part 上限 56 |
+| 223 | 84 | HistoryPage 阶段 4：骨架组件解耦（HistoryFrame 独立组件），HistoryPage 彻底 0 part，part 上限 42 |
 
 ---
 
@@ -95,7 +99,27 @@
 - `lifecycle/sniffer_page_lifecycle.dart`：空白页重置、空闲延迟卸载、桌面 UA 恢复。
 - 门面 `douyin_sniffer.dart` **278 行**，硬上限 400，**0 part**。
 
-### 3.5 原生（Kotlin）
+### 3.5 ParsePage（0 part，大重构完成）
+
+- `lib/pages/parse/page/parse_page.dart`（157 行）：精简页面骨架，持有协调器实例与状态刷新。
+- `lib/pages/parse/widget/frame/parse_frame.dart`（123 行）：独立自闭环输入框与滚动指示器管理。
+- `lib/pages/parse/flow/single/single_parse_coordinator.dart`：单作品解析编排。
+- `lib/pages/parse/flow/multi/multi_parse_coordinator.dart`：多链接并发解析编排。
+- `lib/pages/parse/flow/home/home_parse_coordinator.dart`：主页批量解析编排。
+- `lib/pages/parse/flow/common/parse_save_coordinator.dart`：单作品画质/图集弹窗交互与按作者解算。
+- `lib/pages/parse/flow/common/parse_flow_helper.dart`：错误文案、媒体类型文本转译纯函数。
+- 纯展示原子组件：`PromptSurface`、`LoginPromptBanner`、`BatchSupportBanner`、`StatusCard`、`ParseActionButton`。
+
+### 3.6 HistoryPage（0 part，大重构完成）
+
+- `lib/pages/history/page/history_page.dart`（106 行）：页面骨架，监听缩略图缓存与历史存储变更。
+- `lib/pages/history/widget/frame/history_frame.dart`（208 行）：顶部操作栏、搜索输入框、提示条、列表视图与底栏删除按钮。
+- `lib/pages/history/flow/selection/history_selection_coordinator.dart`（108 行）：多选模式、选中项维护、全选/反选与删除确认对话框。
+- `lib/pages/history/flow/search/history_search_coordinator.dart`（44 行）：关键词防抖模糊检索、已保存筛选与清空。
+- `lib/pages/history/flow/action/history_action_helper.dart`（35 行）：剪贴板复制链接与轻量 SnackBar 提示。
+- 独立展示组件：`HistoryCard`、`HistoryCardThumbnail`（100% 离线缓存+兜底）、`HistoryPromptBanner`、`HistoryEmptyView`、`HistoryFilterButton`。
+
+### 3.7 原生（Kotlin）
 
 - `MainActivity.kt` 86 行：只组装通道与生命周期。
 - `audio/AudioPreviewPlayer.kt`：prepared 状态机、AudioFocus、错误即释放。
@@ -166,8 +190,8 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 ### B. PLAN_80 · 剩余架构债
 
 - [x] **ParsePage（24 条）**：`lib/pages/parse/page/parse_page.dart` + 12 个分片彻底消除；拆为 Single/Multi/Home 三大 Coordinator、ParseSaveCoordinator、ParseFlowHelper 与纯 UI ParseFrame，彻底 **0 part**。
-- [ ] **HistoryPage（16 条）**：`lib/pages/history/page/history_page.dart` + 8 个 part；拆为 HistoryCard/HistoryFrame/HistoryActions 独立组件，消除整页重建。
-- [ ] **widgets/save_page（42 条）**：top/middle/bottom 三个 sheet 的 part 拆为独立 Widget + 选择视图模型。
+- [x] **HistoryPage（16 条）**：`lib/pages/history/page/history_page.dart` + 8 个 part；彻底消除，拆为 HistoryCard/HistoryCardThumbnail/HistoryFrame/HistoryPromptBanner/HistoryEmptyView 与 Selection/Search Coordinator，彻底 **0 part**。
+- [ ] **widgets/save_page（38 条）**：top/middle/bottom 三个 sheet 的 part 拆为独立 Widget + 选择视图模型。
 - [ ] **删除聚合导出壳**：`lib/models/media_item.dart`（几十处 import 改为按域导入）、`lib/utils/url_parser.dart`（转发到 `utils/url/`）。
 - [ ] **Store 显式注入**：`HistoryStore`/`TerminalMemoryStore` 等静态单例改为 `main.dart` 构造并注入，符合 AGENTS §4。
 - [ ] 清理 `_FlowFlow` 命名残余、`ignore_for_file`。
@@ -220,7 +244,7 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 
 | 主题 | 文件 |
 | --- | --- |
-| 迭代计划 | `PLAN/PLAN_71~80/PLAN_77~80.md`、`PLAN/PLAN_81~90/PLAN_81.md`、`PLAN_82.md` |
+| 迭代计划 | `PLAN/PLAN_71~80/PLAN_77~80.md`、`PLAN/PLAN_81~90/PLAN_81~84.md` |
 | 嗅探门面 | `lib/services/sniffer/facade/douyin_sniffer.dart` |
 | 任务态 | `lib/services/sniffer/session/sniff_session.dart` |
 | 消息路由 | `lib/services/sniffer/message/sniffer_message_router.dart` |
