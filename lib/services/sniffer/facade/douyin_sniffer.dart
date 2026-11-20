@@ -9,6 +9,8 @@ import '../../../utils/login_state_store.dart';
 import '../../../utils/url_parser.dart';
 import '../../share/client/douyin_share_api.dart';
 import '../channel/sniffer_channel_parser.dart';
+import '../message/login_message_handler.dart';
+import '../message/sniffer_message_host.dart';
 import '../session/sniff_session.dart';
 import '../common/log_message_policy.dart';
 import '../lifecycle/sniff_cancelled_exception.dart';
@@ -30,8 +32,6 @@ part '../single/share_fallback_flow.dart';
 part '../single/webview_fallback_flow.dart';
 
 part '../common/message_flow.dart';
-
-part '../common/message_login_flow.dart';
 
 part '../common/message_result_flow.dart';
 
@@ -58,7 +58,8 @@ class DouyinSniffer
         IUserHomeExtractor,
         ISingleWorkSnifferDelegate,
         IUserHomeSnifferDelegate,
-        IMultiWorkSnifferDelegate {
+        IMultiWorkSnifferDelegate,
+        SnifferMessageHost {
   /// 单作品解析领域提取器
   late final ISingleWorkExtractor singleWork = SingleWorkExtractor(this);
 
@@ -92,6 +93,46 @@ class DouyinSniffer
 
   /// 单任务共享状态（任务态字段统一收敛于此）
   final SniffSession _session = SniffSession();
+
+  late final LoginMessageHandler _loginHandler = LoginMessageHandler(this);
+
+  @override
+  SniffSession get session => _session;
+
+  @override
+  bool get isTaskActive => _isTaskActive;
+
+  @override
+  bool get snifferLoggedIn => _isLoggedIn;
+
+  @override
+  set snifferLoggedIn(bool value) => _isLoggedIn = value;
+
+  @override
+  void notifyLoginState(bool loggedIn) => onLoginStateDetected?.call(loggedIn);
+
+  @override
+  void logDiagnostic(String message) => _log(message);
+
+  @override
+  Future<void> finishWithFallbackItems(
+    List<MediaItem> items,
+    int taskId, {
+    String? title,
+    String? desc,
+    String? coverUrl,
+    String? awemeId,
+  }) {
+    return _finishWithItems(
+      items,
+      false,
+      taskId,
+      title: title,
+      desc: desc,
+      coverUrl: coverUrl,
+      awemeId: awemeId,
+    );
+  }
 
   final DouyinShareApi _shareApi = DouyinShareApi();
   final Set<String> _blockedSchemes = <String>{};

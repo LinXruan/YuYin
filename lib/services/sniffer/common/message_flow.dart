@@ -32,7 +32,7 @@ extension SnifferMessageFlowFlow on DouyinSniffer {
       if (data['type'] == 'login_state') {
         final remoteLoggedIn = data['loggedIn'] == true;
         final reason = data['reason']?.toString() ?? '';
-        _handleLoginStateDetected(remoteLoggedIn, reason, _session.taskId);
+        _loginHandler.handle(remoteLoggedIn, reason, _session.taskId);
         return;
       }
       if (data['type'] == 'hint') {

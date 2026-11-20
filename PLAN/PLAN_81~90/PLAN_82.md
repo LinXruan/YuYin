@@ -64,4 +64,4 @@
 
 - **阶段 1（1.6.1+206）已完成**：新增 `session/sniff_session.dart`，33 个任务态字段从门面与 12 个分片迁入；引用统一为 `_session.x`，门面只留 `_controller`/`_disposed`/`_shareApi`/`_blockedSchemes`/登录回调。
   迁移后真机回归：主页未登录 18 条、单视频、图文均通过。
-  踩坑：sed 批量替换把 `'t$_taskId'` 变成 `'t$_session.taskId'`，nonce 变成对象字符串导致注入 JS 语法错误（主页 40 秒无作品）；已改为 `'t${_session.taskId}'`。后续阶段改引用时必须检查字符串插值。
+  踩坑：sed 批量替换把 `'t$_taskId'` 变成 `'t$_session.taskId'`，nonce 变成对象字符串导致注入 JS 语法错误（主页 40 秒无作品）；已改为 `'t${_session.taskId}'`。后续阶段改引用时必须检查字符串插值。- **阶段 2 部分（1.6.1+207）**：`LoginMessageHandler` + `SnifferMessageHost` 接口落地，登录态分流移出 `part`；真机未登录视频验证日志与结果正常。其余消息（log/hint/result/home/profile）仍在 `message_flow`，待下一阶段并入路由。
