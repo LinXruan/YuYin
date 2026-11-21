@@ -7,10 +7,7 @@ import '../../../services/update/app_installer.dart';
 import '../../../services/update/client/update_checker.dart';
 import '../../../utils/update/app_update_store.dart';
 import '../../../utils/url/url_launcher_util.dart';
-
-part '../notes/release_notes_box.dart';
-
-part '../markdown/markdown_render_view.dart';
+import '../notes/release_notes_box.dart';
 
 /// 更新提示与发布说明弹窗
 class UpdateDialog extends StatelessWidget {
@@ -108,7 +105,7 @@ class UpdateDialog extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            _ReleaseNotesBox(notes: info.releaseNotes),
+            ReleaseNotesBox(notes: info.releaseNotes),
           ],
         ),
       ),

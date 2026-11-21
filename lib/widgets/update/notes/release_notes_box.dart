@@ -1,15 +1,20 @@
-part of '../dialog/update_dialog.dart';
+import 'dart:async';
 
-class _ReleaseNotesBox extends StatefulWidget {
-  const _ReleaseNotesBox({required this.notes});
+import 'package:flutter/material.dart';
+
+import '../markdown/markdown_render_view.dart';
+
+/// 发布说明展示盒组件（可滚动内容与自绘滚动指示器）
+class ReleaseNotesBox extends StatefulWidget {
+  const ReleaseNotesBox({super.key, required this.notes});
 
   final String notes;
 
   @override
-  State<_ReleaseNotesBox> createState() => _ReleaseNotesBoxState();
+  State<ReleaseNotesBox> createState() => _ReleaseNotesBoxState();
 }
 
-class _ReleaseNotesBoxState extends State<_ReleaseNotesBox> {
+class _ReleaseNotesBoxState extends State<ReleaseNotesBox> {
   double _scrollProgress = 0.0;
   double _thumbHeight = 0.0;
   double _trackHeight = 0.0;
@@ -61,7 +66,7 @@ class _ReleaseNotesBoxState extends State<_ReleaseNotesBox> {
     });
 
     _hideScrollTimer?.cancel();
-    _hideScrollTimer = Timer(const Duration(milliseconds: 1200), () {
+    _hideScrollTimer = Timer(const Duration(milliseconds: 900), () {
       if (mounted) {
         setState(() => _showScrollIndicator = false);
       }
@@ -73,67 +78,59 @@ class _ReleaseNotesBoxState extends State<_ReleaseNotesBox> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(
-        maxHeight: 180.0,
+    final boxBgColor = isDark
+        ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35)
+        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5);
+    final borderColor =
+        theme.colorScheme.outlineVariant.withValues(alpha: isDark ? 0.3 : 0.45);
+
+    final double topOffset = (_trackHeight - _thumbHeight) * _scrollProgress;
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: boxBgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor, width: 1.0),
       ),
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: isDark
-              ? theme.colorScheme.surfaceContainerHigh
-              : theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+      child: Stack(
+        children: [
+          // 内部限制最大高度为 220dp，保证超出时优雅滚动
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 220),
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                _handleScrollNotification(notification);
+                return false;
+              },
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                child: MarkdownRenderView(markdown: widget.notes),
+              ),
+            ),
           ),
-        ),
-        child: NotificationListener<ScrollNotification>(
-          onNotification: (notification) {
-            _handleScrollNotification(notification);
-            return false;
-          },
-          child: Stack(
-            fit: StackFit.loose,
-            children: [
-              SingleChildScrollView(
-                padding: const EdgeInsets.only(
-                  left: 12.0,
-                  top: 10.0,
-                  right: 14.0,
-                  bottom: 10.0,
-                ),
-                child: SelectionArea(
-                  child: _MarkdownRenderView(markdown: widget.notes),
+
+          // 右侧自定义指示条（仅在需要且滚动时浮现，停止后渐隐）
+          Positioned(
+            right: 4,
+            top: 6 + (topOffset.isNaN ? 0.0 : topOffset),
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 200),
+              opacity: _showScrollIndicator ? 1.0 : 0.0,
+              child: Container(
+                width: 3.5,
+                height: _thumbHeight > 0 ? _thumbHeight : 24.0,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.4)
+                      : Colors.black.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              // 定制纯视觉滑动指示器：无手势劫持、向左微调防遮挡边框、不滑动渐隐
-              if (_trackHeight > 0 && _thumbHeight > 0)
-                Positioned(
-                  top: 6.0 + (_scrollProgress * (_trackHeight - _thumbHeight)),
-                  right: 5.0,
-                  child: IgnorePointer(
-                    child: AnimatedOpacity(
-                      opacity: _showScrollIndicator ? 1.0 : 0.0,
-                      duration: const Duration(milliseconds: 250),
-                      child: Container(
-                        width: 3.0,
-                        height: _thumbHeight,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary
-                              .withValues(alpha: 0.65),
-                          borderRadius: BorderRadius.circular(1.5),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 }
-
-/// Markdown 渲染视图：将 Markdown 文本解析为层级结构化的视觉组件
