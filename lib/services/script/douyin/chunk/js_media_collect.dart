@@ -57,9 +57,12 @@ const String jsMediaCollect = r'''  // 普通视频：同时兼容 bit_rate（�
     }
     return unique;
   }
-  // 静态图：优先 jpeg/jpg 原图，否则取最后一项（兼容 RSC 的 urlList）
+  // 静态图：优先 jpeg/jpg 原图，否则取最后一项（兼容 RSC 的 urlList 与 display_image）
   function pickImage(img) {
-    var list = img && (img.url_list || img.urlList);
+    if (!img) return '';
+    var list = img.url_list || img.urlList ||
+      (img.display_image && (img.display_image.url_list || img.display_image.urlList)) ||
+      (img.owner_watermark_image && (img.owner_watermark_image.url_list || img.owner_watermark_image.urlList));
     if (!list || !list.length) return '';
     for (var i = 0; i < list.length; i++) {
       var u = String(list[i] || '').toLowerCase();
@@ -72,7 +75,9 @@ const String jsMediaCollect = r'''  // 普通视频：同时兼容 bit_rate（�
     var items = [];
     for (var i = 0; i < images.length; i++) {
       var img = images[i] || {}, imageUrl = clean(pickImage(img));
-      if (imageUrl) items.push({ url: imageUrl, mediaType: 'image', resolution: resText(img.width, img.height) });
+      var w = img.width || (img.display_image && img.display_image.width);
+      var h = img.height || (img.display_image && img.display_image.height);
+      if (imageUrl) items.push({ url: imageUrl, mediaType: 'image', resolution: resText(w, h) });
       if (img.video) {
         var best = pickBest(img.video);
         if (best) items.push({

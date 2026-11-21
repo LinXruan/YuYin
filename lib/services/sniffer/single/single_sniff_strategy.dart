@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../models/single_work/media_download_item.dart';
 import '../../../models/single_work/single_work_result.dart';
@@ -10,7 +11,6 @@ import '../../../utils/url/url_classifier.dart';
 import '../../../utils/url/url_extractor.dart';
 import '../../multi_work/article_work_exception.dart';
 import '../../share/client/douyin_share_api.dart';
-import '../channel/sniffer_channel_parser.dart';
 import '../lifecycle/sniff_cancelled_exception.dart';
 import '../session/sniff_session.dart';
 import '../sniffer_time_budget.dart';
@@ -23,10 +23,14 @@ import 'webview_fallback_strategy.dart';
 /// 负责协调主 WebView 注入捕获、Dio 分享页并行兜底（B）与 WebView 分享页兜底（C）。
 class SingleSniffStrategy {
   final SnifferSingleHost host;
+  final Future<String> Function(Uri uri) _cookieReader;
   late final WebviewFallbackStrategy webviewFallback;
   late final ShareFallbackStrategy shareFallback;
 
-  SingleSniffStrategy(this.host) {
+  SingleSniffStrategy(
+    this.host, {
+    Future<String> Function(Uri uri)? cookieReader,
+  }) : _cookieReader = cookieReader ?? _readNativeCookies {
     webviewFallback = WebviewFallbackStrategy(
       host: host,
       onFallbackTimeout: (error, {taskId}) => finishWithError(error, taskId: taskId),
@@ -216,13 +220,15 @@ class SingleSniffStrategy {
 
     var cookie = '';
     try {
-      cookie = SnifferChannelParser.jsResultToString(
-        await host.controller
-            .runJavaScriptReturningResult('document.cookie')
-            .timeout(const Duration(seconds: 3)),
+      final primaryUri = cookieUriFor(
+        session.lastPageUrl ?? session.awemePageUrl ?? session.sourceUrl,
       );
+      cookie = await _cookieReader(primaryUri);
+      if (cookie.isEmpty && primaryUri.host != 'www.douyin.com') {
+        cookie = await _cookieReader(Uri.parse('https://www.douyin.com'));
+      }
     } catch (e) {
-      host.logDiagnostic('读取 Cookie 失败: $e');
+      host.logDiagnostic('读取原生 Cookie 失败: $e');
     }
 
     if (taskId != session.taskId ||
@@ -324,5 +330,27 @@ class SingleSniffStrategy {
     final awemeId = DouyinUrlExtractor.extractAwemeId(url);
     if (awemeId == null) return;
     shareFallback.maybeStart(awemeId, taskId);
+  }
+
+  /// 提取用于查询原生 Cookie 的域名根 URI
+  @visibleForTesting
+  static Uri cookieUriFor(String? rawUrl) {
+    final parsed = rawUrl == null ? null : Uri.tryParse(rawUrl.trim());
+    if (parsed != null &&
+        (parsed.scheme == 'http' || parsed.scheme == 'https') &&
+        parsed.host.isNotEmpty) {
+      return Uri(scheme: parsed.scheme, host: parsed.host);
+    }
+    return Uri.parse('https://www.douyin.com');
+  }
+
+  static Future<String> _readNativeCookies(Uri uri) async {
+    final manager = WebViewCookieManager();
+    final cookies = await manager.getCookies(domain: uri);
+    if (cookies.isEmpty) return '';
+    return cookies
+        .where((c) => c.name.isNotEmpty)
+        .map((c) => '${c.name}=${c.value}')
+        .join('; ');
   }
 }

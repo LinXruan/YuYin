@@ -21,7 +21,12 @@ const String jsScanEngine = r'''  }
       // 有 ID 且与目标不一致：整棵子树跳过，避免推荐作品的 video/images 抢跑
       if (filterId && nodeId && nodeId !== filterId) continue;
 
-      var hasImages = Array.isArray(node.images) && node.images.length > 0;
+      var rawImages = (Array.isArray(node.images) && node.images.length > 0)
+        ? node.images
+        : ((node.image_post_info && Array.isArray(node.image_post_info.images) && node.image_post_info.images.length > 0)
+          ? node.image_post_info.images
+          : null);
+      var hasImages = !!rawImages;
       var video = !hasImages ? (node.video || ((node.play_addr || node.playAddr || node.bit_rate) ? node : null)) : null;
 
       // 仅在当前节点是目标作品或包含核心媒体资源（images/video）时提取文案，彻底防止顶层无关组件污染
@@ -31,7 +36,7 @@ const String jsScanEngine = r'''  }
       }
 
       if (hasImages) {
-        var items = collectImages(node.images);
+        var items = collectImages(rawImages);
         var audioUrl = pickAudioUrl(node);
         if (audioUrl) {
           items.push({ url: audioUrl, mediaType: 'audio', gearName: '配乐' });

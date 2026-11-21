@@ -41,12 +41,14 @@ const String jsHomeCollect = r'''  // 解析作品数量文本（支持逗号、
     }
     return 0;
   }
-  // 将新作品链接、封面及标题追加到全局去重池中，并按每 10 条汇报进度
-  function appendHomeWorks(urls, authorName, coversMap, titlesMap, authorAvatar) {
+  // 将新作品链接、封面及标题追加到全局去重池中，并按每 10 条汇报进度（API 标题优先于 DOM 文本）
+  function appendHomeWorks(urls, authorName, coversMap, titlesMap, authorAvatar, titleSource) {
     if (!Array.isArray(urls) || !urls.length) return 0;
     var newAdded = 0;
+    var srcKind = titleSource || 'dom';
     S.homeWorkCovers = S.homeWorkCovers || {};
     S.homeWorkTitles = S.homeWorkTitles || {};
+    S.homeWorkTitleSources = S.homeWorkTitleSources || {};
     for (var i = 0; i < urls.length; i++) {
       var u = urls[i];
       if (u && !S.homeWorkSet[u]) {
@@ -57,8 +59,12 @@ const String jsHomeCollect = r'''  // 解析作品数量文本（支持逗号、
       if (u && coversMap && coversMap[u] && !S.homeWorkCovers[u]) {
         S.homeWorkCovers[u] = coversMap[u];
       }
-      if (u && titlesMap && titlesMap[u] && !S.homeWorkTitles[u]) {
-        S.homeWorkTitles[u] = titlesMap[u];
+      if (u && titlesMap && titlesMap[u]) {
+        var prevSrc = S.homeWorkTitleSources[u];
+        if (!S.homeWorkTitles[u] || (srcKind === 'api' && prevSrc !== 'api')) {
+          S.homeWorkTitles[u] = titlesMap[u];
+          S.homeWorkTitleSources[u] = srcKind;
+        }
       }
     }
     if (authorName && !S.authorNickname) {

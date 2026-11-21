@@ -17,7 +17,7 @@ const String jsHomeDispatch = r'''  // 从 /aweme/v1/web/aweme/post/ 接口响�
         // 纯文章作品不进入保存页（article_info 为文章节点标志）
         if (item.article_info) continue;
         var awemeType = item.aweme_type;
-        var path = (awemeType === 68 || awemeType === 61 || item.images) ? 'note' : 'video';
+        var path = (awemeType === 68 || awemeType === 61 || item.images || item.image_post_info) ? 'note' : 'video';
         var workUrl = 'https://www.douyin.com/' + path + '/' + awemeId;
         validUrls.push(workUrl);
 
@@ -40,7 +40,7 @@ const String jsHomeDispatch = r'''  // 从 /aweme/v1/web/aweme/post/ 接口响�
       } catch (e) {}
       if (nickname && !S.authorNickname) S.authorNickname = nickname;
       if (avatar && !S.authorAvatar) S.authorAvatar = avatar;
-      appendHomeWorks(validUrls, nickname, coversMap, titlesMap, avatar);
+      appendHomeWorks(validUrls, nickname, coversMap, titlesMap, avatar, 'api');
     }
 
     updateWorksTabCount();
@@ -60,7 +60,7 @@ const String jsHomeDispatch = r'''  // 从 /aweme/v1/web/aweme/post/ 接口响�
     scanUserProfileDom();
     var domResult = scanDomPostLinks();
     if (domResult && domResult.urls && domResult.urls.length > 0) {
-      appendHomeWorks(domResult.urls, '', domResult.covers, domResult.titles, '');
+      appendHomeWorks(domResult.urls, '', domResult.covers, domResult.titles, '', 'dom');
     }
 
     updateWorksTabCount();

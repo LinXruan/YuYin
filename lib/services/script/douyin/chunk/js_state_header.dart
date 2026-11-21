@@ -5,7 +5,7 @@ const String jsStateHeader = r'''
   var S = window.__dyState || (window.__dyState = {
     sent: false, homeSent: false, worksTabCount: 0, lastUrl: '', logs: {}, videoHintSent: false, degraded: false,
     desc: '', coverUrl: '', scannedPaceIdx: 0, loginReported: null, authProbed: false, pendingVideo: null,
-    homeWorks: [], homeWorkSet: {}, homeWorkCovers: {}, homeWorkTitles: {}, homeLoggedCount: 0, homeScrollInterval: null,
+    homeWorks: [], homeWorkSet: {}, homeWorkCovers: {}, homeWorkTitles: {}, homeWorkTitleSources: {}, homeLoggedCount: 0, homeScrollInterval: null,
     homeHasMore: null, homeIdleScrolls: 0, homeLastCount: 0, homeFinished: false, authorNickname: ''
   });
   // 任务归属：首个注入该文档的任务写入 nonce；后续任务的注入直接返回
