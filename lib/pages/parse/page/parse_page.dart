@@ -313,6 +313,8 @@ class _ParsePageState extends State<ParsePage>
       onCancelParse: _cancelParse,
       onCancelDownload: _cancelDownload,
       onPasteFromClipboard: _pasteFromClipboard,
+      loginStateStore: _stores.loginState,
+      parseHintStore: _stores.parseHint,
       onRetry: _retryFailed,
       onTapAccount: widget.onTapAccount,
     );

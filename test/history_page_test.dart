@@ -11,18 +11,21 @@ import 'package:yuyin/utils/thumbnail/history_thumbnail_cache.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  late HistoryStore historyStore;
+
   setUp(() {
-    HistoryStore.resetForTesting(skipSave: true);
+    historyStore = HistoryStore(skipSaveForTesting: true);
     HistoryThumbnailCache.resetForTesting();
   });
 
   tearDown(() {
+    historyStore.dispose();
     HistoryThumbnailCache.resetForTesting();
   });
 
   Widget buildTestWidget() {
     return MaterialApp(
-      home: HistoryPage(),
+      home: HistoryPage(historyStore: historyStore),
     );
   }
 
@@ -40,7 +43,7 @@ void main() {
 
   testWidgets('列表展示：有数据时展示标题、提示栏、时间、媒体摘要且无选择按钮', (tester) async {
     final now = DateTime.now();
-    await HistoryStore.addRecord(
+    await historyStore.addRecord(
       HistoryItem(
         id: '1',
         url: 'https://v.douyin.com/1/',
@@ -51,7 +54,7 @@ void main() {
         createdAt: now,
       ),
     );
-    await HistoryStore.addRecord(
+    await historyStore.addRecord(
       HistoryItem(
         id: '2',
         url: 'https://v.douyin.com/2/',
@@ -118,7 +121,7 @@ void main() {
       url: 'https://v.douyin.com/target/',
       fullDesc: '要点击的目标作品文案',
     );
-    await HistoryStore.addRecord(item);
+    await historyStore.addRecord(item);
 
     await tester.pumpWidget(buildTestWidget());
     await tester.pumpAndSettle();
@@ -136,14 +139,14 @@ void main() {
   });
 
   testWidgets('搜索功能：输入关键字防抖过滤，支持清空恢复', (tester) async {
-    await HistoryStore.addRecord(
+    await historyStore.addRecord(
       HistoryItem(
         id: '1',
         url: 'https://v.douyin.com/1/',
         fullDesc: '猫咪日常生活记录 今天小橘猫超级萌',
       ),
     );
-    await HistoryStore.addRecord(
+    await historyStore.addRecord(
       HistoryItem(
         id: '2',
         url: 'https://v.douyin.com/2/',
@@ -177,13 +180,13 @@ void main() {
   });
 
   testWidgets('PLAN_42: 长按卡片进入多选模式、无勾选框、安卓返回键退出多选、批量删除', (tester) async {
-    await HistoryStore.addRecord(
+    await historyStore.addRecord(
       HistoryItem(id: '1', url: 'https://v.douyin.com/1/', fullDesc: '测试条目一'),
     );
-    await HistoryStore.addRecord(
+    await historyStore.addRecord(
       HistoryItem(id: '2', url: 'https://v.douyin.com/2/', fullDesc: '测试条目二'),
     );
-    await HistoryStore.addRecord(
+    await historyStore.addRecord(
       HistoryItem(id: '3', url: 'https://v.douyin.com/3/', fullDesc: '测试条目三'),
     );
 
@@ -236,12 +239,12 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, '删除'));
     await tester.pumpAndSettle();
 
-    expect(HistoryStore.records, isEmpty);
+    expect(historyStore.records, isEmpty);
     expect(find.text('暂无历史记录'), findsOneWidget);
   });
 
   testWidgets('提示栏点击“不再显示”：持久化标记隐藏并在关闭后消失', (tester) async {
-    await HistoryStore.addRecord(
+    await historyStore.addRecord(
       HistoryItem(id: '1', url: 'https://v.douyin.com/1/', fullDesc: '测试条目'),
     );
 
@@ -265,7 +268,7 @@ void main() {
 
     await tester.runAsync(() async {
       await HistoryThumbnailCache.warmUp();
-      await HistoryStore.addRecord(
+      await historyStore.addRecord(
         HistoryItem(
           id: '1',
           url: 'https://v.douyin.com/1/',
@@ -298,7 +301,7 @@ void main() {
 
   testWidgets('PLAN_46: “已保存”与“已解析”筛选功能、多选联动排除未保存项、全选与筛选联动', (tester) async {
     // 准备测试数据：条目 1 为已保存，条目 2 为未保存，条目 3 为已保存
-    await HistoryStore.addRecord(
+    await historyStore.addRecord(
       HistoryItem(
         id: '1',
         url: 'https://v.douyin.com/1/',
@@ -306,7 +309,7 @@ void main() {
         isSaved: true,
       ),
     );
-    await HistoryStore.addRecord(
+    await historyStore.addRecord(
       HistoryItem(
         id: '2',
         url: 'https://v.douyin.com/2/',
@@ -314,7 +317,7 @@ void main() {
         isSaved: false,
       ),
     );
-    await HistoryStore.addRecord(
+    await historyStore.addRecord(
       HistoryItem(
         id: '3',
         url: 'https://v.douyin.com/3/',

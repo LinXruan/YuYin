@@ -9,24 +9,30 @@ import 'package:yuyin/utils/thumbnail/history_thumbnail_cache.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  late HistoryStore historyStore;
+
   setUp(() {
-    HistoryStore.resetForTesting(skipSave: true);
+    historyStore = HistoryStore(skipSaveForTesting: true);
     HistoryThumbnailCache.resetForTesting();
   });
 
   tearDown(() {
+    historyStore.dispose();
     HistoryThumbnailCache.resetForTesting();
   });
 
   Widget buildTestWidget({ValueChanged<String>? onRequestParse}) {
     return MaterialApp(
-      home: HistoryPage(onRequestParse: onRequestParse),
+      home: HistoryPage(
+        historyStore: historyStore,
+        onRequestParse: onRequestParse,
+      ),
     );
   }
 
   testWidgets('媒体类型筛选胶囊组：点击视频/图文/主页分类精准过滤列表', (tester) async {
     final now = DateTime.now();
-    await HistoryStore.addRecord(
+    await historyStore.addRecord(
       HistoryItem(
         id: 'v1',
         url: 'https://v.douyin.com/v1/',
@@ -36,7 +42,7 @@ void main() {
         createdAt: now,
       ),
     );
-    await HistoryStore.addRecord(
+    await historyStore.addRecord(
       HistoryItem(
         id: 'img1',
         url: 'https://v.douyin.com/img1/',
@@ -46,7 +52,7 @@ void main() {
         createdAt: now,
       ),
     );
-    await HistoryStore.addRecord(
+    await historyStore.addRecord(
       HistoryItem(
         id: 'home1',
         url: 'https://www.douyin.com/user/1',
@@ -99,7 +105,7 @@ void main() {
 
   testWidgets('历史卡片一键重新解析：点击“解析”按钮回调目标链接', (tester) async {
     String? parsedUrl;
-    await HistoryStore.addRecord(
+    await historyStore.addRecord(
       HistoryItem(
         id: 'target',
         url: 'https://v.douyin.com/target_video/',

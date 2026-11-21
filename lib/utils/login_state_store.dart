@@ -12,28 +12,30 @@ import 'atomic_file_writer.dart';
 ///
 /// 严格遵守隐私安全守则：绝不保存用户账号、密码、Token 或 Cookie。
 class LoginStateStore {
-  LoginStateStore._();
+  LoginStateStore({bool promptDismissed = false})
+      : _loginPromptDismissed = promptDismissed;
 
   static const String _flagFileName = 'login_state.flag';
   static const String _profileFileName = 'login_profile.json';
   static const String _hidePromptFileName = 'hide_login_prompt.flag';
-  static bool _loginPromptDismissed = false;
+
+  bool _loginPromptDismissed;
 
   /// 同步读取内存缓存：避免冷启动时横幅首帧闪现
-  static bool get loginPromptDismissed => _loginPromptDismissed;
+  bool get loginPromptDismissed => _loginPromptDismissed;
 
   @visibleForTesting
-  static void resetForTesting({bool promptDismissed = false}) {
+  void resetForTesting({bool promptDismissed = false}) {
     _loginPromptDismissed = promptDismissed;
   }
 
   /// 启动预加载提示横幅状态
-  static Future<void> init() async {
+  Future<void> init() async {
     _loginPromptDismissed = await isLoginPromptDismissed();
   }
 
   /// 是否处于登录状态
-  static Future<bool> isLoggedIn() async {
+  Future<bool> isLoggedIn() async {
     try {
       final file = await _flagFile();
       return await file.exists();
@@ -79,7 +81,7 @@ class LoginStateStore {
   }
 
   /// 获取登录用户的简要公开资料（若曾成功获取）
-  static Future<LoginProfile?> getProfile() async {
+  Future<LoginProfile?> getProfile() async {
     try {
       final file = await _profileFile();
       if (!await file.exists()) return null;
@@ -96,7 +98,7 @@ class LoginStateStore {
   }
 
   /// 标记已完成登录，可附带检测到的公开用户信息
-  static Future<void> markLoggedIn({LoginProfile? profile}) async {
+  Future<void> markLoggedIn({LoginProfile? profile}) async {
     try {
       final flagFile = await _flagFile();
       await AtomicFileWriter.writeString(flagFile, '1');
@@ -114,7 +116,7 @@ class LoginStateStore {
   }
 
   /// 用户是否已选择“不再显示”登录提示浮窗
-  static Future<bool> isLoginPromptDismissed() async {
+  Future<bool> isLoginPromptDismissed() async {
     try {
       final file = await _hidePromptFile();
       final exists = await file.exists();
@@ -126,7 +128,7 @@ class LoginStateStore {
   }
 
   /// 设置是否永久隐藏登录提示浮窗（“不再显示”）
-  static Future<void> setLoginPromptDismissed(bool dismissed) async {
+  Future<void> setLoginPromptDismissed(bool dismissed) async {
     _loginPromptDismissed = dismissed;
     try {
       final file = await _hidePromptFile();
@@ -141,7 +143,7 @@ class LoginStateStore {
   }
 
   /// 清除登录状态与本地用户信息
-  static Future<void> clearLogin() async {
+  Future<void> clearLogin() async {
     try {
       final flag = await _flagFile();
       await AtomicFileWriter.delete(flag);

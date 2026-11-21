@@ -17,17 +17,23 @@ import '../atomic_file_writer.dart';
 /// - quality：只接受 highest / lowest
 /// - NotAll / Empty / mixed / none 只是运行时聚合，不写入模板
 class TerminalMemoryStore {
-  TerminalMemoryStore._();
+  TerminalMemoryStore({
+    this._picture = AggregateState.all,
+    this._live = AggregateState.all,
+    this._music = AggregateState.all,
+    this._video = AggregateState.all,
+    this._quality = BatchVideoQualityMode.highest,
+  });
 
   static const String _fileName = 'terminal_memory.json';
 
-  static AggregateState _picture = AggregateState.all;
-  static AggregateState _live = AggregateState.all;
-  static AggregateState _music = AggregateState.all;
-  static AggregateState _video = AggregateState.all;
-  static BatchVideoQualityMode _quality = BatchVideoQualityMode.highest;
+  AggregateState _picture;
+  AggregateState _live;
+  AggregateState _music;
+  AggregateState _video;
+  BatchVideoQualityMode _quality;
 
-  static TerminalSeed get seed => TerminalSeed(
+  TerminalSeed get seed => TerminalSeed(
         picture: _picture,
         live: _live,
         music: _music,
@@ -36,7 +42,7 @@ class TerminalMemoryStore {
       );
 
   /// 会话结束：按 Terminal 最终聚合写回模板
-  static Future<void> capture(TerminalSelectionView terminal) async {
+  Future<void> capture(TerminalSelectionView terminal) async {
     var changed = false;
 
     AggregateState apply(AggregateState next, AggregateState current) {
@@ -70,7 +76,7 @@ class TerminalMemoryStore {
     if (changed) await _save();
   }
 
-  static Future<void> init() async {
+  Future<void> init() async {
     try {
       final file = await _file();
       final content = await AtomicFileWriter.readString(file);
@@ -96,7 +102,7 @@ class TerminalMemoryStore {
   }
 
   @visibleForTesting
-  static void reset({
+  void reset({
     AggregateState picture = AggregateState.all,
     AggregateState live = AggregateState.all,
     AggregateState music = AggregateState.all,
@@ -110,7 +116,7 @@ class TerminalMemoryStore {
     _quality = quality;
   }
 
-  static Future<void> _save() async {
+  Future<void> _save() async {
     try {
       final file = await _file();
       final data = <String, dynamic>{

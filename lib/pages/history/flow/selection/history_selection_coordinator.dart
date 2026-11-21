@@ -5,8 +5,12 @@ import '../../../../utils/history/history_store.dart';
 
 /// 历史记录多选管理协调器（负责多选模式、选中集合、全选/反选与删除确认对话框）
 class HistorySelectionCoordinator {
-  HistorySelectionCoordinator({required this.onChanged});
+  HistorySelectionCoordinator({
+    required this.historyStore,
+    required this.onChanged,
+  });
 
+  final HistoryStore historyStore;
   final VoidCallback onChanged;
 
   bool isSelectionMode = false;
@@ -91,7 +95,7 @@ class HistorySelectionCoordinator {
     );
 
     if (confirmed == true && context.mounted) {
-      await HistoryStore.deleteRecords(selectedIds);
+      await historyStore.deleteRecords(selectedIds);
       selectedIds.clear();
       isSelectionMode = false;
       onChanged();

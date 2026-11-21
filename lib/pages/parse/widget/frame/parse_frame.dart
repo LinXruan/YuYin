@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../models/parse/parse_status.dart';
+import '../../../../utils/login_state_store.dart';
+import '../../../../utils/settings/parse_hint_store.dart';
 import '../banner/batch_support_banner.dart';
 import '../banner/login_prompt_banner.dart';
 import '../status/status_card.dart';
@@ -26,6 +28,8 @@ class ParseFrame extends StatefulWidget {
     required this.onCancelParse,
     required this.onCancelDownload,
     required this.onPasteFromClipboard,
+    this.loginStateStore,
+    this.parseHintStore,
     this.onRetry,
     this.onTapAccount,
   });
@@ -42,6 +46,8 @@ class ParseFrame extends StatefulWidget {
   final VoidCallback onCancelParse;
   final VoidCallback onCancelDownload;
   final VoidCallback onPasteFromClipboard;
+  final LoginStateStore? loginStateStore;
+  final ParseHintStore? parseHintStore;
   final ValueChanged<List<String>>? onRetry;
   final VoidCallback? onTapAccount;
 
@@ -214,10 +220,11 @@ class _ParseFrameState extends State<ParseFrame> {
                   const SizedBox(height: 12),
                   LoginPromptBanner(
                     loggedIn: widget.loggedIn,
+                    loginStateStore: widget.loginStateStore,
                     onTapLogin: widget.onTapAccount,
                   ),
                   const SizedBox(height: 8),
-                  const BatchSupportBanner(),
+                  BatchSupportBanner(parseHintStore: widget.parseHintStore),
                   const SizedBox(height: 16),
                 ],
               );

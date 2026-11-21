@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import '../../../../utils/login_state_store.dart';
 import '../../../download/download_cancel_registry.dart';
 import '../../server/agent_automation_server.dart';
 
@@ -94,11 +93,11 @@ class SystemHandler {
     final body = await server.readJsonBody(request);
     final mockLoggedIn = body['loggedIn'] == true;
     if (mockLoggedIn) {
-      await LoginStateStore.markLoggedIn();
+      await server.stores.loginState.markLoggedIn();
       server.loggedIn.value = true;
       server.logs.add('已模拟设置为登录状态 (loggedIn=true)');
     } else {
-      await LoginStateStore.clearLogin();
+      await server.stores.loginState.clearLogin();
       server.loggedIn.value = false;
       server.logs.add('已清除登录状态 (loggedIn=false)');
     }

@@ -18,9 +18,7 @@ import '../../../../services/selection/debug/selection_debug_bridge.dart';
 import '../../../../services/selection/save_selection_session.dart';
 import '../../../../services/sniffer/lifecycle/sniff_cancelled_exception.dart';
 import '../../../../services/user_home/user_home_batch_saver.dart';
-import '../../../../utils/history/history_store.dart';
 import '../../../../utils/login_state_store.dart';
-import '../../../../utils/memory/terminal_memory_store.dart';
 import '../../../../models/url/douyin_link_kind.dart';
 import '../../../../utils/url/url_classifier.dart';
 import '../../../../widgets/save_page/middle_multi_work_sheet.dart';
@@ -39,7 +37,7 @@ class HomeParseCoordinator {
     var isLogged = ctx.loggedIn.value;
     if (!isLogged) {
       try {
-        isLogged = await LoginStateStore.isLoggedIn() &&
+        isLogged = await ctx.stores.loginState.isLoggedIn() &&
             await LoginStateStore.checkWebViewCookieSession();
         if (isLogged) ctx.loggedIn.value = true;
       } catch (_) {}
@@ -96,7 +94,7 @@ class HomeParseCoordinator {
             continue;
           }
           worksBySecUid[secUid] = works;
-          await HistoryStore.addRecord(
+          await ctx.stores.history.addRecord(
             HistoryItem(
               id: 'home:$secUid',
               url: 'https://www.douyin.com/user/$secUid',
@@ -150,7 +148,8 @@ class HomeParseCoordinator {
       final session = SaveSelectionSession.home(
         profiles: profiles,
         worksBySecUid: worksBySecUid,
-        seed: TerminalMemoryStore.seed,
+        seed: ctx.stores.terminalMemory.seed,
+        memoryStore: ctx.stores.terminalMemory,
       );
       SelectionDebugBridge.attach(session);
 
@@ -223,7 +222,7 @@ class HomeParseCoordinator {
         );
         if (!ctx.mounted) return;
 
-        await HistoryStore.markSavedBatch({
+        await ctx.stores.history.markSavedBatch({
           for (final author in result.authors)
             if (author.success) 'home:${author.secUid}': null,
         });

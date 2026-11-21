@@ -9,16 +9,23 @@ import '../utils/login_state_store.dart';
 
 /// 抖音网页登录页：支持全自动识别登录与登出状态感知
 class LoginWebViewPage extends StatefulWidget {
-  const LoginWebViewPage({super.key, this.initialLoggedIn = false});
+  const LoginWebViewPage({
+    super.key,
+    this.initialLoggedIn = false,
+    this.loginStateStore,
+  });
 
   /// 打开页面时是否此前已处于登录状态（从“我的主页”进入时为 true，不自动倒计时关闭）
   final bool initialLoggedIn;
+  final LoginStateStore? loginStateStore;
 
   @override
   State<LoginWebViewPage> createState() => _LoginWebViewPageState();
 }
 
 class _LoginWebViewPageState extends State<LoginWebViewPage> {
+  late final LoginStateStore _loginState =
+      widget.loginStateStore ?? LoginStateStore();
   late final WebViewController _controller;
   LoginProfile? _detectedProfile;
   bool _isLoggedOut = false;
@@ -85,7 +92,7 @@ class _LoginWebViewPageState extends State<LoginWebViewPage> {
           _autoReturnTimer?.cancel();
           _autoReturnTimer = null;
         });
-        LoginStateStore.clearLogin();
+        _loginState.clearLogin();
         break;
 
       case LoginEventType.loginSuccess:
@@ -98,7 +105,7 @@ class _LoginWebViewPageState extends State<LoginWebViewPage> {
           _autoReturning = shouldAutoReturn;
         });
 
-        LoginStateStore.markLoggedIn(profile: event.profile);
+        _loginState.markLoggedIn(profile: event.profile);
 
         if (shouldAutoReturn) {
           _autoReturnTimer?.cancel();

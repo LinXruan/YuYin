@@ -8,7 +8,6 @@ import '../../../../models/save_page/work_kind.dart';
 import '../../../../models/single_work/media_download_item.dart';
 import '../../../../models/single_work/single_work_result.dart';
 import '../../../../models/user_home/user_home_profile.dart';
-import '../../../../utils/memory/terminal_memory_store.dart';
 import '../../../../utils/url/batch_input_parser.dart';
 import '../../../../utils/url/url_classifier.dart';
 import '../../../selection/debug/selection_debug_bridge.dart';
@@ -118,7 +117,7 @@ class SelectionHandler {
         ? BatchVideoQualityMode.lowest
         : BatchVideoQualityMode.highest;
 
-    final memory = TerminalMemoryStore.seed;
+    final memory = server.stores.terminalMemory.seed;
     final seed = TerminalSeed(
       picture: memory.picture,
       live: memory.live,

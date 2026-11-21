@@ -43,8 +43,10 @@ SingleWorkResult _video(String work) {
 }
 
 void main() {
+  late TerminalMemoryStore memoryStore;
+
   setUp(() {
-    TerminalMemoryStore.reset();
+    memoryStore = TerminalMemoryStore();
   });
 
   group('PLAN_76 底层选档同步选中与 Terminal 记忆闭环', () {
@@ -55,19 +57,19 @@ void main() {
         worksBySecUid: const {
           'a1': [SaveWorkItem(url: 'v0', kind: WorkMediaKind.video)],
         },
-        seed: TerminalMemoryStore.seed,
+        seed: memoryStore.seed,
       );
       home.ingest('v0', _video('v0'));
       home.setTerminalKind(WorkMediaKind.video, SelectionState.none);
-      await TerminalMemoryStore.capture(home.terminal);
+      await memoryStore.capture(home.terminal);
       home.dispose();
-      expect(TerminalMemoryStore.seed.video, AggregateState.none);
+      expect(memoryStore.seed.video, AggregateState.none);
 
       // 2. 随后解析单作品视频：初始随种子为未选
       final single = SaveSelectionSession.singleWork(
         work: const SaveWorkItem(url: 's1', kind: WorkMediaKind.video),
         parsed: _video('s1'),
-        seed: TerminalMemoryStore.seed,
+        seed: memoryStore.seed,
       );
       expect(single.workState('s1'), SelectionState.none);
       expect(single.workOf('s1')!.selectedTier, isNull);
@@ -82,20 +84,20 @@ void main() {
       expect(single.buildSelectedWork('s1')?.items.single.url, 's1#low');
 
       // 4. 关闭后自然写回 Terminal 记忆（零特例）
-      await TerminalMemoryStore.capture(single.terminal);
+      await memoryStore.capture(single.terminal);
       single.dispose();
-      expect(TerminalMemoryStore.seed.video, AggregateState.all);
-      expect(TerminalMemoryStore.seed.quality, BatchVideoQualityMode.lowest);
+      expect(memoryStore.seed.video, AggregateState.all);
+      expect(memoryStore.seed.quality, BatchVideoQualityMode.lowest);
     });
 
     testWidgets('单作品视频在 video=none 种子下初始禁用保存，点选画质后高亮且可保存', (
       tester,
     ) async {
-      TerminalMemoryStore.reset(video: AggregateState.none);
+      memoryStore.reset(video: AggregateState.none);
       final session = SaveSelectionSession.singleWork(
         work: const SaveWorkItem(url: 's1', kind: WorkMediaKind.video),
         parsed: _video('s1'),
-        seed: TerminalMemoryStore.seed,
+        seed: memoryStore.seed,
       );
       bool? confirmed;
 
@@ -153,7 +155,7 @@ void main() {
     testWidgets('嵌套模式下未选视频打开面板显示可用「返回」，点选档位后同步选中', (
       tester,
     ) async {
-      TerminalMemoryStore.reset(video: AggregateState.none);
+      memoryStore.reset(video: AggregateState.none);
       final session = SaveSelectionSession.multiWork(
         works: [
           SaveWorkItem(
@@ -162,7 +164,7 @@ void main() {
             parsedResult: _video('m1'),
           ),
         ],
-        seed: TerminalMemoryStore.seed,
+        seed: memoryStore.seed,
       );
 
       await tester.pumpWidget(

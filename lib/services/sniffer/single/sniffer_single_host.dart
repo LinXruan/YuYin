@@ -28,6 +28,9 @@ abstract class SnifferSingleHost {
   /// 登录态查询回调（主界面提供）
   bool Function()? get isLoggedIn;
 
+  /// 查询本地持久化登录标记
+  Future<bool> isStoredLoggedIn();
+
   /// 内部诊断日志
   void logDiagnostic(String message);
 

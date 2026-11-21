@@ -80,6 +80,7 @@ class ShellScaffold extends StatelessWidget {
                 },
               ),
               HistoryPage(
+                historyStore: stores.history,
                 saveLocationStore: stores.saveLocation,
                 onRequestParse: (url) {
                   pendingInputUrl.value = url;

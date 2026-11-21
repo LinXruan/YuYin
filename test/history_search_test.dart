@@ -6,7 +6,15 @@ import 'package:yuyin/pages/history/flow/search/history_search_coordinator.dart'
 import 'package:yuyin/utils/history/history_store.dart';
 
 void main() {
-  setUp(() => HistoryStore.resetForTesting(skipSave: true));
+  late HistoryStore historyStore;
+
+  setUp(() {
+    historyStore = HistoryStore(skipSaveForTesting: true);
+  });
+
+  tearDown(() {
+    historyStore.dispose();
+  });
 
   group('HistoryStore 高性能搜索算法测试', () {
     setUp(() async {
@@ -38,53 +46,53 @@ void main() {
       ];
 
       for (final item in items) {
-        await HistoryStore.addRecord(item);
+        await historyStore.addRecord(item);
       }
     });
 
     test('空关键字或纯空格返回全部记录', () {
-      expect(HistoryStore.search('').length, 4);
-      expect(HistoryStore.search('   ').length, 4);
+      expect(historyStore.search('').length, 4);
+      expect(historyStore.search('   ').length, 4);
     });
 
     test('单关键词匹配完整文案中的内容（无论是否在标题中）', () {
-      final res = HistoryStore.search('麻辣烫');
+      final res = historyStore.search('麻辣烫');
       expect(res.length, 1);
       expect(res.first.id, '2');
     });
 
     test('单关键词匹配标题', () {
-      final res = HistoryStore.search('Flutter');
+      final res = historyStore.search('Flutter');
       expect(res.length, 1);
       expect(res.first.id, '3');
     });
 
     test('多关键词空格分割 AND 逻辑检索', () {
       // 同时包含 "小橘猫" 和 "打架"
-      final res = HistoryStore.search('小橘猫 打架');
+      final res = historyStore.search('小橘猫 打架');
       expect(res.length, 1);
       expect(res.first.id, '4');
 
       // 仅包含 "小橘猫" 的有两个 (id: 4 和 id: 1)
-      final allCats = HistoryStore.search('小橘猫');
+      final allCats = historyStore.search('小橘猫');
       expect(allCats.length, 2);
     });
 
     test('大小写无关检索', () {
-      final resUpper = HistoryStore.search('FLUTTER');
+      final resUpper = historyStore.search('FLUTTER');
       expect(resUpper.length, 1);
       expect(resUpper.first.id, '3');
     });
 
     test('无匹配结果返回空列表', () {
-      final res = HistoryStore.search('太空飞船');
+      final res = historyStore.search('太空飞船');
       expect(res, isEmpty);
     });
 
     test('高并发大容量（500 条数据）纯内存极速检索在 10ms 内完成', () async {
-      HistoryStore.resetForTesting();
+      historyStore.resetForTesting();
       for (int i = 0; i < 500; i++) {
-        await HistoryStore.addRecord(
+        await historyStore.addRecord(
           HistoryItem(
             id: 'perf_$i',
             url: 'https://v.douyin.com/perf_$i/',
@@ -96,7 +104,7 @@ void main() {
 
       final stopwatch = Stopwatch()..start();
       for (int i = 0; i < 100; i++) {
-        final results = HistoryStore.search('目标特征词');
+        final results = historyStore.search('目标特征词');
         expect(results.length, 50); // 500 / 10 = 50
       }
       stopwatch.stop();
@@ -112,7 +120,7 @@ void main() {
     late HistoryItem homeItem;
 
     setUp(() async {
-      HistoryStore.resetForTesting(skipSave: true);
+      historyStore.resetForTesting(skipSave: true);
       videoItem = HistoryItem(
         id: 'v1',
         url: 'https://v.douyin.com/video1/',
@@ -137,9 +145,9 @@ void main() {
         isSaved: true,
       );
 
-      await HistoryStore.addRecord(videoItem);
-      await HistoryStore.addRecord(imageItem);
-      await HistoryStore.addRecord(homeItem);
+      await historyStore.addRecord(videoItem);
+      await historyStore.addRecord(imageItem);
+      await historyStore.addRecord(homeItem);
     });
 
     test('HistoryTypeFilter 枚举 matches 行为符合预期', () {
@@ -160,27 +168,27 @@ void main() {
       expect(HistoryTypeFilter.userHome.matches(homeItem), isTrue);
     });
 
-    test('HistoryStore.search 支持媒体类型精确过滤与多维联动', () {
+    test('historyStore.search 支持媒体类型精确过滤与多维联动', () {
       // 默认全部
-      expect(HistoryStore.search('').length, 3);
+      expect(historyStore.search('').length, 3);
 
       // 仅视频
-      final videos = HistoryStore.search('', typeFilter: HistoryTypeFilter.video);
+      final videos = historyStore.search('', typeFilter: HistoryTypeFilter.video);
       expect(videos.length, 1);
       expect(videos.first.id, 'v1');
 
       // 仅图文
-      final images = HistoryStore.search('', typeFilter: HistoryTypeFilter.image);
+      final images = historyStore.search('', typeFilter: HistoryTypeFilter.image);
       expect(images.length, 1);
       expect(images.first.id, 'img1');
 
       // 仅主页
-      final homes = HistoryStore.search('', typeFilter: HistoryTypeFilter.userHome);
+      final homes = historyStore.search('', typeFilter: HistoryTypeFilter.userHome);
       expect(homes.length, 1);
       expect(homes.first.id, 'home1');
 
       // 联动：已保存 + 视频
-      final savedVideos = HistoryStore.search(
+      final savedVideos = historyStore.search(
         '',
         onlySaved: true,
         typeFilter: HistoryTypeFilter.video,
@@ -189,7 +197,7 @@ void main() {
       expect(savedVideos.first.id, 'v1');
 
       // 联动：已保存 + 图文（图文未保存，应为空）
-      final savedImages = HistoryStore.search(
+      final savedImages = historyStore.search(
         '',
         onlySaved: true,
         typeFilter: HistoryTypeFilter.image,
@@ -197,7 +205,7 @@ void main() {
       expect(savedImages, isEmpty);
 
       // 联动：关键词 + 主页
-      final searchedHomes = HistoryStore.search(
+      final searchedHomes = historyStore.search(
         '作者',
         typeFilter: HistoryTypeFilter.userHome,
       );

@@ -2,7 +2,6 @@ import 'dart:io';
 
 import '../../../../models/history/saved_media_availability.dart';
 import '../../../../models/history_item.dart';
-import '../../../../utils/history/history_store.dart';
 import '../../../history/album_locator.dart';
 import '../../server/agent_automation_server.dart';
 
@@ -16,8 +15,8 @@ class HistoryHandler {
   Future<void> handleQuery(HttpRequest request) async {
     final query = request.uri.queryParameters['q'];
     final records = query != null && query.trim().isNotEmpty
-        ? HistoryStore.search(query.trim())
-        : HistoryStore.records;
+        ? server.stores.history.search(query.trim())
+        : server.stores.history.records;
 
     server.sendJson(request, HttpStatus.ok, {
       'count': records.length,
@@ -37,14 +36,14 @@ class HistoryHandler {
     }
     for (final entry in raw) {
       if (entry is Map) {
-        await HistoryStore.addRecord(
+        await server.stores.history.addRecord(
           HistoryItem.fromJson(Map<String, dynamic>.from(entry)),
         );
       }
     }
     server.sendJson(request, HttpStatus.ok, {
       'success': true,
-      'count': HistoryStore.records.length,
+      'count': server.stores.history.records.length,
     });
   }
 
@@ -109,7 +108,7 @@ class HistoryHandler {
 
   /// POST /api/history/clear：清空历史记录
   Future<void> handleClear(HttpRequest request) async {
-    await HistoryStore.clearAll();
+    await server.stores.history.clearAll();
     server.sendJson(request, HttpStatus.ok, {
       'success': true,
       'message': '历史记录已清空',
@@ -128,7 +127,7 @@ class HistoryHandler {
       });
       return null;
     }
-    for (final item in HistoryStore.records) {
+    for (final item in server.stores.history.records) {
       if (item.id == id || item.url == id) return item;
     }
     server.sendJson(request, HttpStatus.notFound, {

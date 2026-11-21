@@ -34,6 +34,7 @@ class SaveSelectionSession extends ChangeNotifier {
   SaveSelectionSession._({
     required this.source,
     required List<AuthorNode> authors,
+    this._memoryStore,
   })  : _authors = authors,
         _terminal = TerminalNode(authors) {
     for (final author in authors) {
@@ -51,6 +52,7 @@ class SaveSelectionSession extends ChangeNotifier {
     required List<UserHomeProfile> profiles,
     required Map<String, List<SaveWorkItem>> worksBySecUid,
     required TerminalSeed seed,
+    TerminalMemoryStore? memoryStore,
   }) {
     final authors = <AuthorNode>[];
     final seenUrls = <String>{};
@@ -68,6 +70,7 @@ class SaveSelectionSession extends ChangeNotifier {
     return SaveSelectionSession._(
       source: SelectionSource.home,
       authors: authors,
+      memoryStore: memoryStore,
     );
   }
 
@@ -75,6 +78,7 @@ class SaveSelectionSession extends ChangeNotifier {
   factory SaveSelectionSession.multiWork({
     required List<SaveWorkItem> works,
     required TerminalSeed seed,
+    TerminalMemoryStore? memoryStore,
   }) {
     final nodes = <WorkNode>[];
     final seenUrls = <String>{};
@@ -88,6 +92,7 @@ class SaveSelectionSession extends ChangeNotifier {
       authors: [
         _authorNode(_syntheticProfile, nodes, synthetic: true),
       ],
+      memoryStore: memoryStore,
     );
   }
 
@@ -96,6 +101,7 @@ class SaveSelectionSession extends ChangeNotifier {
     required SaveWorkItem work,
     required SingleWorkResult parsed,
     required TerminalSeed seed,
+    TerminalMemoryStore? memoryStore,
   }) {
     return SaveSelectionSession._(
       source: SelectionSource.singleWork,
@@ -106,6 +112,7 @@ class SaveSelectionSession extends ChangeNotifier {
           synthetic: true,
         ),
       ],
+      memoryStore: memoryStore,
     );
   }
 
@@ -117,6 +124,7 @@ class SaveSelectionSession extends ChangeNotifier {
   );
 
   final SelectionSource source;
+  final TerminalMemoryStore? _memoryStore;
 
   final List<AuthorNode> _authors;
   final TerminalNode _terminal;
@@ -307,7 +315,10 @@ class SaveSelectionSession extends ChangeNotifier {
   void close() {
     if (_closed) return;
     _closed = true;
-    unawaited(TerminalMemoryStore.capture(_terminal));
+    final memoryStore = _memoryStore;
+    if (memoryStore != null) {
+      unawaited(memoryStore.capture(_terminal));
+    }
     dispose();
   }
 

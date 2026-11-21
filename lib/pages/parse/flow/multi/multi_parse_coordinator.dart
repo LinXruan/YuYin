@@ -12,8 +12,6 @@ import '../../../../services/selection/debug/selection_debug_bridge.dart';
 import '../../../../services/selection/save_selection_session.dart';
 import '../../../../services/selection/session_work_preparer.dart';
 import '../../../../services/sniffer/lifecycle/sniff_cancelled_exception.dart';
-import '../../../../utils/history/history_store.dart';
-import '../../../../utils/memory/terminal_memory_store.dart';
 import '../../../../widgets/save_page/middle_multi_work_sheet.dart';
 import '../common/parse_flow_context.dart';
 import '../common/parse_flow_helper.dart';
@@ -87,7 +85,7 @@ class MultiParseCoordinator {
           ),
         );
       }
-      await HistoryStore.addRecords(historyRecords);
+      await ctx.stores.history.addRecords(historyRecords);
       if (!ctx.mounted || !ctx.isParsing()) return;
 
       ctx.setParsing(false);
@@ -96,7 +94,8 @@ class MultiParseCoordinator {
 
       final session = SaveSelectionSession.multiWork(
         works: extractResult.works,
-        seed: TerminalMemoryStore.seed,
+        seed: ctx.stores.terminalMemory.seed,
+        memoryStore: ctx.stores.terminalMemory,
       );
       SelectionDebugBridge.attach(session);
 
@@ -178,7 +177,7 @@ class MultiParseCoordinator {
           for (final item in results)
             if (item.success) item.url: item.savedBaseName,
         };
-        await HistoryStore.markSavedBatch(savedEntries);
+        await ctx.stores.history.markSavedBatch(savedEntries);
 
         final successCount = results.where((item) => item.success).length;
         final finishMsg = '多作品保存完成：成功 $successCount/${results.length}';

@@ -15,15 +15,17 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
+  late HistoryStore historyStore;
 
   setUp(() {
     tempDir = Directory.systemTemp.createTempSync('plan_53_test_');
-    HistoryStore.resetForTesting(skipSave: true);
+    historyStore = HistoryStore(skipSaveForTesting: true);
     HistoryThumbnailCache.resetForTesting();
     HistoryThumbnailCache.testDir = tempDir;
   });
 
   tearDown(() {
+    historyStore.dispose();
     HistoryThumbnailCache.resetForTesting();
     try {
       tempDir.deleteSync(recursive: true);
@@ -31,8 +33,8 @@ void main() {
   });
 
   Widget buildTestApp() {
-    return const MaterialApp(
-      home: HistoryPage(),
+    return MaterialApp(
+      home: HistoryPage(historyStore: historyStore),
     );
   }
 
@@ -119,7 +121,7 @@ void main() {
     testWidgets('3. 本地无缓存时展示优雅占位图，界面彻底杜绝任何 Image.network', (tester) async {
       // 准备带有网络 coverUrl 的历史记录（但本地暂无文件）
       await tester.runAsync(() async {
-        await HistoryStore.addRecord(
+        await historyStore.addRecord(
           HistoryItem(
             id: 'no_local_cache_item',
             url: 'https://v.douyin.com/test1/',
@@ -159,7 +161,7 @@ void main() {
 
       await tester.runAsync(() async {
         await HistoryThumbnailCache.warmUp();
-        await HistoryStore.addRecord(
+        await historyStore.addRecord(
           HistoryItem(
             id: 'saved_1',
             url: 'https://v.douyin.com/saved/',
@@ -168,7 +170,7 @@ void main() {
             isSaved: true,
           ),
         );
-        await HistoryStore.addRecord(
+        await historyStore.addRecord(
           HistoryItem(
             id: 'unsaved_2',
             url: 'https://v.douyin.com/unsaved/',

@@ -179,12 +179,15 @@ void main() {
     });
 
     group('4. 历史页缩略图填充模式修复（不拉伸不变形）', () {
+      late HistoryStore historyStore;
+
       setUp(() {
-        HistoryStore.resetForTesting(skipSave: true);
+        historyStore = HistoryStore(skipSaveForTesting: true);
         HistoryThumbnailCache.resetForTesting();
       });
 
       tearDown(() {
+        historyStore.dispose();
         HistoryThumbnailCache.resetForTesting();
       });
 
@@ -196,7 +199,7 @@ void main() {
 
         await tester.runAsync(() async {
           await HistoryThumbnailCache.warmUp();
-          await HistoryStore.addRecord(
+          await historyStore.addRecord(
             HistoryItem(
               id: 'plan58_1',
               url: 'https://v.douyin.com/plan58_1/',
@@ -207,8 +210,8 @@ void main() {
         });
 
         await tester.pumpWidget(
-          const MaterialApp(
-            home: HistoryPage(),
+          MaterialApp(
+            home: HistoryPage(historyStore: historyStore),
           ),
         );
         await tester.pump();

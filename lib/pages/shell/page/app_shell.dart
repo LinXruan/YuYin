@@ -32,7 +32,8 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  final DouyinSniffer _sniffer = DouyinSniffer();
+  late final DouyinSniffer _sniffer =
+      DouyinSniffer(loginStateStore: widget.stores.loginState);
   late final VideoDownloader _downloader =
       VideoDownloader(saveLocationStore: widget.stores.saveLocation);
   final LogController _logs = LogController();
@@ -71,18 +72,18 @@ class _AppShellState extends State<AppShell> {
       if (!mounted) return;
       if (!remoteLoggedIn && _loggedIn.value) {
         _loggedIn.value = false;
-        LoginStateStore.clearLogin();
+        widget.stores.loginState.clearLogin();
         if (kDebugMode) {
           _logs.add('检测到抖音远端会话已失效，已自动同步为未登录状态');
         }
       } else if (remoteLoggedIn && !_loggedIn.value) {
         _loggedIn.value = true;
-        LoginStateStore.markLoggedIn();
+        widget.stores.loginState.markLoggedIn();
       }
     };
 
     // 恢复上次留下的登录标记，并静默通过 WebView Cookie 本地库二次校验（0 网络开销）
-    LoginStateStore.isLoggedIn().then((isSaved) async {
+    widget.stores.loginState.isLoggedIn().then((isSaved) async {
       if (!mounted) return;
       if (!isSaved) {
         _loggedIn.value = false;
@@ -94,7 +95,7 @@ class _AppShellState extends State<AppShell> {
         _loggedIn.value = true;
       } else {
         _loggedIn.value = false;
-        await LoginStateStore.clearLogin();
+        await widget.stores.loginState.clearLogin();
       }
     });
 
@@ -155,7 +156,10 @@ class _AppShellState extends State<AppShell> {
   Future<void> _openLoginPage({bool initialLoggedIn = false}) async {
     final done = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => LoginWebViewPage(initialLoggedIn: initialLoggedIn),
+        builder: (_) => LoginWebViewPage(
+          initialLoggedIn: initialLoggedIn,
+          loginStateStore: widget.stores.loginState,
+        ),
       ),
     );
     if (!mounted) return;
@@ -164,7 +168,7 @@ class _AppShellState extends State<AppShell> {
       _logs.add('登录完成，Cookie 已保存，可重新解析获取高清画质');
     } else if (done == false) {
       _loggedIn.value = false;
-      await LoginStateStore.clearLogin();
+      await widget.stores.loginState.clearLogin();
       _logs.add('检测到账号已退出登录，恢复未登录状态');
     }
   }

@@ -41,6 +41,9 @@ class _FakeSingleHost implements SnifferSingleHost {
   @override
   bool Function()? isLoggedIn;
 
+  @override
+  Future<bool> isStoredLoggedIn() async => false;
+
   final List<String> diagnostics = <String>[];
   final List<String> userLogs = <String>[];
 

@@ -12,8 +12,6 @@ import '../../../../services/media/video_downloader.dart';
 import '../../../../services/selection/debug/selection_debug_bridge.dart';
 import '../../../../services/selection/save_selection_session.dart';
 import '../../../../services/sniffer/lifecycle/sniff_cancelled_exception.dart';
-import '../../../../utils/history/history_store.dart';
-import '../../../../utils/memory/terminal_memory_store.dart';
 import '../../../../utils/save/file_name_formatter.dart';
 import '../../../../utils/url/url_extractor.dart';
 import '../../../../widgets/save_page/bottom_media_sheet.dart';
@@ -73,7 +71,7 @@ class SingleParseCoordinator {
       if (result.audioCount > 0) summaryTags.add('音频');
       summaryTags.add('文案');
 
-      await HistoryStore.addRecord(
+      await ctx.stores.history.addRecord(
         HistoryItem(
           id: url,
           url: url,
@@ -123,7 +121,7 @@ class SingleParseCoordinator {
       );
       if (!ctx.mounted) return;
       if (savedTypes.isNotEmpty) {
-        HistoryStore.markSavedWithMeta(url, savedBaseName: baseName);
+        ctx.stores.history.markSavedWithMeta(url, savedBaseName: baseName);
       }
       final locations = <String>[];
       if (savedTypes.contains(MediaType.image)) {
@@ -188,7 +186,8 @@ class SingleParseCoordinator {
     final session = SaveSelectionSession.singleWork(
       work: work,
       parsed: result,
-      seed: TerminalMemoryStore.seed,
+      seed: ctx.stores.terminalMemory.seed,
+      memoryStore: ctx.stores.terminalMemory,
     );
     try {
       if (result.isImagePost) {

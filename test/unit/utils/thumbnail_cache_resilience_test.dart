@@ -13,15 +13,17 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
+  late HistoryStore historyStore;
 
   setUp(() {
     tempDir = Directory.systemTemp.createTempSync('thumb_resilience_');
-    HistoryStore.resetForTesting(skipSave: true);
+    historyStore = HistoryStore(skipSaveForTesting: true);
     HistoryThumbnailCache.resetForTesting();
     HistoryThumbnailCache.testDir = tempDir;
   });
 
   tearDown(() {
+    historyStore.dispose();
     HistoryThumbnailCache.resetForTesting();
     try {
       tempDir.deleteSync(recursive: true);
@@ -169,14 +171,14 @@ void main() {
     expect(orphan.existsSync(), isFalse);
 
     // HistoryStore 删除记录应联动清理其缩略图
-    await HistoryStore.addRecord(
+    await historyStore.addRecord(
       HistoryItem(
         id: 'keep_1',
         url: 'https://www.douyin.com/video/keep_1',
         fullDesc: '保留作品',
       ),
     );
-    await HistoryStore.deleteRecord('keep_1');
+    await historyStore.deleteRecord('keep_1');
     await Future<void>.delayed(const Duration(milliseconds: 20));
     expect(active.existsSync(), isFalse);
   });

@@ -7,6 +7,7 @@ import '../../../models/single_work/media_download_item.dart';
 import '../../../models/single_work/single_work_result.dart';
 import '../../../models/user_home/user_home_profile.dart';
 import '../../../models/user_home/user_home_result.dart';
+import '../../../utils/login_state_store.dart';
 import '../../../utils/url/url_classifier.dart';
 import '../../../utils/url/url_extractor.dart';
 import '../../multi_work/i_multi_work_extractor.dart';
@@ -93,6 +94,7 @@ class DouyinSniffer
 
   bool _disposed = false;
   bool _isLoggedIn = false;
+  final LoginStateStore _loginStateStore;
 
   /// 内部诊断日志回调：仅 debug 版写入界面日志
   void Function(String message)? onLog;
@@ -107,7 +109,8 @@ class DouyinSniffer
   /// 远端登录状态变化感知回调
   void Function(bool loggedIn)? onLoginStateDetected;
 
-  DouyinSniffer() {
+  DouyinSniffer({LoginStateStore? loginStateStore})
+      : _loginStateStore = loginStateStore ?? LoginStateStore() {
     final controller = WebViewController();
     _controller = controller;
     controller
@@ -137,6 +140,9 @@ class DouyinSniffer
   bool get isTaskActive => _isTaskActive;
   @override
   bool get snifferLoggedIn => _isLoggedIn;
+  @override
+  Future<bool> isStoredLoggedIn() => _loginStateStore.isLoggedIn();
+
   @override
   set snifferLoggedIn(bool value) => _isLoggedIn = value;
   @override

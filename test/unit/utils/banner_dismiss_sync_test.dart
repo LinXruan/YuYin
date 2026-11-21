@@ -13,22 +13,16 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
-    ParseHintStore.resetForTesting();
-    LoginStateStore.resetForTesting();
-    HistoryStore.resetForTesting(skipSave: true);
     HistoryThumbnailCache.resetForTesting();
   });
 
   tearDown(() {
-    ParseHintStore.resetForTesting();
-    LoginStateStore.resetForTesting();
-    HistoryStore.resetForTesting(skipSave: true);
     HistoryThumbnailCache.resetForTesting();
   });
 
   testWidgets('冷启动已永久关闭提示横幅时首帧零闪现（同步缓存命中）', (tester) async {
-    ParseHintStore.resetForTesting(dismissed: true);
-    LoginStateStore.resetForTesting(promptDismissed: true);
+    final parseHintStore = ParseHintStore(dismissed: true);
+    final loginStateStore = LoginStateStore(promptDismissed: true);
     final loggedIn = ValueNotifier<bool>(false);
     addTearDown(loggedIn.dispose);
 
@@ -37,8 +31,11 @@ void main() {
         home: Scaffold(
           body: Column(
             children: [
-              const BatchSupportBanner(),
-              LoginPromptBanner(loggedIn: loggedIn),
+              BatchSupportBanner(parseHintStore: parseHintStore),
+              LoginPromptBanner(
+                loggedIn: loggedIn,
+                loginStateStore: loginStateStore,
+              ),
             ],
           ),
         ),
@@ -50,8 +47,13 @@ void main() {
   });
 
   testWidgets('历史页已永久关闭提示横幅时首帧零闪现', (tester) async {
-    HistoryStore.resetForTesting(skipSave: true, promptDismissed: true);
-    await HistoryStore.addRecord(
+    final historyStore = HistoryStore(
+      skipSaveForTesting: true,
+      promptDismissed: true,
+    );
+    addTearDown(historyStore.dispose);
+
+    await historyStore.addRecord(
       HistoryItem(
         id: 'h1',
         url: 'https://v.douyin.com/h1/',
@@ -59,7 +61,9 @@ void main() {
       ),
     );
 
-    await tester.pumpWidget(const MaterialApp(home: HistoryPage()));
+    await tester.pumpWidget(
+      MaterialApp(home: HistoryPage(historyStore: historyStore)),
+    );
     expect(find.text('单击复制链接，长按进入选择模式'), findsNothing);
   });
 }

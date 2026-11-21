@@ -3,7 +3,6 @@ import 'dart:io';
 import '../../../../app_info.dart';
 import '../../../../models/common/work_type.dart';
 import '../../../../models/history_item.dart';
-import '../../../../utils/history/history_store.dart';
 import '../../../../utils/settings/display_mode_service.dart';
 import '../../../../utils/url/batch_input_parser.dart';
 import '../../../../utils/url/url_classifier.dart';
@@ -200,7 +199,7 @@ class ParseHandler {
             ? result.title!.trim()
             : text);
 
-    await HistoryStore.addRecord(
+    await server.stores.history.addRecord(
       HistoryItem(
         id: url,
         url: url,

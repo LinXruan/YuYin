@@ -65,7 +65,7 @@ class HomeSniffStrategy {
       host.snifferLoggedIn = host.isLoggedIn!();
     } else {
       try {
-        final isSaved = await LoginStateStore.isLoggedIn();
+        final isSaved = await host.isStoredLoggedIn();
         host.snifferLoggedIn =
             isSaved && await LoginStateStore.checkWebViewCookieSession();
       } catch (_) {

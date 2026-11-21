@@ -7,7 +7,6 @@ import 'package:yuyin/app_info.dart';
 import 'package:yuyin/models/history_item.dart';
 import 'package:yuyin/services/bridge/server/agent_automation_server.dart';
 import 'package:yuyin/utils/app_stores.dart';
-import 'package:yuyin/utils/history/history_store.dart';
 import 'package:yuyin/utils/debug/log_controller.dart';
 
 void main() {
@@ -22,7 +21,7 @@ void main() {
 
     setUp(() async {
       stores = AppStores();
-      HistoryStore.resetForTesting(skipSave: true);
+      stores.history.skipSaveForTesting = true;
       logs = LogController();
       busy = ValueNotifier<bool>(false);
       loggedIn = ValueNotifier<bool>(false);
@@ -175,14 +174,14 @@ void main() {
     });
 
     test('GET /api/history 与 POST /api/history/clear 正常读取与清空历史记录', () async {
-      await HistoryStore.addRecord(
+      await stores.history.addRecord(
         HistoryItem(
           id: '1',
           url: 'https://v.douyin.com/1/',
           fullDesc: '历史测试作品一',
         ),
       );
-      await HistoryStore.addRecord(
+      await stores.history.addRecord(
         HistoryItem(
           id: '2',
           url: 'https://v.douyin.com/2/',
@@ -215,7 +214,7 @@ void main() {
       );
       final resp3 = await req3.close();
       expect(resp3.statusCode, HttpStatus.ok);
-      expect(HistoryStore.records, isEmpty);
+      expect(stores.history.records, isEmpty);
     });
 
     test('POST /api/login/mock 正常模拟设置与清除登录态', () async {

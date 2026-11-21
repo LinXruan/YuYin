@@ -5,21 +5,25 @@ import 'prompt_surface.dart';
 
 /// 常驻功能提示：与登录提示卡同风格，可关闭或永久隐藏。
 class BatchSupportBanner extends StatefulWidget {
-  const BatchSupportBanner({super.key});
+  const BatchSupportBanner({super.key, this.parseHintStore});
+
+  final ParseHintStore? parseHintStore;
 
   @override
   State<BatchSupportBanner> createState() => _BatchSupportBannerState();
 }
 
 class _BatchSupportBannerState extends State<BatchSupportBanner> {
+  late final ParseHintStore _parseHintStore =
+      widget.parseHintStore ?? ParseHintStore();
   bool _sessionDismissed = false;
-  late bool _permanentlyDismissed = ParseHintStore.batchHintDismissed;
+  late bool _permanentlyDismissed = _parseHintStore.batchHintDismissed;
 
   @override
   void initState() {
     super.initState();
     if (!_permanentlyDismissed) {
-      ParseHintStore.isBatchHintDismissed().then((dismissed) {
+      _parseHintStore.isBatchHintDismissed().then((dismissed) {
         if (mounted && dismissed) {
           setState(() => _permanentlyDismissed = true);
         }
@@ -87,7 +91,7 @@ class _BatchSupportBannerState extends State<BatchSupportBanner> {
               TextButton(
                 onPressed: () async {
                   setState(() => _permanentlyDismissed = true);
-                  await ParseHintStore.setBatchHintDismissed(true);
+                  await _parseHintStore.setBatchHintDismissed(true);
                 },
                 style: TextButton.styleFrom(
                   visualDensity: VisualDensity.compact,

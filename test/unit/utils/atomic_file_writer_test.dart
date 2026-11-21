@@ -84,6 +84,7 @@ void main() {
 
   group('HistoryStore 批量落盘', () {
     late Directory dir;
+    late HistoryStore store;
 
     setUpAll(() async {
       dir = await _tempDir('yuyin_history_');
@@ -101,11 +102,15 @@ void main() {
     });
 
     setUp(() {
-      HistoryStore.resetForTesting();
+      store = HistoryStore();
+    });
+
+    tearDown(() {
+      store.dispose();
     });
 
     test('addRecords 一次写入全部记录并去重', () async {
-      await HistoryStore.addRecords([
+      await store.addRecords([
         for (var i = 0; i < 10; i++)
           HistoryItem(
             id: 'id$i',
@@ -113,49 +118,49 @@ void main() {
             fullDesc: '',
           ),
       ]);
-      expect(HistoryStore.records.length, 10);
+      expect(store.records.length, 10);
 
-      await HistoryStore.addRecords([
+      await store.addRecords([
         HistoryItem(
           id: 'id3',
           url: 'https://www.douyin.com/video/3',
           fullDesc: '',
         ),
       ]);
-      expect(HistoryStore.records.length, 10);
-      expect(HistoryStore.records.first.id, 'id3');
+      expect(store.records.length, 10);
+      expect(store.records.first.id, 'id3');
     });
 
     test('markSavedBatch 单次应用保存状态与文件基名', () async {
-      await HistoryStore.addRecords([
+      await store.addRecords([
         HistoryItem(id: 'a', url: 'ua', fullDesc: ''),
         HistoryItem(id: 'b', url: 'ub', fullDesc: ''),
       ]);
 
-      await HistoryStore.markSavedBatch({'a': '视频A', 'b': null});
+      await store.markSavedBatch({'a': '视频A', 'b': null});
 
-      final a = HistoryStore.records.firstWhere((item) => item.id == 'a');
-      final b = HistoryStore.records.firstWhere((item) => item.id == 'b');
+      final a = store.records.firstWhere((item) => item.id == 'a');
+      final b = store.records.firstWhere((item) => item.id == 'b');
       expect(a.isSaved, isTrue);
       expect(a.savedBaseName, '视频A');
       expect(b.isSaved, isTrue);
     });
 
     test('文件损坏后 init 可从 .bak 恢复', () async {
-      await HistoryStore.addRecords([
+      await store.addRecords([
         HistoryItem(id: 'a', url: 'ua', fullDesc: '第一条'),
       ]);
-      await HistoryStore.addRecords([
+      await store.addRecords([
         HistoryItem(id: 'b', url: 'ub', fullDesc: '第二条'),
       ]);
       final file = File('${dir.path}/history_records.json');
       await file.writeAsString('[{"id":');
 
-      HistoryStore.resetForTesting();
-      await HistoryStore.init();
+      store.resetForTesting();
+      await store.init();
 
-      expect(HistoryStore.records.length, 1);
-      expect(HistoryStore.records.first.id, 'a');
+      expect(store.records.length, 1);
+      expect(store.records.first.id, 'a');
     });
   });
 

@@ -5,8 +5,6 @@ import '../../../../models/history_item.dart';
 import '../../../../models/save_page/save_work_item.dart';
 import '../../../../models/save_page/selection/terminal_seed.dart';
 import '../../../../models/save_page/work_kind.dart';
-import '../../../../utils/history/history_store.dart';
-import '../../../../utils/memory/terminal_memory_store.dart';
 import '../../../../utils/save/author_folder_name.dart';
 import '../../../../utils/save/home_save_path.dart';
 import '../../../../utils/url/batch_input_parser.dart';
@@ -78,10 +76,10 @@ class SaveHandler {
           ),
         );
       }
-      await HistoryStore.addRecords(records);
+      await server.stores.history.addRecords(records);
 
       final quality = server.qualityModeFrom(body['quality']?.toString());
-      final memory = TerminalMemoryStore.seed;
+      final memory = server.stores.terminalMemory.seed;
       final session = SaveSelectionSession.multiWork(
         works: extract.works,
         seed: TerminalSeed(
@@ -102,7 +100,7 @@ class SaveHandler {
       final results = await saver.saveWorks(selected, onLog: server.logs.add);
       for (final result in results) {
         if (result.success) {
-          await HistoryStore.markSavedWithMeta(
+          await server.stores.history.markSavedWithMeta(
             result.url,
             savedBaseName: result.savedBaseName,
           );
@@ -181,7 +179,7 @@ class SaveHandler {
         return;
       }
 
-      await HistoryStore.addRecord(
+      await server.stores.history.addRecord(
         HistoryItem(
           id: 'home:${home.secUid}',
           url: 'https://www.douyin.com/user/${home.secUid}',
@@ -199,7 +197,7 @@ class SaveHandler {
       final authorFolder = AuthorFolderName.resolve(home.nickname, home.secUid);
       final config = server.stores.saveLocation.current;
       final quality = server.qualityModeFrom(body['quality']?.toString());
-      final memory = TerminalMemoryStore.seed;
+      final memory = server.stores.terminalMemory.seed;
       final session = SaveSelectionSession.home(
         profiles: [home.profile],
         worksBySecUid: {home.secUid: works},
@@ -225,7 +223,7 @@ class SaveHandler {
         onLog: server.logs.add,
       );
       if (results.any((item) => item.success)) {
-        await HistoryStore.markSaved('home:${home.secUid}', true);
+        await server.stores.history.markSaved('home:${home.secUid}', true);
       }
       server.sendJson(request, HttpStatus.ok, {
         'secUid': home.secUid,

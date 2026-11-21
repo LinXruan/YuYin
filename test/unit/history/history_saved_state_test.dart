@@ -5,8 +5,14 @@ import 'package:yuyin/models/history_item.dart';
 import 'package:yuyin/utils/history/history_store.dart';
 
 void main() {
+  late HistoryStore store;
+
   setUp(() {
-    HistoryStore.resetForTesting(skipSave: true);
+    store = HistoryStore(skipSaveForTesting: true);
+  });
+
+  tearDown(() {
+    store.dispose();
   });
 
   group('HistorySavedState', () {
@@ -30,7 +36,7 @@ void main() {
 
   group('HistoryStore.markSaved', () {
     test('主页记录按 id 匹配', () async {
-      await HistoryStore.addRecord(
+      await store.addRecord(
         HistoryItem(
           id: 'home:sec1',
           url: 'https://www.douyin.com/user/sec1',
@@ -40,13 +46,13 @@ void main() {
         ),
       );
 
-      await HistoryStore.markSaved('home:sec1');
+      await store.markSaved('home:sec1');
 
-      expect(HistoryStore.records.single.isSaved, isTrue);
+      expect(store.records.single.isSaved, isTrue);
     });
 
     test('主页记录 id 不匹配时按 authorSecUid 兜底', () async {
-      await HistoryStore.addRecord(
+      await store.addRecord(
         HistoryItem(
           id: 'legacy-id',
           url: '',
@@ -56,9 +62,9 @@ void main() {
         ),
       );
 
-      await HistoryStore.markSaved('home:sec2');
+      await store.markSaved('home:sec2');
 
-      expect(HistoryStore.records.single.isSaved, isTrue);
+      expect(store.records.single.isSaved, isTrue);
     });
   });
 }

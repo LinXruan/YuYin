@@ -74,7 +74,9 @@ SaveSelectionSession _session({
 }
 
 void main() {
-  setUp(() => TerminalMemoryStore.reset());
+  late TerminalMemoryStore memoryStore;
+
+  setUp(() => memoryStore = TerminalMemoryStore());
 
   group('PLAN_70 四态聚合', () {
     test('Empty 被跳过：只有部分 note 有音频时仍为 All', () {
@@ -193,18 +195,18 @@ void main() {
       session.setTerminalResource(MediaType.image, false);
       session.setTerminalQuality(QualityEdge.lowest);
 
-      await TerminalMemoryStore.capture(session.terminal);
-      expect(TerminalMemoryStore.seed.picture, AggregateState.none);
-      expect(TerminalMemoryStore.seed.quality, BatchVideoQualityMode.lowest);
-      expect(TerminalMemoryStore.seed.music, AggregateState.all);
+      await memoryStore.capture(session.terminal);
+      expect(memoryStore.seed.picture, AggregateState.none);
+      expect(memoryStore.seed.quality, BatchVideoQualityMode.lowest);
+      expect(memoryStore.seed.music, AggregateState.all);
 
-      TerminalMemoryStore.reset();
+      memoryStore.reset();
       final partial = _session();
       partial.setAuthorResource('a1', MediaType.image, false);
-      await TerminalMemoryStore.capture(partial.terminal);
+      await memoryStore.capture(partial.terminal);
 
       expect(partial.terminal.picture, AggregateState.notAll);
-      expect(TerminalMemoryStore.seed.picture, AggregateState.all);
+      expect(memoryStore.seed.picture, AggregateState.all);
     });
 
     test('mixed / none 画质不覆盖模板', () async {
@@ -212,13 +214,13 @@ void main() {
       session.setTier('v1', 'v1#mid');
       expect(session.terminal.quality, QualityIndicator.mixed);
 
-      await TerminalMemoryStore.capture(session.terminal);
-      expect(TerminalMemoryStore.seed.quality, BatchVideoQualityMode.highest);
+      await memoryStore.capture(session.terminal);
+      expect(memoryStore.seed.quality, BatchVideoQualityMode.highest);
 
       session.setTerminalKind(WorkMediaKind.video, SelectionState.none);
       expect(session.terminal.quality, QualityIndicator.none);
-      await TerminalMemoryStore.capture(session.terminal);
-      expect(TerminalMemoryStore.seed.quality, BatchVideoQualityMode.highest);
+      await memoryStore.capture(session.terminal);
+      expect(memoryStore.seed.quality, BatchVideoQualityMode.highest);
     });
   });
 }

@@ -9,6 +9,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
+  late HistoryStore historyStore;
 
   setUpAll(() async {
     tempDir = await Directory.systemTemp.createTemp('history_store_test_');
@@ -30,7 +31,11 @@ void main() {
   });
 
   setUp(() {
-    HistoryStore.resetForTesting();
+    historyStore = HistoryStore();
+  });
+
+  tearDown(() {
+    historyStore.dispose();
   });
 
   group('HistoryItem 数据模型与格式化测试', () {
@@ -135,8 +140,8 @@ void main() {
 
   group('HistoryStore 内存操作与生命周期测试', () {
     test('初始状态为空', () {
-      expect(HistoryStore.records, isEmpty);
-      expect(HistoryStore.recordsNotifier.value, isEmpty);
+      expect(historyStore.records, isEmpty);
+      expect(historyStore.recordsNotifier.value, isEmpty);
     });
 
     test('addRecord 添加条目并置顶', () async {
@@ -153,13 +158,13 @@ void main() {
         createdAt: DateTime.now(),
       );
 
-      await HistoryStore.addRecord(item1);
-      expect(HistoryStore.records.length, 1);
-      expect(HistoryStore.records.first.id, '1');
+      await historyStore.addRecord(item1);
+      expect(historyStore.records.length, 1);
+      expect(historyStore.records.first.id, '1');
 
-      await HistoryStore.addRecord(item2);
-      expect(HistoryStore.records.length, 2);
-      expect(HistoryStore.records.first.id, '2'); // 最新置顶
+      await historyStore.addRecord(item2);
+      expect(historyStore.records.length, 2);
+      expect(historyStore.records.first.id, '2'); // 最新置顶
     });
 
     test('重复解析相同 url 自动去重并更新置顶', () async {
@@ -182,15 +187,15 @@ void main() {
         createdAt: DateTime.now(),
       );
 
-      await HistoryStore.addRecord(item1);
-      await HistoryStore.addRecord(item2);
-      expect(HistoryStore.records.length, 2);
+      await historyStore.addRecord(item1);
+      await historyStore.addRecord(item2);
+      expect(historyStore.records.length, 2);
 
-      await HistoryStore.addRecord(item3);
+      await historyStore.addRecord(item3);
       // 总条数仍为 2，并且新记录置顶，旧记录被替换
-      expect(HistoryStore.records.length, 2);
-      expect(HistoryStore.records.first.id, 'new_id');
-      expect(HistoryStore.records.first.fullDesc, '更新后的新文案');
+      expect(historyStore.records.length, 2);
+      expect(historyStore.records.first.id, 'new_id');
+      expect(historyStore.records.first.fullDesc, '更新后的新文案');
     });
 
     test('超过 500 条上限自动截断最旧记录', () async {
@@ -201,50 +206,50 @@ void main() {
           fullDesc: '文案 $i',
           createdAt: DateTime.now().add(Duration(seconds: i)),
         );
-        await HistoryStore.addRecord(item);
+        await historyStore.addRecord(item);
       }
 
-      expect(HistoryStore.records.length, HistoryStore.maxHistoryCount);
-      expect(HistoryStore.records.first.id, 'id_509');
+      expect(historyStore.records.length, HistoryStore.maxHistoryCount);
+      expect(historyStore.records.first.id, 'id_509');
       // 最旧的前 10 条（id_0 到 id_9）已被淘汰
-      expect(HistoryStore.records.any((r) => r.id == 'id_0'), isFalse);
-      expect(HistoryStore.records.any((r) => r.id == 'id_9'), isFalse);
-      expect(HistoryStore.records.any((r) => r.id == 'id_10'), isTrue);
+      expect(historyStore.records.any((r) => r.id == 'id_0'), isFalse);
+      expect(historyStore.records.any((r) => r.id == 'id_9'), isFalse);
+      expect(historyStore.records.any((r) => r.id == 'id_10'), isTrue);
     });
 
     test('deleteRecord 删除单条', () async {
       final item1 = HistoryItem(id: '1', url: 'https://v.douyin.com/1/', fullDesc: 'a');
       final item2 = HistoryItem(id: '2', url: 'https://v.douyin.com/2/', fullDesc: 'b');
-      await HistoryStore.addRecord(item1);
-      await HistoryStore.addRecord(item2);
+      await historyStore.addRecord(item1);
+      await historyStore.addRecord(item2);
 
-      await HistoryStore.deleteRecord('1');
-      expect(HistoryStore.records.length, 1);
-      expect(HistoryStore.records.first.id, '2');
+      await historyStore.deleteRecord('1');
+      expect(historyStore.records.length, 1);
+      expect(historyStore.records.first.id, '2');
     });
 
     test('deleteRecords 批量删除', () async {
       for (int i = 1; i <= 5; i++) {
-        await HistoryStore.addRecord(
+        await historyStore.addRecord(
           HistoryItem(id: '$i', url: 'https://v.douyin.com/$i/', fullDesc: 'item $i'),
         );
       }
-      expect(HistoryStore.records.length, 5);
+      expect(historyStore.records.length, 5);
 
-      await HistoryStore.deleteRecords({'1', '3', '5'});
-      expect(HistoryStore.records.length, 2);
-      final remainingIds = HistoryStore.records.map((r) => r.id).toSet();
+      await historyStore.deleteRecords({'1', '3', '5'});
+      expect(historyStore.records.length, 2);
+      final remainingIds = historyStore.records.map((r) => r.id).toSet();
       expect(remainingIds, {'2', '4'});
     });
 
     test('clearAll 清空全部记录', () async {
-      await HistoryStore.addRecord(HistoryItem(id: '1', url: 'u1', fullDesc: 'a'));
-      await HistoryStore.addRecord(HistoryItem(id: '2', url: 'u2', fullDesc: 'b'));
-      expect(HistoryStore.records.length, 2);
+      await historyStore.addRecord(HistoryItem(id: '1', url: 'u1', fullDesc: 'a'));
+      await historyStore.addRecord(HistoryItem(id: '2', url: 'u2', fullDesc: 'b'));
+      expect(historyStore.records.length, 2);
 
-      await HistoryStore.clearAll();
-      expect(HistoryStore.records, isEmpty);
-      expect(HistoryStore.recordsNotifier.value, isEmpty);
+      await historyStore.clearAll();
+      expect(historyStore.records, isEmpty);
+      expect(historyStore.recordsNotifier.value, isEmpty);
     });
   });
 
@@ -252,7 +257,7 @@ void main() {
     test('addRecord 写入文件后，可以通过 init 恢复', () async {
       final t1 = DateTime(2026, 11, 2, 10, 0);
       final t2 = DateTime(2026, 11, 2, 11, 0);
-      await HistoryStore.addRecord(
+      await historyStore.addRecord(
         HistoryItem(
           id: 'persist_1',
           url: 'https://v.douyin.com/p1/',
@@ -260,7 +265,7 @@ void main() {
           createdAt: t1,
         ),
       );
-      await HistoryStore.addRecord(
+      await historyStore.addRecord(
         HistoryItem(
           id: 'persist_2',
           url: 'https://v.douyin.com/p2/',
@@ -270,14 +275,14 @@ void main() {
       );
 
       // 清空内存
-      HistoryStore.resetForTesting();
-      expect(HistoryStore.records, isEmpty);
+      historyStore.resetForTesting();
+      expect(historyStore.records, isEmpty);
 
       // 重新从文件加载
-      await HistoryStore.init();
-      expect(HistoryStore.records.length, 2);
-      expect(HistoryStore.records[0].id, 'persist_2'); // 最新的在前面
-      expect(HistoryStore.records[1].id, 'persist_1');
+      await historyStore.init();
+      expect(historyStore.records.length, 2);
+      expect(historyStore.records[0].id, 'persist_2'); // 最新的在前面
+      expect(historyStore.records[1].id, 'persist_1');
     });
 
     test('PLAN_46: markSaved 与 isSaved 状态持久化及重析继承', () async {
@@ -287,19 +292,19 @@ void main() {
         fullDesc: '文案1',
         isSaved: false,
       );
-      await HistoryStore.addRecord(item);
-      expect(HistoryStore.records.first.isSaved, isFalse);
+      await historyStore.addRecord(item);
+      expect(historyStore.records.first.isSaved, isFalse);
 
       // 标记为已保存
-      await HistoryStore.markSaved('test_url_1', true);
-      expect(HistoryStore.records.first.isSaved, isTrue);
+      await historyStore.markSaved('test_url_1', true);
+      expect(historyStore.records.first.isSaved, isTrue);
 
       // search onlySaved 过滤
-      expect(HistoryStore.search('', onlySaved: true).length, 1);
-      expect(HistoryStore.search('', onlySaved: false).length, 1);
+      expect(historyStore.search('', onlySaved: true).length, 1);
+      expect(historyStore.search('', onlySaved: false).length, 1);
 
       // 重新解析同一 URL，由于旧记录已保存，新 addRecord 自动继承已保存状态
-      await HistoryStore.addRecord(
+      await historyStore.addRecord(
         HistoryItem(
           id: 'test_url_1',
           url: 'https://v.douyin.com/u1/',
@@ -307,8 +312,8 @@ void main() {
           isSaved: false,
         ),
       );
-      expect(HistoryStore.records.first.isSaved, isTrue);
-      expect(HistoryStore.records.first.fullDesc, '更新后的文案1');
+      expect(historyStore.records.first.isSaved, isTrue);
+      expect(historyStore.records.first.fullDesc, '更新后的文案1');
     });
   });
 }

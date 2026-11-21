@@ -11,10 +11,12 @@ import '../widget/frame/history_frame.dart';
 class HistoryPage extends StatefulWidget {
   const HistoryPage({
     super.key,
+    this.historyStore,
     this.saveLocationStore,
     this.onRequestParse,
   });
 
+  final HistoryStore? historyStore;
   final SaveLocationStore? saveLocationStore;
   final ValueChanged<String>? onRequestParse;
 
@@ -24,11 +26,12 @@ class HistoryPage extends StatefulWidget {
 
 class _HistoryPageState extends State<HistoryPage>
     with AutomaticKeepAliveClientMixin {
+  late final HistoryStore _historyStore = widget.historyStore ?? HistoryStore();
   late final HistorySelectionCoordinator _selection;
   late final HistorySearchCoordinator _search;
 
   bool _sessionDismissed = false;
-  late bool _permanentlyDismissed = HistoryStore.promptDismissed;
+  late bool _permanentlyDismissed = _historyStore.promptDismissed;
 
   @override
   bool get wantKeepAlive => true;
@@ -37,6 +40,7 @@ class _HistoryPageState extends State<HistoryPage>
   void initState() {
     super.initState();
     _selection = HistorySelectionCoordinator(
+      historyStore: _historyStore,
       onChanged: () {
         if (mounted) setState(() {});
       },
@@ -47,7 +51,7 @@ class _HistoryPageState extends State<HistoryPage>
       },
       onFilterSavedChanged: (onlySaved) {
         if (onlySaved) {
-          final savedIds = HistoryStore.records
+          final savedIds = _historyStore.records
               .where((item) => item.isSaved)
               .map((item) => item.id)
               .toSet();
@@ -55,18 +59,21 @@ class _HistoryPageState extends State<HistoryPage>
         }
       },
       onTypeFilterChanged: (filter) {
-        final validIds = HistoryStore.search(
-          _search.searchQuery,
-          onlySaved: _search.filterOnlySaved,
-          typeFilter: filter,
-        ).map((item) => item.id).toSet();
+        final validIds = _historyStore
+            .search(
+              _search.searchQuery,
+              onlySaved: _search.filterOnlySaved,
+              typeFilter: filter,
+            )
+            .map((item) => item.id)
+            .toSet();
         _selection.pruneDeleted(validIds);
       },
     );
     HistoryThumbnailCache.warmUp();
-    HistoryStore.recordsNotifier.addListener(_onRecordsChanged);
+    _historyStore.recordsNotifier.addListener(_onRecordsChanged);
     if (!_permanentlyDismissed) {
-      HistoryStore.isPromptDismissed().then((dismissed) {
+      _historyStore.isPromptDismissed().then((dismissed) {
         if (mounted && dismissed) {
           setState(() => _permanentlyDismissed = true);
         }
@@ -76,7 +83,7 @@ class _HistoryPageState extends State<HistoryPage>
 
   @override
   void dispose() {
-    HistoryStore.recordsNotifier.removeListener(_onRecordsChanged);
+    _historyStore.recordsNotifier.removeListener(_onRecordsChanged);
     _search.dispose();
     super.dispose();
   }
@@ -84,7 +91,7 @@ class _HistoryPageState extends State<HistoryPage>
   void _onRecordsChanged() {
     if (!mounted) return;
     setState(() {
-      final currentIds = HistoryStore.records.map((r) => r.id).toSet();
+      final currentIds = _historyStore.records.map((r) => r.id).toSet();
       _selection.pruneDeleted(currentIds);
     });
   }
@@ -92,12 +99,12 @@ class _HistoryPageState extends State<HistoryPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final displayedItems = HistoryStore.search(
+    final displayedItems = _historyStore.search(
       _search.searchQuery,
       onlySaved: _search.filterOnlySaved,
       typeFilter: _search.typeFilter,
     );
-    final hasAnyRecord = HistoryStore.records.isNotEmpty;
+    final hasAnyRecord = _historyStore.records.isNotEmpty;
 
     return HistoryFrame(
       selection: _selection,
@@ -113,7 +120,7 @@ class _HistoryPageState extends State<HistoryPage>
       saveLocationStore: widget.saveLocationStore,
       onPermanentlyDismiss: () async {
         setState(() => _permanentlyDismissed = true);
-        await HistoryStore.setPromptDismissed(true);
+        await _historyStore.setPromptDismissed(true);
       },
     );
   }

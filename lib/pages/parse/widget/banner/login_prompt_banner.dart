@@ -5,9 +5,15 @@ import 'prompt_surface.dart';
 
 /// 登录提示横幅。
 class LoginPromptBanner extends StatefulWidget {
-  const LoginPromptBanner({super.key, required this.loggedIn, this.onTapLogin});
+  const LoginPromptBanner({
+    super.key,
+    required this.loggedIn,
+    this.loginStateStore,
+    this.onTapLogin,
+  });
 
   final ValueNotifier<bool> loggedIn;
+  final LoginStateStore? loginStateStore;
   final VoidCallback? onTapLogin;
 
   @override
@@ -15,14 +21,16 @@ class LoginPromptBanner extends StatefulWidget {
 }
 
 class _LoginPromptBannerState extends State<LoginPromptBanner> {
+  late final LoginStateStore _loginStateStore =
+      widget.loginStateStore ?? LoginStateStore();
   bool _sessionDismissed = false;
-  late bool _permanentlyDismissed = LoginStateStore.loginPromptDismissed;
+  late bool _permanentlyDismissed = _loginStateStore.loginPromptDismissed;
 
   @override
   void initState() {
     super.initState();
     if (!_permanentlyDismissed) {
-      LoginStateStore.isLoginPromptDismissed().then((dismissed) {
+      _loginStateStore.isLoginPromptDismissed().then((dismissed) {
         if (mounted && dismissed) {
           setState(() => _permanentlyDismissed = true);
         }
@@ -97,7 +105,7 @@ class _LoginPromptBannerState extends State<LoginPromptBanner> {
                   TextButton(
                     onPressed: () async {
                       setState(() => _permanentlyDismissed = true);
-                      await LoginStateStore.setLoginPromptDismissed(true);
+                      await _loginStateStore.setLoginPromptDismissed(true);
                     },
                     style: TextButton.styleFrom(
                       visualDensity: VisualDensity.compact,

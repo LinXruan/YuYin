@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import '../../../../utils/history/history_store.dart';
 import '../../../../utils/settings/display_mode_service.dart';
 import '../../../../utils/thumbnail/history_thumbnail_cache.dart';
 import '../../server/agent_automation_server.dart';
@@ -44,7 +43,7 @@ class MediaHandler {
 
   /// POST /api/thumbnails/preload：对所有未缓存缩略图的历史记录执行后台离线缓存
   Future<void> handlePreloadThumbnails(HttpRequest request) async {
-    final records = HistoryStore.records;
+    final records = server.stores.history.records;
     var triggered = 0;
     for (final item in records) {
       final cover = item.coverUrl;
