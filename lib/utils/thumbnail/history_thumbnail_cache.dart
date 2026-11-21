@@ -16,7 +16,7 @@ class HistoryThumbnailCache {
 
   static final ThumbnailCacheState _state = ThumbnailCacheState();
 
-  /// 缩略图缓存更新通知器（新缩略图落盘后通知 UI 局部刷新）
+  /// 缩略图缓存更新通知器（新缩略图落盘或清理后通知 UI 局部刷新）
   static ValueNotifier<int> get cacheUpdateNotifier => _state.updateNotifier;
 
   /// 供单元测试自定义存储目录
@@ -29,6 +29,22 @@ class HistoryThumbnailCache {
   /// 供单元测试自定义 Dio
   @visibleForTesting
   static void setMockDio(Dio dio) => _state.dio = dio;
+
+  /// 供单元测试配置容量上限与时钟
+  @visibleForTesting
+  static void configureForTesting({
+    int? maxEntries,
+    int? maxBytes,
+    DateTime Function()? now,
+  }) {
+    if (maxEntries != null) _state.maxEntries = maxEntries;
+    if (maxBytes != null) _state.maxBytes = maxBytes;
+    if (now != null) _state.now = now;
+  }
+
+  /// 供单元测试读取当前缓存世代
+  @visibleForTesting
+  static int get generationForTesting => _state.generation;
 
   /// 供单元测试或调试重置状态
   @visibleForTesting
@@ -56,4 +72,10 @@ class HistoryThumbnailCache {
       ThumbnailMaintenance.getStats(_state);
 
   static Future<void> clearCache() => ThumbnailMaintenance.clearCache(_state);
+
+  static Future<int> removeByIds(Iterable<String> ids) =>
+      ThumbnailMaintenance.removeByIds(_state, ids);
+
+  static Future<int> pruneOrphans(Set<String> activeIds) =>
+      ThumbnailMaintenance.pruneOrphans(_state, activeIds);
 }

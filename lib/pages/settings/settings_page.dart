@@ -1,18 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app_info.dart';
 import '../../services/sniffer/facade/douyin_sniffer.dart';
 import '../../services/update/client/update_checker.dart';
-import '../../utils/update/app_update_store.dart';
 import '../../utils/debug/log_controller.dart';
 import '../../utils/network_detector.dart';
 import '../../utils/settings/theme_store.dart';
+import '../../utils/thumbnail/history_thumbnail_cache.dart';
+import '../../utils/update/app_update_store.dart';
 import '../../widgets/update/dialog/update_dialog.dart';
 import '../about_page.dart';
 import '../debug_page.dart';
 import 'download_settings_page.dart';
 
-/// 设置页：提供“外观设置”、“下载设置”、“检查更新”、“调试”和“关于”
+/// 设置页：提供“外观设置”、“下载设置”、“缩略图缓存”、“检查更新”、“调试”和“关于”
 class SettingsPage extends StatefulWidget {
   const SettingsPage({
     super.key,
@@ -25,6 +28,16 @@ class SettingsPage extends StatefulWidget {
   final DouyinSniffer sniffer;
   final UpdateChecker? updateChecker;
 
+  /// 将字节数格式化为易读体积文本
+  static String formatCacheSize(int bytes) {
+    if (bytes <= 0) return '0 B';
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+  }
+
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
@@ -33,6 +46,9 @@ class _SettingsPageState extends State<SettingsPage>
     with AutomaticKeepAliveClientMixin {
   late final UpdateChecker _checker;
   bool _isChecking = false;
+  bool _isClearingCache = false;
+  int _cachedCount = 0;
+  int _cachedBytes = 0;
 
   @override
   bool get wantKeepAlive => true;
@@ -41,14 +57,84 @@ class _SettingsPageState extends State<SettingsPage>
   void initState() {
     super.initState();
     _checker = widget.updateChecker ?? UpdateChecker();
+    HistoryThumbnailCache.cacheUpdateNotifier.addListener(_onCacheUpdated);
+    unawaited(_refreshThumbnailStats());
   }
 
   @override
   void dispose() {
+    HistoryThumbnailCache.cacheUpdateNotifier.removeListener(_onCacheUpdated);
     if (widget.updateChecker == null) {
       _checker.dispose();
     }
     super.dispose();
+  }
+
+  void _onCacheUpdated() {
+    if (!mounted) return;
+    unawaited(_refreshThumbnailStats());
+  }
+
+  Future<void> _refreshThumbnailStats() async {
+    final stats = await HistoryThumbnailCache.getStats();
+    if (!mounted) return;
+    final count = (stats['cachedFilesCount'] as int?) ?? 0;
+    final bytes = (stats['totalBytes'] as int?) ?? 0;
+    if (count == _cachedCount && bytes == _cachedBytes) return;
+    setState(() {
+      _cachedCount = count;
+      _cachedBytes = bytes;
+    });
+  }
+
+  Future<void> _onTapThumbnailCache() async {
+    await _refreshThumbnailStats();
+    if (!mounted || _isClearingCache) return;
+    if (_cachedCount == 0) {
+      _showSnack('暂无需要清理的缩略图缓存');
+      return;
+    }
+
+    final sizeText = SettingsPage.formatCacheSize(_cachedBytes);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('清理缩略图缓存'),
+        content: Text(
+          '将删除本地已缓存的 $_cachedCount 张作品封面（约 $sizeText），不影响已保存的本地媒体文件。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('清理'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isClearingCache = true);
+    await HistoryThumbnailCache.clearCache();
+    await _refreshThumbnailStats();
+    if (!mounted) return;
+    setState(() => _isClearingCache = false);
+    _showSnack('已清理缩略图缓存');
+  }
+
+  void _showSnack(String message) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.hideCurrentSnackBar();
+    messenger?.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   void _showThemeDialog(BuildContext context, ThemeMode currentMode) {
@@ -87,7 +173,6 @@ class _SettingsPageState extends State<SettingsPage>
 
   /// 点击检查更新：允许重复点击（每次打断旧请求），先检测网络状态
   Future<void> _onCheckUpdate() async {
-    // 1. 网络连接前置检测：离线时直接拦截并弹出提示
     final hasNet = await NetworkDetector.hasInternetConnection();
     if (!mounted) return;
     if (!hasNet) {
@@ -95,41 +180,29 @@ class _SettingsPageState extends State<SettingsPage>
       return;
     }
 
-    // 2. 状态切换为正在检查（按钮不锁定，保持可点击）
     setState(() => _isChecking = true);
-
-    // 3. 执行检查（内部会自动 cancel 之前的请求）
     final result = await _checker.checkUpdate(currentVersion: appVersion);
-    if (!mounted) return;
-
-    // 若被新点击打断取消，不更新 UI，交由最新一次请求处理
-    if (result.isCancelled) {
-      return;
-    }
-
+    if (!mounted || result.isCancelled) return;
     setState(() => _isChecking = false);
 
     if (result.errorMessage != null) {
-      final messenger = ScaffoldMessenger.maybeOf(context);
-      messenger?.hideCurrentSnackBar();
-      messenger?.showSnackBar(
-        SnackBar(
-          content: Text(result.errorMessage!),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      _showSnack(result.errorMessage!);
       return;
     }
 
     if (result.info != null) {
-      // 检查更新成功后，先扫描本地是否已有与最新版本一致的 APK 安装包
       final localApk = result.info!.hasUpdate
           ? await AppUpdateStore.findMatchingApk(result.info!.version)
           : null;
       if (!mounted) return;
       UpdateDialog.show(context, result.info!, localApk: localApk);
     }
+  }
+
+  String _cacheSubtitle() {
+    if (_isClearingCache) return '正在清理缩略图缓存...';
+    if (_cachedCount == 0) return '暂无缓存封面';
+    return '已缓存 $_cachedCount 张封面（${SettingsPage.formatCacheSize(_cachedBytes)}）';
   }
 
   @override
@@ -161,6 +234,20 @@ class _SettingsPageState extends State<SettingsPage>
               builder: (_) => const DownloadSettingsPage(),
             ),
           ),
+        ),
+        const Divider(height: 1),
+        ListTile(
+          leading: const Icon(Icons.photo_library_outlined),
+          title: const Text('缩略图缓存'),
+          subtitle: Text(_cacheSubtitle()),
+          trailing: _isClearingCache
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.cleaning_services_outlined),
+          onTap: _onTapThumbnailCache,
         ),
         const Divider(height: 1),
         ListTile(

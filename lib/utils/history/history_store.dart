@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -75,6 +76,11 @@ class HistoryStore {
         // 确保按最新时间在最前
         _records.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         recordsNotifier.value = List.unmodifiable(_records);
+        unawaited(
+          HistoryThumbnailCache.pruneOrphans(
+            _records.map((item) => item.id).toSet(),
+          ),
+        );
       }
     } catch (_) {
       // 容错处理，保障应用正常启动
@@ -162,6 +168,7 @@ class HistoryStore {
     if (_records.length != originalLength) {
       _publish();
       await _save();
+      unawaited(HistoryThumbnailCache.removeByIds([id]));
     }
   }
 
@@ -173,6 +180,7 @@ class HistoryStore {
     if (_records.length != originalLength) {
       _publish();
       await _save();
+      unawaited(HistoryThumbnailCache.removeByIds(ids));
     }
   }
 
@@ -182,6 +190,7 @@ class HistoryStore {
     _records.clear();
     recordsNotifier.value = [];
     await _save();
+    unawaited(HistoryThumbnailCache.clearCache());
   }
 
   /// 纯内存极速分词搜索：委托给 HistoryQuery 纯函数。
