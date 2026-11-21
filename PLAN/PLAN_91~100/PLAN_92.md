@@ -33,7 +33,7 @@
 - **注入链路**：`main.dart` → `YuYinApp` → `AppShell` → `ShellScaffold` / `ShellUpdateBanner` → `SettingsPage` / `DownloadSettingsPage` / `SaveLocationDialog` / `SaveLocationPickers` / `UpdateDialog` / `VideoDownloader` / `UserHomeBatchSaver` / `AlbumLocator` / `VideoQualityUtils` / `QualityOptionsSnapshot` / `Top|Middle|BottomDebugSnapshotHelper` / `AgentAutomationServer`（`BridgeRouter`、`ParseHandler`、`DownloadHandler`、`SaveHandler`、`SelectionHandler`、`SystemHandler`）。
 - **同步版本**：`pubspec.yaml`、`lib/app_info.dart` → `1.6.1+247`。
 - **测试同步**：更新对应 Store / Settings / Update / Selection / Bridge 测试文件，确保 100% 独立实例化运行。
-- **提交规范**：`247_pl92：建立 AppStores 容器并完成设置、主题、更新与调试 Store 显式注入`
+- **提交规范**：`247_pl92：建立 AppStores 容器并完成设置、主题、更新与调试 Store 显式注入`（已完成，commit `e13401a`）
 
 ### 阶段 2（build 248）：历史、记忆模板、登录与提示类 Store 显式注入
 - **改造 Store**：`HistoryStore`、`TerminalMemoryStore`、`LoginStateStore`、`ParseHintStore`，全部纳入 `AppStores.initialize()` 并行启动。
@@ -43,14 +43,15 @@
   - `LoginStateStore` → `AppShell` / `LoginWebViewPage` / `LoginPromptBanner` / `HomeParseCoordinator` / `DouyinSniffer`（`SingleSniffStrategy`、`HomeSniffStrategy`、`ProfileSniffStrategy`） / `SystemHandler`
   - `ParseHintStore` → `ParsePage` / `ParseFrame` / `BatchSupportBanner`
 - **同步版本**：`pubspec.yaml`、`lib/app_info.dart` → `1.6.1+248`。
-- **测试同步与真机回归**：更新其余历史/记忆/横幅/登录测试，跑全量门禁、`flutter build apk --debug` 与真机 WIFI ADB 三链路实测。
-- **提交规范**：`248_pl92：完成历史、记忆、登录与提示 Store 显式注入及真机三链路验证`
+- **测试同步与真机回归**：更新其余历史/记忆/横幅/登录测试，跑全量门禁、`flutter build apk --debug` 与真机 WIFI ADB 三链路实测（视频 `1920x1200`、图文 4 资源、主页 18 条 + `/api/history` 全部通过）。
+- **提交规范**：`248_pl92：完成历史、记忆、登录与提示 Store 显式注入及真机三链路验证`（已完成，commit `a4e05e0`）
 
 ### 阶段 3（build 249）：Store 隔离单测与交接文档收官
 - **涉及文件**：
   - 新增 `test/unit/utils/app_stores_injection_test.dart`（验证多套 `AppStores` 实例完全隔离、无静态状态串扰）
   - 更新 `PLAN/PLAN_91~100/PLAN_92.md`、`HANDOVER.md`
   - 同步版本 `pubspec.yaml`、`lib/app_info.dart` → `1.6.1+249`
+- **验收**：`flutter analyze` 0 issues，`flutter test` 435 项测试 100% 全绿。
 - **提交规范**：`249_pl92：补充 AppStores 隔离单测并更新交接文档（PLAN_92 收官）`
 
 ---

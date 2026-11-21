@@ -1,23 +1,24 @@
-# 余音交接清单（截至 1.6.1+246）
+# 余音交接清单（截至 1.6.1+249）
 
-> 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_91~100/PLAN_91.md`。
-> 工作区干净，最近提交为 246_pl91。
+> 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_91~100/PLAN_92.md`。
+> 工作区干净，最近提交为 249_pl92。
 
 ---
 
 ## 0. 一句话现状
 
-- 版本：`1.6.1+246`（版本名冻结，只递增 build 号）。
-- 门禁：`flutter analyze` 0 issues；`flutter test` 433 全绿；**结构门禁 `part` 上限为 0 且零 `plan_XX` 测试残留**！
+- 版本：`1.6.1+249`（版本名冻结，只递增 build 号）。
+- 门禁：`flutter analyze` 0 issues；`flutter test` 435 全绿；**结构门禁 `part` 上限为 0 且零 `plan_XX` 测试残留**！
 - 已完成大重构：
   - **全库 0 part**（调试桥、Selection、Shell、Sniffer、ParsePage、HistoryPage、UpdateDialog、SavePage 全部 0 part）。
   - **全库 0 兼容壳**（彻底删除 `lib/models/media_item.dart` 与 `lib/utils/url_parser.dart` 兼容壳，全域 100% 直连具体领域模型与解析类）。
+  - **全库 0 Store 静态单例（PLAN_92）**：全部 9 个 Store（`ThemeStore` / `DownloadSettingsStore` / `SaveLocationStore` / `AppUpdateStore` / `SavePageDebugStore` / `HistoryStore` / `TerminalMemoryStore` / `LoginStateStore` / `ParseHintStore`）改造为可实例化领域类，由 `main.dart` 通过 `AppStores.initialize()` 并行初始化并显式向下注入，测试全隔离零全局脏状态。
   - **ParseStatus 强类型状态机与 HTTP 动态端口**（彻底解耦 `StatusCard` 日志文本包含推导，支持失败项一键重试；测试套件彻底消除端口碰撞隐患）。
   - **历史页多维筛选与一键重新解析**（媒体类型筛选：全部/视频/图文/主页，卡片一键「解析」直达解析页，彻底消除缩略图落盘高频全页重建）。
   - **测试领域重组与门禁收官（PLAN_89）**：38 个历史 `plan_*` 测试全面迁入 `test/unit|widget/<domain>/`，补全核心组件 Widget 测试，门禁禁止新增迭代编号命名。
   - **Wave 3 交互与体验闭环（PLAN_90）**：中层弹窗失败内嵌反馈、冷启动横幅同步预加载零闪现、音频错误态与 200ms 拖动/seek 守卫防抖、全屏多图滑动切换与 `42×42dp` 角标热区。
   - **缩略图缓存管理闭环与 Sniffer/JS 细节修复（PLAN_91）**：缩略图确定性 64 位 FNV-1a 哈希、失败 URL 指数退避、`clearCache` 世代取消、LRU 上限（600 张/100 MB）与孤儿淘汰、设置页缩略图缓存统计与一键清理入口；`SingleSniffStrategy` 原生 Cookie 读取替换 3 秒 `document.cookie`、iPhone UA 不伪造 `Win32`、`scanTree` 兼容 `image_post_info.images`、API 标题优先于 DOM 文本。
-- 后续主要工作：Store 显式注入、`SessionWorkPreparer` 滑动窗口边解析边下载、`StorageBridge` 目录缓存与线程池、选择树单作者增量刷新及 `js_scan_engine` / DOM 回流清理。
+- 后续主要工作：`SessionWorkPreparer` 滑动窗口边解析边下载、Sniffer 启动去冗余 IPC、`StorageBridge` 目录缓存与线程池、选择树单作者增量刷新及 `js_scan_engine` / DOM 回流清理。
 
 ---
 
@@ -89,6 +90,9 @@
 | 244 | 91 | PLAN_91 阶段 1：缩略图缓存补齐确定性哈希、退避、世代取消、LRU/孤儿淘汰与设置页清理入口 |
 | 245 | 91 | PLAN_91 阶段 2：原生 Cookie 替换 `document.cookie`，修复 iPhone UA 伪装与 `image_post_info`/API 标题覆盖 |
 | 246 | 91 | PLAN_91 阶段 3：真机 WIFI ADB 全链路实测通过（433 全绿）与交接文档收官 |
+| 247 | 92 | PLAN_92 阶段 1：建立 `AppStores` 容器并完成设置/主题/保存位置/更新/调试 Store 显式注入 |
+| 248 | 92 | PLAN_92 阶段 2：完成历史/记忆/登录/提示 Store 显式注入与真机 WIFI ADB 三链路实测 |
+| 249 | 92 | PLAN_92 阶段 3：补充 `AppStores` 隔离单测并更新交接文档（435 全绿，PLAN_80 架构债清零） |
 
 ---
 
@@ -204,7 +208,7 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 - [x] **widgets/update（4 条）**：UpdateDialog 拆为 MarkdownRenderView 与 ReleaseNotesBox 独立组件，彻底 **0 part**。
 - [x] **widgets/save_page（38 条）**：top/middle/bottom 三个 sheet 拆为独立 Tile/Cover/Avatar/Preview 组件与 DebugSnapshotHelper，彻底 **0 part**。
 - [x] **删除聚合导出壳**：`lib/models/media_item.dart` 与 `lib/utils/url_parser.dart` 彻底删除，全域 100% 直连领域模型与解析对象（全库 0 兼容壳达成）。
-- [ ] **Store 显式注入**：`HistoryStore`/`TerminalMemoryStore` 等静态单例改为显式容器注入或下沉解耦。
+- [x] **Store 显式注入**：9 个 Store 静态单例全部改为可实例化类，由 `main.dart` 经 `AppStores` 容器显式构造注入，全库零 Store 静态可变状态。（PLAN_92 已完成）
 - [x] 清理 `_FlowFlow` 命名残余、`ignore_for_file`。（全库 `lib/` 与 `test/` 已清零）
 
 ### C. PLAN_78 · 性能剩余项
@@ -274,7 +278,7 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 ## 8. 新对话开场建议
 
 1. 先读本文件 + `AGENTS.md` + `DEBUG.md`。
-2. 跑 `flutter analyze` 与 `flutter test` 确认基线（应为 `0 issues` / `433 tests all passed`）。
-3. 目前 `part`、兼容壳、测试归类、`PLAN_79` 体验与缩略图/JS/Cookie 细节均已收官；下一步建议按需从 `5.B / 5.C` 剩余项挑高优先级推进（例如：`SessionWorkPreparer` 滑动窗口边解析边下载、Sniffer 启动去冗余 IPC、Store 显式注入、`StorageBridge` 目录缓存与线程池等）。
-4. 严格遵守 `AGENTS.md` §0：先写 `PLAN_92.md` 再编码；每完成一个阶段执行 `bump build → analyze → test → 设备三链路回归 → commit`。
+2. 跑 `flutter analyze` 与 `flutter test` 确认基线（应为 `0 issues` / `435 tests all passed`）。
+3. 目前 `part`、兼容壳、Store 静态单例、测试归类、`PLAN_79` 体验与缩略图/JS/Cookie 细节均已清零收官；下一步建议按需从 `5.C` 剩余性能项推进（例如：`SessionWorkPreparer` 滑动窗口边解析边下载、Sniffer 启动去冗余 IPC、`StorageBridge` 目录缓存与线程池、选择树单作者增量刷新等）。
+4. 严格遵守 `AGENTS.md` §0：先写 `PLAN_93.md` 再编码；每完成一个阶段执行 `bump build → analyze → test → 设备三链路回归 → commit`。
 5. 任何阶段遇到阻塞（时序回归、无法确定的行为），先停下汇报或记录，严禁用回退兜底掩盖问题。
