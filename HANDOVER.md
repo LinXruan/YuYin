@@ -1,21 +1,22 @@
-# 余音交接清单（截至 1.6.1+240）
+# 余音交接清单（截至 1.6.1+243）
 
-> 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_81~90/PLAN_89.md`。
-> 工作区干净，最近提交为 240_pl89。
+> 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_81~90/PLAN_90.md`。
+> 工作区干净，最近提交为 243_pl90。
 
 ---
 
 ## 0. 一句话现状
 
-- 版本：`1.6.1+240`（版本名冻结，只递增 build 号）。
-- 门禁：`flutter analyze` 0 issues；`flutter test` 414 全绿；**结构门禁 `part` 上限为 0 且零 `plan_XX` 测试残留**！
+- 版本：`1.6.1+243`（版本名冻结，只递增 build 号）。
+- 门禁：`flutter analyze` 0 issues；`flutter test` 421 全绿；**结构门禁 `part` 上限为 0 且零 `plan_XX` 测试残留**！
 - 已完成大重构：
   - **全库 0 part**（调试桥、Selection、Shell、Sniffer、ParsePage、HistoryPage、UpdateDialog、SavePage 全部 0 part）。
   - **全库 0 兼容壳**（彻底删除 `lib/models/media_item.dart` 与 `lib/utils/url_parser.dart` 兼容壳，全域 100% 直连具体领域模型与解析类）。
   - **ParseStatus 强类型状态机与 HTTP 动态端口**（彻底解耦 `StatusCard` 日志文本包含推导，支持失败项一键重试；测试套件彻底消除端口碰撞隐患）。
   - **历史页多维筛选与一键重新解析**（媒体类型筛选：全部/视频/图文/主页，卡片一键「解析」直达解析页，彻底消除缩略图落盘高频全页重建）。
   - **测试领域重组与门禁收官（PLAN_89）**：38 个历史 `plan_*` 测试全面迁入 `test/unit|widget/<domain>/`，补全核心组件 Widget 测试，门禁禁止新增迭代编号命名。
-- 后续主要工作：Store 显式注入、PLAN_78 性能优化项、PLAN_79 体验优化项。
+  - **Wave 3 交互与体验闭环（PLAN_90）**：中层弹窗失败内嵌反馈、冷启动横幅同步预加载零闪现、音频错误态与 200ms 拖动/seek 守卫防抖、全屏多图滑动切换与 `42×42dp` 角标热区。
+- 后续主要工作：Store 显式注入、PLAN_78 性能优化项、设置页缓存管理与 JS 细节。
 
 ---
 
@@ -81,6 +82,9 @@
 | 238 | 89 | PLAN_89 阶段 1：重组 38 个 `test/plan_*` 至 `test/unit\|widget/<domain>/` 并新增零编号门禁 |
 | 239 | 89 | PLAN_89 阶段 2：补全 LogPanel、MediaAudioPlayerBar、SettingsPage 与 ShellUpdateBanner Widget 测试 |
 | 240 | 89 | PLAN_89 阶段 3：全量 414 测试通过、真机 WIFI ADB 三链路实测与交接文档收官 |
+| 241 | 90 | PLAN_90 阶段 1：中层打开失败弹窗内反馈，冷启动横幅同步预加载防闪 |
+| 242 | 90 | PLAN_90 阶段 2：音频错误态与防抖修复，大图全屏滑动与 42×42dp 热区优化 |
+| 243 | 90 | PLAN_90 阶段 3：真机 WIFI ADB 全链路实测通过（421 全绿）与交接文档收官 |
 
 ---
 
@@ -213,10 +217,10 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 ### D. PLAN_79 · 体验与准确度剩余项
 
 - [x] `ParseStatus` 强类型（idle/running/success/partialFailure/failure）+ 失败项一键重试；`StatusCard` 消费新模型。（PLAN_87 已完成）
-- [ ] 中层打开未解析作品失败时弹窗内反馈（不再只写后台日志）。
+- [x] 中层打开未解析作品失败时弹窗内反馈（不再只写后台日志）。（PLAN_90 已完成）
 - [x] 历史页「一键重新解析」与媒体类型筛选。（PLAN_88 已完成）
-- [ ] 音频：错误态展示、进度拖动 200ms 防抖、暂停恢复不抖动。
-- [ ] 图片全屏滑动切换；22×22dp 极小按钮热区；冷启动已关闭横幅防闪。
+- [x] 音频：错误态展示、进度拖动 200ms 防抖、暂停恢复不抖动。（PLAN_90 已完成）
+- [x] 图片全屏滑动切换；22×22dp 极小按钮热区；冷启动已关闭横幅防闪。（PLAN_90 已完成）
 - [ ] 设置页缩略图缓存管理入口。
 - [ ] 剩余 JS 问题：`jsPlatformPatch` 在 iPhone UA 下伪造 `Win32`；`scanTree` 漏 `image_post_info.images`；DOM 文本覆盖 API 标题。
 

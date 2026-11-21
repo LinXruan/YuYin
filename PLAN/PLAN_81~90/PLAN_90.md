@@ -44,8 +44,8 @@
   - 改造 `lib/pages/parse/flow/common/parse_save_coordinator.dart`、`lib/widgets/save_page/middle_multi_work_sheet.dart`
   - 改造 `lib/utils/settings/parse_hint_store.dart`、`lib/utils/login_state_store.dart`、`lib/utils/history/history_store.dart`、`lib/main.dart`
   - 改造 `lib/pages/parse/widget/banner/batch_support_banner.dart`、`lib/pages/parse/widget/banner/login_prompt_banner.dart`、`lib/pages/history/page/history_page.dart`
-  - 新增/更新 `test/widget/save_page/middle_open_error_test.dart` 与 `test/unit/utils/banner_dismiss_sync_test.dart`
-- **提交规范**：`241_pl90：中层打开失败弹窗内反馈，冷启动横幅同步预加载防闪`
+  - 新增 `test/widget/save_page/middle_open_error_test.dart` 与 `test/unit/utils/banner_dismiss_sync_test.dart`
+- **提交规范**：`241_pl90：中层打开失败弹窗内反馈，冷启动横幅同步预加载防闪`（已完成，commit `a1c9391`）
 
 ### 阶段 2（build 242）：音频错误态与防抖、全屏滑图与角标热区优化
 - **涉及文件**：
@@ -53,12 +53,15 @@
   - 改造 `lib/widgets/save_page/bottom/widget/scrubrable_progress_bar.dart`、`media_audio_player_bar.dart`、`bottom_media_tile.dart`
   - 改造 `lib/widgets/save_page/bottom/preview/media_fullscreen_preview.dart`、`lib/widgets/save_page/bottom_media_sheet.dart`
   - 更新/新增 `test/widget/save_page/media_audio_player_bar_test.dart`、`test/widget/save_page/fullscreen_preview_and_hitbox_test.dart`、`test/unit/utils/audio_preview_service_test.dart`
-- **提交规范**：`242_pl90：音频错误态与防抖修复，大图全屏滑动与角标热区扩大`
+- **提交规范**：`242_pl90：音频错误态与防抖修复，大图全屏滑动与角标热区扩大`（已完成，commit `ea863d2`）
 
 ### 阶段 3（build 243）：真机 WIFI ADB 全链路实测与交接文档收官
 - **涉及文件**：
   - `HANDOVER.md`
   - `PLAN/PLAN_81~90/PLAN_90.md`
+- **实测结果**：
+  - `flutter analyze` 0 issues，`flutter test` 421 项测试 100% 全绿。
+  - 真机（WIFI ADB `192.168.1.101:39159`）安装 `1.6.1+243` Debug 包：`120 Hz` 自适应高刷，单视频 1080P、单图文 4 资源、主页 18 条 + 18 封面全链路实测通过。
 - **提交规范**：`243_pl90：真机全链路回归验收与交接文档更新（PLAN_90 收官）`
 
 ---
