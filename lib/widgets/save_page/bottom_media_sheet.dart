@@ -1,29 +1,13 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/media_item.dart';
 import '../../services/media/audio_preview_service.dart';
-import '../../services/selection/debug/selection_snapshot.dart';
 import '../../services/selection/save_selection_session.dart';
-import '../../utils/debug/save_page_debug_store.dart';
+import 'bottom/debug/bottom_debug_snapshot_helper.dart';
+import 'bottom/preview/media_fullscreen_preview.dart';
+import 'bottom/widget/bottom_media_tile.dart';
 import 'bottom/widget/media_audio_player_bar.dart';
-import 'bottom/widget/media_audio_tile.dart';
-import 'bottom/widget/media_live_video_tile.dart';
 import 'filter/filter_controls.dart';
-
-part 'bottom/flow/bottom_state_flow.dart';
-
-part 'bottom/flow/bottom_media_selection_flow.dart';
-
-part 'bottom/flow/bottom_audio_flow.dart';
-
-part 'bottom/flow/bottom_confirm_flow.dart';
-
-part 'bottom/flow/bottom_preview_flow.dart';
-
-part 'bottom/debug/bottom_debug_snapshot.dart';
-
-part 'bottom/widget/bottom_media_tile.dart';
 
 /// 底层保存页：图片 / 实况 / 配乐资源网格
 ///
@@ -111,8 +95,68 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
     super.dispose();
   }
 
-  /// 供流程分片调用的状态刷新入口
-  void _refresh(VoidCallback fn) => setState(fn);
+  void _publishDebugState() {
+    BottomDebugSnapshotHelper.publish(widget.session, widget.workUrl);
+  }
+
+  AggregateState _resourceState(MediaType type) =>
+      _row?.resourceState(type) ?? AggregateState.empty;
+
+  bool _isSelected(MediaItem item) {
+    final row = _row;
+    if (row == null) return false;
+    for (final resource in row.resources) {
+      if (resource.key == item.url) return resource.selected;
+    }
+    return false;
+  }
+
+  void _toggleSelected(int index) {
+    widget.session.toggleResource(widget.workUrl, widget.items[index].url);
+    _publishDebugState();
+  }
+
+  void _toggleCategory(MediaType type) {
+    widget.session.toggleResourceCategory(widget.workUrl, type);
+    _publishDebugState();
+  }
+
+  void _togglePlayAudio(MediaItem item) {
+    if (_currentPlayingItem?.url == item.url) {
+      if (_audioService.isPlaying) {
+        _audioService.pause();
+      } else {
+        _audioService.play(item.url, headers: widget.headers);
+      }
+    } else {
+      _currentPlayingItem = item;
+      _showAudioPlayerBar = true;
+      _audioService.play(item.url, headers: widget.headers);
+    }
+    setState(() {});
+  }
+
+  void _closeAudioPlayerBar() {
+    _audioService.stop();
+    setState(() {
+      _showAudioPlayerBar = false;
+      _currentPlayingItem = null;
+    });
+  }
+
+  void _showPreview(MediaItem item) {
+    MediaFullscreenPreview.show(
+      context,
+      item: item,
+      headers: widget.headers,
+    );
+  }
+
+  void _confirm() {
+    _publishDebugState();
+    _audioService.stop();
+    Navigator.pop(context, true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -173,7 +217,20 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
                           mainAxisSpacing: 8,
                         ),
                     itemCount: widget.items.length,
-                    itemBuilder: (context, index) => _buildTile(index),
+                    itemBuilder: (context, index) {
+                      final item = widget.items[index];
+                      return BottomMediaTile(
+                        index: index,
+                        item: item,
+                        selected: _isSelected(item),
+                        headers: widget.headers,
+                        onTap: () => _toggleSelected(index),
+                        onPreview: _showPreview,
+                        audioService: _audioService,
+                        currentPlayingItem: _currentPlayingItem,
+                        onTogglePlayAudio: _togglePlayAudio,
+                      );
+                    },
                   ),
                 ),
                 if (_showAudioPlayerBar && _currentPlayingItem != null)

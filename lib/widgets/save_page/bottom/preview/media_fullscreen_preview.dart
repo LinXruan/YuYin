@@ -1,10 +1,15 @@
-part of '../../bottom_media_sheet.dart';
+import 'package:flutter/material.dart';
 
-// ignore_for_file: unnecessary_this
+import '../../../../models/media_item.dart';
 
-/// bottom preview flow
-extension _SheetBottomPreviewFlowFlow on _ImagePreviewSheetState {
-  void _showPreview(MediaItem item) {
+/// 底层大图全屏预览弹窗
+abstract final class MediaFullscreenPreview {
+  /// 显示全屏大图预览弹窗
+  static void show(
+    BuildContext context, {
+    required MediaItem item,
+    required Map<String, String> headers,
+  }) {
     showDialog<void>(
       context: context,
       builder: (context) => Dialog.fullscreen(
@@ -17,7 +22,7 @@ extension _SheetBottomPreviewFlowFlow on _ImagePreviewSheetState {
                 maxScale: 4,
                 child: Image.network(
                   item.url,
-                  headers: widget.headers,
+                  headers: headers,
                   fit: BoxFit.contain,
                   loadingBuilder: (context, child, progress) {
                     if (progress == null) return child;
