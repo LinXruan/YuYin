@@ -1,4 +1,5 @@
-import '../../models/media_item.dart';
+import '../single_work/single_work_result.dart';
+import 'work_kind.dart';
 
 /// 保存页中的单个作品条目
 ///

@@ -1,5 +1,6 @@
 import 'work_type.dart';
 
+
 /// 自定义保存位置的六种目标
 enum SaveLocationTarget {
   video,

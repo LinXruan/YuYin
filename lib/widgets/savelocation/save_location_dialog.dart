@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../models/media_item.dart';
+import '../../models/common/save_location_target.dart';
 import '../../utils/savelocation/save_location_store.dart';
 import 'save_location_card.dart';
 import 'save_location_group_title.dart';

@@ -1,8 +1,8 @@
 import 'dart:io';
 
 import '../../../../app_info.dart';
+import '../../../../models/common/work_type.dart';
 import '../../../../models/history_item.dart';
-import '../../../../models/media_item.dart';
 import '../../../../utils/history/history_store.dart';
 import '../../../../utils/savelocation/save_location_store.dart';
 import '../../../../utils/settings/display_mode_service.dart';

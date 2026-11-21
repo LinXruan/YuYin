@@ -1,4 +1,5 @@
-import '../../../models/media_item.dart';
+import '../../../models/common/work_type.dart';
+import '../../../models/save_page/selection/resource_selection_view.dart';
 
 class ResourceNode implements ResourceSelectionView {
   ResourceNode({

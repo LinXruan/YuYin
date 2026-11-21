@@ -3,7 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/models/media_item.dart';
+import 'package:yuyin/models/user_home/user_home_profile.dart';
+import 'package:yuyin/models/user_home/user_home_result.dart';
 import 'package:yuyin/services/bridge/server/agent_automation_server.dart';
 import 'package:yuyin/services/script/douyin/douyin_sniff_script.dart';
 import 'package:yuyin/utils/debug/log_controller.dart';

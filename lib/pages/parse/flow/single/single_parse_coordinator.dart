@@ -1,7 +1,11 @@
 import 'package:dio/dio.dart';
 
+import '../../../../models/common/work_type.dart';
 import '../../../../models/history_item.dart';
-import '../../../../models/media_item.dart';
+import '../../../../models/save_page/save_work_item.dart';
+import '../../../../models/save_page/selection/selected_work.dart';
+import '../../../../models/save_page/work_kind.dart';
+import '../../../../models/single_work/single_work_result.dart';
 import '../../../../services/download/download_cancel_registry.dart';
 import '../../../../services/media/video_downloader.dart';
 import '../../../../services/selection/debug/selection_debug_bridge.dart';

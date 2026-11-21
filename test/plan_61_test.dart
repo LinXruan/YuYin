@@ -1,5 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/models/media_item.dart';
+import 'package:yuyin/models/common/batch_video_quality.dart';
+import 'package:yuyin/models/common/work_type.dart';
+import 'package:yuyin/models/save_page/work_kind.dart';
+import 'package:yuyin/models/save_page/work_video_quality_choice.dart';
+import 'package:yuyin/models/single_work/media_download_item.dart';
+import 'package:yuyin/models/single_work/single_work_result.dart';
 import 'package:yuyin/services/multi_work/article_work_exception.dart';
 import 'package:yuyin/services/multi_work/i_multi_work_extractor.dart';
 import 'package:yuyin/services/multi_work/multi_work_extractor.dart';

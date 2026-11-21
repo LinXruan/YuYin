@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import '../../../models/media_item.dart';
+import '../../../models/single_work/media_download_item.dart';
 import '../../../models/url/douyin_link_kind.dart';
 import '../../share/client/douyin_share_api.dart';
 import '../session/sniff_session.dart';

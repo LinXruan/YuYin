@@ -1,4 +1,5 @@
-import '../../models/media_item.dart';
+import '../../models/common/work_type.dart';
+import '../../models/single_work/media_download_item.dart';
 
 /// 资源自动命名与格式化工具类
 class FileNameFormatter {

@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/models/media_item.dart';
+import 'package:yuyin/models/common/work_type.dart';
 import 'package:yuyin/services/share/client/douyin_share_api.dart';
 
 import 'share_api_fixtures.dart';

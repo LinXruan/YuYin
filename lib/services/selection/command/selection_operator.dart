@@ -1,5 +1,10 @@
 // 选择轴与作者轴命令：只向下写子树，随后自下而上重算聚合。
-import '../../../models/media_item.dart';
+import '../../../models/common/work_type.dart';
+import '../../../models/save_page/selection/aggregate_state.dart';
+import '../../../models/save_page/selection/quality_indicator.dart';
+import '../../../models/save_page/selection/quality_preference.dart';
+import '../../../models/save_page/selection/selection_state.dart';
+import '../../../models/save_page/work_kind.dart';
 import '../node/author_node.dart';
 import '../node/resource_node.dart';
 import '../node/work_node.dart';

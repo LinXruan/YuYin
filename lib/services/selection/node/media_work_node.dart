@@ -1,7 +1,15 @@
 import 'dart:collection';
 import '../selection_aggregator.dart';
 
-import '../../../models/media_item.dart';
+import '../../../models/common/work_type.dart';
+import '../../../models/save_page/selection/aggregate_state.dart';
+import '../../../models/save_page/selection/quality_indicator.dart';
+import '../../../models/save_page/selection/quality_preference.dart';
+import '../../../models/save_page/selection/resource_selection_view.dart';
+import '../../../models/save_page/selection/selection_state.dart';
+import '../../../models/save_page/selection/terminal_seed.dart';
+import '../../../models/single_work/media_download_item.dart';
+import '../../../models/single_work/single_work_result.dart';
 import 'resource_node.dart';
 import 'work_node.dart';
 

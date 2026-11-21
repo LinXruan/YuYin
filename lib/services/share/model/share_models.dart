@@ -1,5 +1,6 @@
 // 分享页领域模型：解析结果与异常。
-import '../../../models/media_item.dart';
+import '../../../models/common/work_type.dart';
+import '../../../models/single_work/media_download_item.dart';
 
 /// 分享页未返回作品数据（可能触发风控）
 class DouyinShareException implements Exception {

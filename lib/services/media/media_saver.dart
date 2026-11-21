@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-import '../../models/media_item.dart';
+import '../../models/common/work_type.dart';
+import '../../models/history/saved_media_availability.dart';
 
 /// 原生存储桥接服务：负责调用系统 SAF 目录选择器、保存文件、查询定位与打开
 class MediaSaver {

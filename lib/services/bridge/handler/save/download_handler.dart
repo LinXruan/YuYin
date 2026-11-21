@@ -2,7 +2,8 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 
-import '../../../../models/media_item.dart';
+import '../../../../models/common/work_type.dart';
+import '../../../../models/single_work/media_download_item.dart';
 import '../../../../utils/history/history_store.dart';
 import '../../../../utils/save/file_name_formatter.dart';
 import '../../../../utils/savelocation/save_location_store.dart';

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../models/media_item.dart';
+import '../../models/common/save_location_target.dart';
+import '../../models/common/work_type.dart';
 import '../../services/media/media_saver.dart';
 import '../../utils/savelocation/save_location_store.dart';
 

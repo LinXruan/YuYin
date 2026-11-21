@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../../models/media_item.dart';
+import '../../models/single_work/media_download_item.dart';
 import '../atomic_file_writer.dart';
 
 /// 下载与画质过滤、自动更新相关配置持久化存储器

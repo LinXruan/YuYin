@@ -1,6 +1,10 @@
 import 'package:dio/dio.dart';
 
-import '../../models/media_item.dart';
+import '../../models/common/media_save_target.dart';
+import '../../models/common/work_type.dart';
+import '../../models/save_page/selection/selected_work.dart';
+import '../../models/save_page/work_save_result.dart';
+import '../../models/single_work/media_download_item.dart';
 
 /// 单作品下载代理：隔离 VideoDownloader，便于纯内存单测
 abstract class IWorkDownloadDelegate {

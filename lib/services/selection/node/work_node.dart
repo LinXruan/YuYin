@@ -1,4 +1,11 @@
-import '../../../models/media_item.dart';
+import '../../../models/common/work_type.dart';
+import '../../../models/save_page/save_work_item.dart';
+import '../../../models/save_page/selection/quality_preference.dart';
+import '../../../models/save_page/selection/resource_selection_view.dart';
+import '../../../models/save_page/selection/selection_state.dart';
+import '../../../models/save_page/selection/work_selection_view.dart';
+import '../../../models/single_work/media_download_item.dart';
+import '../../../models/single_work/single_work_result.dart';
 import 'resource_node.dart';
 
 /// 作品节点契约：视频作品与图文作品共用只读视图，写入只允许会话命令调用。

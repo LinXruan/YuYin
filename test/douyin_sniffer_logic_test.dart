@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/models/media_item.dart';
+import 'package:yuyin/models/common/work_type.dart';
 import 'package:yuyin/services/sniffer/facade/douyin_sniffer.dart';
 import 'package:yuyin/services/sniffer/sniffer_time_budget.dart';
 

@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/models/media_item.dart';
+import 'package:yuyin/models/common/work_type.dart';
+import 'package:yuyin/models/single_work/media_download_item.dart';
+import 'package:yuyin/models/single_work/single_work_result.dart';
 
 void main() {
   group('MediaItem 模型测试', () {

@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../../../models/media_item.dart';
+import '../../../../models/save_page/selection/author_selection_view.dart';
+import '../../../../models/save_page/selection/selected_work.dart';
+import '../../../../models/single_work/media_download_item.dart';
 import '../../../../services/multi_work/article_work_exception.dart';
 import '../../../../services/selection/save_selection_session.dart';
 import '../../../../services/selection/session_work_preparer.dart';

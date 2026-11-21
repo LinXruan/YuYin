@@ -1,5 +1,6 @@
+import '../../models/common/work_type.dart';
 import '../../models/history_item.dart';
-import '../../models/media_item.dart';
+import '../../models/history/saved_media_availability.dart';
 import '../../utils/save/author_folder_name.dart';
 import '../../utils/save/file_name_formatter.dart';
 import '../../utils/save/home_save_path.dart';

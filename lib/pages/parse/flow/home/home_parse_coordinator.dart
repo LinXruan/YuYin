@@ -2,8 +2,15 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 
+import '../../../../models/history/history_record_type.dart';
 import '../../../../models/history_item.dart';
-import '../../../../models/media_item.dart';
+import '../../../../models/common/batch_video_quality.dart';
+import '../../../../models/save_page/save_work_item.dart';
+import '../../../../models/save_page/selection/quality_indicator.dart';
+import '../../../../models/save_page/selection/aggregate_state.dart';
+import '../../../../models/save_page/work_kind.dart';
+import '../../../../models/user_home/user_home_profile.dart';
+import '../../../../models/user_home/user_home_result.dart';
 import '../../../../services/download/download_cancel_registry.dart';
 import '../../../../services/media/video_downloader.dart';
 import '../../../../services/selection/debug/selection_debug_bridge.dart';

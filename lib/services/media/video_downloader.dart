@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../../models/media_item.dart';
+import '../../models/common/media_save_target.dart';
+import '../../models/common/work_type.dart';
+import '../../models/single_work/media_download_item.dart';
 import '../../utils/permission/storage_permission_service.dart';
 import '../../utils/save/file_name_formatter.dart';
 import '../../utils/savelocation/save_location_store.dart';

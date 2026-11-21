@@ -1,6 +1,12 @@
 import 'dart:collection';
 
-import '../../../models/media_item.dart';
+import '../../../models/common/work_type.dart';
+import '../../../models/save_page/selection/aggregate_state.dart';
+import '../../../models/save_page/selection/author_selection_view.dart';
+import '../../../models/save_page/selection/quality_indicator.dart';
+import '../../../models/save_page/selection/selection_state.dart';
+import '../../../models/save_page/selection/work_selection_view.dart';
+import '../../../models/user_home/user_home_profile.dart';
 import '../selection_aggregator.dart';
 import 'work_node.dart';
 

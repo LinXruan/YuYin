@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../../../models/media_item.dart';
+import '../../../models/single_work/media_download_item.dart';
+import '../../../models/single_work/single_work_result.dart';
 import '../../../utils/login_state_store.dart';
 import '../../../models/url/douyin_link_kind.dart';
 import '../../../utils/url/url_classifier.dart';

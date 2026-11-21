@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../models/media_item.dart';
+import '../../../../models/single_work/media_download_item.dart';
 
 /// 实况视频占位图
 class MediaLiveVideoTile extends StatelessWidget {

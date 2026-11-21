@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 
-import '../../models/media_item.dart';
+import '../../models/common/media_save_target.dart';
+import '../../models/save_page/selection/selected_work.dart';
+import '../../models/save_page/work_save_result.dart';
 import '../../utils/save/file_name_formatter.dart';
 import '../media/video_downloader.dart';
 import 'i_work_batch_saver.dart';

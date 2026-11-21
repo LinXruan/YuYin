@@ -1,4 +1,6 @@
-import '../../models/media_item.dart';
+import '../../models/common/batch_video_quality.dart';
+import '../../models/save_page/work_video_quality_choice.dart';
+import '../../models/single_work/media_download_item.dart';
 import 'download_settings_store.dart';
 
 /// 中层/批量保存页的视频画质档位工具

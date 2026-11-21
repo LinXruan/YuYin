@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
-import '../../../models/media_item.dart';
+import '../../../models/single_work/media_download_item.dart';
 
 /// 通道消息纯解析对象：登录态、媒体条目与 JS 字符串转换。
 class SnifferChannelParser {

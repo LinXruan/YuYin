@@ -1,5 +1,6 @@
 import '../common/work_type.dart';
 
+
 /// 某条历史记录在一种媒体类型下的本地保存扫描结果
 class SavedMediaAvailability {
   const SavedMediaAvailability({

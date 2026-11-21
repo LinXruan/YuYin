@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../models/media_item.dart';
+import '../../models/common/save_location_target.dart';
 import 'save_location_pickers.dart';
 
 /// 单个保存位置卡片。

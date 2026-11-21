@@ -1,7 +1,10 @@
 import 'package:dio/dio.dart';
 
 import '../../../../models/history_item.dart';
-import '../../../../models/media_item.dart';
+import '../../../../models/common/batch_video_quality.dart';
+import '../../../../models/save_page/selection/quality_indicator.dart';
+import '../../../../models/save_page/selection/selection_state.dart';
+import '../../../../models/save_page/work_kind.dart';
 import '../../../../services/download/download_cancel_registry.dart';
 import '../../../../services/media/video_downloader.dart';
 import '../../../../services/selection/debug/selection_debug_bridge.dart';

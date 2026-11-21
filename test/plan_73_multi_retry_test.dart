@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/models/media_item.dart';
+import 'package:yuyin/models/common/work_type.dart';
+import 'package:yuyin/models/single_work/media_download_item.dart';
+import 'package:yuyin/models/single_work/single_work_result.dart';
 import 'package:yuyin/services/multi_work/i_multi_work_extractor.dart';
 import 'package:yuyin/services/multi_work/multi_work_extractor.dart';
 import 'package:yuyin/services/sniffer/lifecycle/sniff_cancelled_exception.dart';

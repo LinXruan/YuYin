@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../../models/media_item.dart';
+import '../../../models/single_work/media_download_item.dart';
 import '../cookie/share_cookie.dart';
 import '../model/share_models.dart';
 import '../parser/html/share_html_parser.dart';

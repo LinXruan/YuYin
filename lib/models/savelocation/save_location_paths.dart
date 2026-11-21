@@ -1,4 +1,5 @@
-import '../media_item.dart';
+import '../common/save_location_target.dart';
+import '../common/work_type.dart';
 import 'save_location_config.dart';
 
 /// 保存位置的派生视图：按媒体类型 / 保存目标读取路径。

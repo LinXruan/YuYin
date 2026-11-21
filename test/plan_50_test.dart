@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/models/media_item.dart';
+import 'package:yuyin/models/user_home/user_home_result.dart';
 import 'package:yuyin/models/url/douyin_link_kind.dart';
 import 'package:yuyin/utils/url/url_classifier.dart';
 import 'package:yuyin/utils/url/url_extractor.dart';

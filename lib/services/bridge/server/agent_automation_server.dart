@@ -5,7 +5,12 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../../models/media_item.dart';
+import '../../../models/common/batch_video_quality.dart';
+import '../../../models/save_page/work_save_result.dart';
+import '../../../models/single_work/media_download_item.dart';
+import '../../../models/single_work/single_work_result.dart';
+import '../../../models/user_home/user_home_profile.dart';
+import '../../../models/user_home/user_home_result.dart';
 import '../../../utils/debug/log_controller.dart';
 import '../../sniffer/facade/douyin_sniffer.dart';
 import '../../media/video_downloader.dart';

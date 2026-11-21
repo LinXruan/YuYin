@@ -1,5 +1,11 @@
 // Terminal 轴与画质命令。
-import '../../../models/media_item.dart';
+import '../../../models/common/work_type.dart';
+import '../../../models/save_page/selection/aggregate_state.dart';
+import '../../../models/save_page/selection/quality_indicator.dart';
+import '../../../models/save_page/selection/quality_preference.dart';
+import '../../../models/save_page/selection/selection_state.dart';
+import '../../../models/save_page/work_kind.dart';
+import '../../../models/single_work/media_download_item.dart';
 import '../save_selection_session.dart';
 
 class TerminalOperator {

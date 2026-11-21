@@ -1,6 +1,7 @@
 import '../common/work_type.dart';
 import 'media_download_item.dart';
 
+
 /// 单作品捕获结果：多媒体资源列表、标题/文案、封面与 WebView 当前 Cookie
 class SingleWorkResult {
   const SingleWorkResult({

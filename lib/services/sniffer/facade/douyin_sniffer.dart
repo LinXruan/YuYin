@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../../../models/media_item.dart';
+import '../../../models/single_work/media_download_item.dart';
+import '../../../models/single_work/single_work_result.dart';
+import '../../../models/user_home/user_home_profile.dart';
+import '../../../models/user_home/user_home_result.dart';
 import '../../../utils/url/url_classifier.dart';
 import '../../../utils/url/url_extractor.dart';
 import '../../multi_work/i_multi_work_extractor.dart';

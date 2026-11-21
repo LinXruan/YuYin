@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../models/media_item.dart';
+import '../../../../models/single_work/media_download_item.dart';
 import '../../../../services/media/audio_preview_service.dart';
 import 'scrubrable_progress_bar.dart';
 

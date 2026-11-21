@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/models/media_item.dart';
+import 'package:yuyin/models/common/work_type.dart';
+import 'package:yuyin/models/save_page/selection/aggregate_state.dart';
+import 'package:yuyin/models/save_page/selection/terminal_seed.dart';
+import 'package:yuyin/models/single_work/media_download_item.dart';
 import 'package:yuyin/services/media/audio_preview_service.dart';
 
 import 'image_preview_sheet_harness.dart';

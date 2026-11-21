@@ -1,5 +1,5 @@
 // 封面、图片、音频与最佳档位挑选。
-import '../../../../models/media_item.dart';
+import '../../../../models/single_work/media_download_item.dart';
 import '../item/share_item_parser.dart';
 import '../share_json_utils.dart';
 import '../share_url_utils.dart';

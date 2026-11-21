@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/models/media_item.dart';
+import 'package:yuyin/models/user_home/user_home_profile.dart';
+import 'package:yuyin/models/user_home/user_home_result.dart';
 import 'package:yuyin/services/sniffer/lifecycle/sniff_cancelled_exception.dart';
 import 'package:yuyin/services/user_home/user_home_extractor.dart';
 

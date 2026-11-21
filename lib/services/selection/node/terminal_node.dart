@@ -1,6 +1,9 @@
 import 'dart:collection';
 
-import '../../../models/media_item.dart';
+import '../../../models/save_page/selection/aggregate_state.dart';
+import '../../../models/save_page/selection/author_selection_view.dart';
+import '../../../models/save_page/selection/quality_indicator.dart';
+import '../../../models/save_page/selection/terminal_view.dart';
 import '../selection_aggregator.dart';
 import 'author_node.dart';
 

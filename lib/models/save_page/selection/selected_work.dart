@@ -1,4 +1,7 @@
-import '../../media_item.dart';
+import '../../single_work/media_download_item.dart';
+import '../../single_work/single_work_result.dart';
+import '../save_work_item.dart';
+import '../work_video_quality_choice.dart';
 
 /// 保存时的一个确定作品：资源列表与画质已由矩阵解算完毕
 class SelectedWork {

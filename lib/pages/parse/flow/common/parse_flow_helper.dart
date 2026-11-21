@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 
-import '../../../../models/media_item.dart';
+import '../../../../models/common/batch_video_quality.dart';
+import '../../../../models/save_page/work_kind.dart';
+import '../../../../models/single_work/single_work_result.dart';
 import '../../../../services/multi_work/article_work_exception.dart';
 
 /// 解析流程辅助纯函数：错误翻译、媒体汇总文案、画质文案
