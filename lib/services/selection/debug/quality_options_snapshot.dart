@@ -1,5 +1,4 @@
 import '../../../models/single_work/media_download_item.dart';
-import '../../../utils/settings/download_settings_store.dart';
 import '../../../utils/settings/video_quality_utils.dart';
 import '../save_selection_session.dart';
 
@@ -9,20 +8,23 @@ class QualityOptionsSnapshot {
 
   static Map<String, dynamic> of(
     SaveSelectionSession session,
-    String workUrl,
-  ) {
+    String workUrl, {
+    bool onlyHighestQualityPerResolution = true,
+  }) {
     final work = session.workOf(workUrl);
     if (work == null) {
       return {'success': false, 'error': '作品不存在'};
     }
-    final display = VideoQualityUtils.displayTiers(work.tiers);
+    final display = VideoQualityUtils.displayTiers(
+      work.tiers,
+      onlyHighestPerResolution: onlyHighestQualityPerResolution,
+    );
     final selected = work.selectedTier;
     return {
       'success': true,
       'workUrl': workUrl,
       'behavesAsVideo': work.behavesAsVideo,
-      'onlyHighestQualityPerResolution':
-          DownloadSettingsStore.onlyHighestQualityPerResolution,
+      'onlyHighestQualityPerResolution': onlyHighestQualityPerResolution,
       'selectedTier': selected?.url,
       'quality': work.quality.name,
       'displayIncludesSelected': selected == null

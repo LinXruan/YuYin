@@ -5,6 +5,7 @@ import '../../../../models/parse/parse_status.dart';
 import '../../../../services/batch_work/work_batch_saver.dart';
 import '../../../../services/media/video_downloader.dart';
 import '../../../../services/sniffer/facade/douyin_sniffer.dart';
+import '../../../../utils/app_stores.dart';
 import '../../../../utils/debug/log_controller.dart';
 import 'parse_save_coordinator.dart';
 
@@ -17,6 +18,7 @@ class ParseFlowContext {
     required this.logs,
     required this.busy,
     required this.loggedIn,
+    required this.stores,
     required this.onRequestParseTab,
     required this.isParsing,
     required this.setParsing,
@@ -36,6 +38,7 @@ class ParseFlowContext {
   final LogController logs;
   final ValueNotifier<bool> busy;
   final ValueNotifier<bool> loggedIn;
+  final AppStores stores;
   final VoidCallback onRequestParseTab;
   final bool Function() isParsing;
   final void Function(bool) setParsing;

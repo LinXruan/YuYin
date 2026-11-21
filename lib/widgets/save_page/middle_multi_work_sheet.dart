@@ -8,6 +8,7 @@ import '../../models/save_page/selection/quality_indicator.dart';
 import '../../models/save_page/selection/work_selection_view.dart';
 import '../../models/save_page/work_kind.dart';
 import '../../services/selection/save_selection_session.dart';
+import '../../utils/debug/save_page_debug_store.dart';
 import 'filter/filter_controls.dart';
 import 'filter/filter_strip.dart';
 import 'middle/debug/middle_debug_snapshot_helper.dart';
@@ -24,6 +25,7 @@ class MiddleMultiWorkSheet extends StatefulWidget {
     this.headers = const {},
     this.nested = false,
     this.onOpenWork,
+    this.debugStore,
   });
 
   final SaveSelectionSession session;
@@ -38,6 +40,8 @@ class MiddleMultiWorkSheet extends StatefulWidget {
 
   final Future<void> Function(String workUrl, int index)? onOpenWork;
 
+  final SavePageDebugStore? debugStore;
+
   /// 返回 true 表示确认（nested 时为返回上层）
   static Future<bool?> show(
     BuildContext context, {
@@ -46,6 +50,7 @@ class MiddleMultiWorkSheet extends StatefulWidget {
     Map<String, String> headers = const {},
     bool nested = false,
     Future<void> Function(String workUrl, int index)? onOpenWork,
+    SavePageDebugStore? debugStore,
   }) {
     return showModalBottomSheet<bool>(
       context: context,
@@ -57,6 +62,7 @@ class MiddleMultiWorkSheet extends StatefulWidget {
         headers: headers,
         nested: nested,
         onOpenWork: onOpenWork,
+        debugStore: debugStore,
       ),
     );
   }
@@ -72,7 +78,11 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
   List<WorkSelectionView> get _rows => widget.session.rowsOf(widget.secUid);
 
   void _publishDebugState() {
-    MiddleDebugSnapshotHelper.publish(widget.session, widget.secUid);
+    MiddleDebugSnapshotHelper.publish(
+      widget.session,
+      widget.secUid,
+      debugStore: widget.debugStore,
+    );
   }
 
   void _toggleWork(int index) {

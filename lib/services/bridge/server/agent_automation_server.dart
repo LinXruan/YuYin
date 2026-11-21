@@ -11,6 +11,7 @@ import '../../../models/single_work/media_download_item.dart';
 import '../../../models/single_work/single_work_result.dart';
 import '../../../models/user_home/user_home_profile.dart';
 import '../../../models/user_home/user_home_result.dart';
+import '../../../utils/app_stores.dart';
 import '../../../utils/debug/log_controller.dart';
 import '../../sniffer/facade/douyin_sniffer.dart';
 import '../../media/video_downloader.dart';
@@ -34,14 +35,16 @@ class AgentAutomationServer {
     required this.logs,
     required this.busy,
     required this.loggedIn,
+    AppStores? stores,
     this.port = 9527,
-  });
+  }) : stores = stores ?? AppStores();
 
   final DouyinSniffer? sniffer;
   final VideoDownloader? downloader;
   final LogController logs;
   final ValueNotifier<bool> busy;
   final ValueNotifier<bool> loggedIn;
+  final AppStores stores;
   final int port;
 
   HttpServer? _server;

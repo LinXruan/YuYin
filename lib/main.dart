@@ -3,34 +3,19 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'pages/shell/page/app_shell.dart';
-import 'utils/update/app_update_store.dart';
-import 'utils/login_state_store.dart';
-import 'utils/settings/download_settings_store.dart';
-import 'utils/history/history_store.dart';
-import 'utils/savelocation/save_location_store.dart';
-import 'utils/memory/terminal_memory_store.dart';
-import 'utils/settings/parse_hint_store.dart';
-import 'utils/settings/theme_store.dart';
+import 'utils/app_stores.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Store 互不依赖，并行预加载缩短冷启动并防止首帧闪烁
-  await Future.wait([
-    ThemeStore.init(),
-    SaveLocationStore.init(),
-    TerminalMemoryStore.init(),
-    DownloadSettingsStore.init(),
-    HistoryStore.init(),
-    ParseHintStore.init(),
-    LoginStateStore.init(),
-  ]);
-  unawaited(AppUpdateStore.cleanOldApks());
-  runApp(const YuYinApp());
+  final stores = await AppStores.initialize();
+  runApp(YuYinApp(stores: stores));
 }
 
 /// 应用入口：负责主题配置与首页
 class YuYinApp extends StatelessWidget {
-  const YuYinApp({super.key});
+  const YuYinApp({super.key, required this.stores});
+
+  final AppStores stores;
 
   static ThemeData _buildLightTheme() {
     final scheme = ColorScheme.fromSeed(
@@ -107,7 +92,7 @@ class YuYinApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<ThemeMode>(
-      valueListenable: ThemeStore.themeModeNotifier,
+      valueListenable: stores.theme.themeModeNotifier,
       builder: (context, themeMode, _) {
         return MaterialApp(
           title: '余音',
@@ -115,7 +100,7 @@ class YuYinApp extends StatelessWidget {
           theme: _buildLightTheme(),
           darkTheme: _buildDarkTheme(),
           themeMode: themeMode,
-          home: const AppShell(),
+          home: AppShell(stores: stores),
         );
       },
     );

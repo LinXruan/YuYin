@@ -6,7 +6,6 @@ import '../../../../models/common/work_type.dart';
 import '../../../../models/single_work/media_download_item.dart';
 import '../../../../utils/history/history_store.dart';
 import '../../../../utils/save/file_name_formatter.dart';
-import '../../../../utils/savelocation/save_location_store.dart';
 import '../../../../utils/url/url_extractor.dart';
 import '../../server/agent_automation_server.dart';
 
@@ -78,7 +77,7 @@ class DownloadHandler {
 
       final savedLocations = <String, String>{};
       for (final type in savedTypes) {
-        final path = SaveLocationStore.getDisplayPath(type);
+        final path = server.stores.saveLocation.getDisplayPath(type);
         savedLocations[type.name] = path;
         server.logs.add('${type.label}已保存到$path');
       }

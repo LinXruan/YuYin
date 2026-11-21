@@ -12,7 +12,6 @@ import 'package:yuyin/models/single_work/single_work_result.dart';
 import 'package:yuyin/models/user_home/user_home_profile.dart';
 import 'package:yuyin/services/selection/save_selection_session.dart';
 import 'package:yuyin/utils/memory/terminal_memory_store.dart';
-import 'package:yuyin/utils/settings/download_settings_store.dart';
 import 'package:yuyin/utils/settings/video_quality_utils.dart';
 import 'package:yuyin/widgets/save_page/bottom/widget/video_tier_picker_sheet.dart';
 
@@ -46,7 +45,6 @@ SingleWorkResult _video(String work) {
 void main() {
   setUp(() {
     TerminalMemoryStore.reset();
-    DownloadSettingsStore.resetForTesting(defaultValue: false);
   });
 
   group('PLAN_76 底层选档同步选中与 Terminal 记忆闭环', () {

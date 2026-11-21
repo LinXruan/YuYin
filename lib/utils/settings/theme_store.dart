@@ -3,22 +3,23 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+
 import '../atomic_file_writer.dart';
 
-/// 主题模式持久化与全局控制器
+/// 主题模式持久化与实例化控制器
 class ThemeStore {
-  ThemeStore._();
+  ThemeStore({ThemeMode initialMode = ThemeMode.system})
+      : themeModeNotifier = ValueNotifier<ThemeMode>(initialMode);
 
   static const String _fileName = 'theme_mode.flag';
   static const MethodChannel _nativeChannel =
       MethodChannel('com.debug.yuyin/theme');
 
-  /// 全局主题模式通知源，驱动 MaterialApp 实时热切换
-  static final ValueNotifier<ThemeMode> themeModeNotifier =
-      ValueNotifier(ThemeMode.system);
+  /// 主题模式通知源，驱动 MaterialApp 实时热切换
+  final ValueNotifier<ThemeMode> themeModeNotifier;
 
   /// 启动时从本地文件恢复主题设置并同步给原生系统
-  static Future<void> init() async {
+  Future<void> init() async {
     try {
       final file = await _file();
       final raw = await AtomicFileWriter.readString(file);
@@ -26,8 +27,7 @@ class ThemeStore {
         await _syncToNative(ThemeMode.system);
         return;
       }
-      final text = raw.trim();
-      final mode = parseThemeMode(text);
+      final mode = parseThemeMode(raw.trim());
       themeModeNotifier.value = mode;
       await _syncToNative(mode);
     } catch (_) {
@@ -36,7 +36,7 @@ class ThemeStore {
   }
 
   /// 设置并持久化主题模式，实时同步至 Android 原生
-  static Future<void> setThemeMode(ThemeMode mode) async {
+  Future<void> setThemeMode(ThemeMode mode) async {
     themeModeNotifier.value = mode;
     try {
       final file = await _file();
@@ -46,6 +46,8 @@ class ThemeStore {
     }
     await _syncToNative(mode);
   }
+
+  void dispose() => themeModeNotifier.dispose();
 
   /// 同步至 Android 原生层（设置应用级夜间模式与 Activity 窗口背景）
   static Future<void> _syncToNative(ThemeMode mode) async {

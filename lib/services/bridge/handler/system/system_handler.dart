@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import '../../../../utils/login_state_store.dart';
-import '../../../../utils/settings/download_settings_store.dart';
 import '../../../download/download_cancel_registry.dart';
 import '../../server/agent_automation_server.dart';
 
@@ -81,11 +80,12 @@ class SystemHandler {
       return;
     }
 
-    await DownloadSettingsStore.setOnlyHighestQualityPerResolution(enabled);
+    await server.stores.downloadSettings
+        .setOnlyHighestQualityPerResolution(enabled);
     server.sendJson(request, HttpStatus.ok, {
       'success': true,
       'onlyHighestQualityPerResolution':
-          DownloadSettingsStore.onlyHighestQualityPerResolution,
+          server.stores.downloadSettings.onlyHighestQualityPerResolution,
     });
   }
 

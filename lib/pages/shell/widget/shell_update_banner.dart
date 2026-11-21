@@ -4,9 +4,18 @@ import '../../../utils/update/app_update_store.dart';
 
 /// 底部更新条：下载中显示进度，失败时提供重试与关闭。
 class ShellUpdateBanner extends StatelessWidget {
-  const ShellUpdateBanner({super.key, required this.status});
+  const ShellUpdateBanner({
+    super.key,
+    required this.status,
+    this.onCancel,
+    this.onRetry,
+    this.onDismissError,
+  });
 
   final AppUpdateStatus status;
+  final VoidCallback? onCancel;
+  final VoidCallback? onRetry;
+  final VoidCallback? onDismissError;
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +121,7 @@ class ShellUpdateBanner extends StatelessWidget {
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
             tooltip: '取消下载',
-            onPressed: AppUpdateStore.cancelDownload,
+            onPressed: onCancel,
           ),
         ],
       ),
@@ -147,7 +156,7 @@ class ShellUpdateBanner extends StatelessWidget {
             ),
           ),
           TextButton(
-            onPressed: () => AppUpdateStore.retryLastDownload(),
+            onPressed: onRetry,
             style: TextButton.styleFrom(
               foregroundColor: theme.colorScheme.onErrorContainer,
               minimumSize: const Size(0, 32),
@@ -161,7 +170,7 @@ class ShellUpdateBanner extends StatelessWidget {
             constraints: const BoxConstraints(),
             tooltip: '关闭提示',
             color: theme.colorScheme.onErrorContainer,
-            onPressed: AppUpdateStore.dismissError,
+            onPressed: onDismissError,
           ),
         ],
       ),

@@ -1,19 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/pages/settings/download_settings_page.dart';
-import 'package:yuyin/utils/settings/download_settings_store.dart';
 import 'package:yuyin/utils/savelocation/save_location_store.dart';
+import 'package:yuyin/utils/settings/download_settings_store.dart';
 
 void main() {
-  setUp(() async {
-    DownloadSettingsStore.resetForTesting(defaultValue: true);
-    await SaveLocationStore.resetToDefault();
+  late DownloadSettingsStore downloadSettingsStore;
+  late SaveLocationStore saveLocationStore;
+
+  setUp(() {
+    downloadSettingsStore = DownloadSettingsStore();
+    saveLocationStore = SaveLocationStore();
+  });
+
+  tearDown(() {
+    downloadSettingsStore.dispose();
+    saveLocationStore.dispose();
   });
 
   testWidgets('DownloadSettingsPage 渲染保存位置与画质选项开关并能正常响应交互', (tester) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        home: DownloadSettingsPage(),
+      MaterialApp(
+        home: DownloadSettingsPage(
+          saveLocationStore: saveLocationStore,
+          downloadSettingsStore: downloadSettingsStore,
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -33,17 +44,17 @@ void main() {
     final qualitySwitchFinder = find.widgetWithText(SwitchListTile, '仅显示同分辨率下最高画质');
     final updateSwitchFinder = find.widgetWithText(SwitchListTile, '自动检查更新');
 
-    expect(DownloadSettingsStore.onlyHighestQualityPerResolution, isTrue);
-    expect(DownloadSettingsStore.autoCheckUpdate, isTrue);
+    expect(downloadSettingsStore.onlyHighestQualityPerResolution, isTrue);
+    expect(downloadSettingsStore.autoCheckUpdate, isTrue);
 
     // 4. 点击画质开关切换为 false
     await tester.tap(qualitySwitchFinder);
     await tester.pumpAndSettle();
-    expect(DownloadSettingsStore.onlyHighestQualityPerResolution, isFalse);
+    expect(downloadSettingsStore.onlyHighestQualityPerResolution, isFalse);
 
     // 5. 点击自动检查更新开关切换为 false
     await tester.tap(updateSwitchFinder);
     await tester.pumpAndSettle();
-    expect(DownloadSettingsStore.autoCheckUpdate, isFalse);
+    expect(downloadSettingsStore.autoCheckUpdate, isFalse);
   });
 }

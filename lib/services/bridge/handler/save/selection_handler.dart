@@ -56,7 +56,11 @@ class SelectionHandler {
       server.sendJson(
         request,
         HttpStatus.ok,
-        SelectionDebugBridge.qualityOptions(workUrl),
+        SelectionDebugBridge.qualityOptions(
+          workUrl,
+          onlyHighestQualityPerResolution: server
+              .stores.downloadSettings.onlyHighestQualityPerResolution,
+        ),
       );
       return;
     }

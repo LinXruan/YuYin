@@ -12,18 +12,19 @@ class SaveLocationPickers {
   static Future<void> pickDirectory(
     BuildContext context,
     SaveLocationTarget target,
+    SaveLocationStore saveLocationStore,
   ) async {
     final result = await MediaSaver.pickDirectoryByName(target.name);
     if (result == null || result['displayPath']?.isNotEmpty != true) return;
 
     if (target.isHome) {
-      await SaveLocationStore.updateHomeLocation(
+      await saveLocationStore.updateHomeLocation(
         target.mediaType,
         uri: result['uri'],
         displayPath: result['displayPath']!,
       );
     } else {
-      await SaveLocationStore.updateLocation(
+      await saveLocationStore.updateLocation(
         target.mediaType,
         uri: result['uri'],
         displayPath: result['displayPath']!,

@@ -6,6 +6,7 @@ import '../../models/save_page/selection/work_selection_view.dart';
 import '../../models/single_work/media_download_item.dart';
 import '../../services/media/audio_preview_service.dart';
 import '../../services/selection/save_selection_session.dart';
+import '../../utils/debug/save_page_debug_store.dart';
 import 'bottom/debug/bottom_debug_snapshot_helper.dart';
 import 'bottom/preview/media_fullscreen_preview.dart';
 import 'bottom/widget/bottom_media_tile.dart';
@@ -24,6 +25,7 @@ class ImagePreviewSheet extends StatefulWidget {
     required this.headers,
     this.audioService,
     this.nested = false,
+    this.debugStore,
   });
 
   final SaveSelectionSession session;
@@ -39,6 +41,8 @@ class ImagePreviewSheet extends StatefulWidget {
   /// true 表示由中层进入，底部按钮显示“返回”
   final bool nested;
 
+  final SavePageDebugStore? debugStore;
+
   static Future<bool?> show(
     BuildContext context, {
     required SaveSelectionSession session,
@@ -47,6 +51,7 @@ class ImagePreviewSheet extends StatefulWidget {
     required Map<String, String> headers,
     AudioPreviewService? audioService,
     bool nested = false,
+    SavePageDebugStore? debugStore,
   }) {
     return showModalBottomSheet<bool>(
       context: context,
@@ -59,6 +64,7 @@ class ImagePreviewSheet extends StatefulWidget {
         headers: headers,
         audioService: audioService,
         nested: nested,
+        debugStore: debugStore,
       ),
     );
   }
@@ -99,7 +105,11 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
   }
 
   void _publishDebugState() {
-    BottomDebugSnapshotHelper.publish(widget.session, widget.workUrl);
+    BottomDebugSnapshotHelper.publish(
+      widget.session,
+      widget.workUrl,
+      debugStore: widget.debugStore,
+    );
   }
 
   AggregateState _resourceState(MediaType type) =>

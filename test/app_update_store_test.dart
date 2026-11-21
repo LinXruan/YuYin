@@ -134,8 +134,9 @@ void main() {
     });
 
     test('AppUpdateStore: cleanOldApks 只保留最高版本的安装包，清理旧包', () async {
+      final store = AppUpdateStore();
       final tempDir = await Directory.systemTemp.createTemp('yuyin_test_updates_');
-      AppUpdateStore.testUpdatesDir = tempDir;
+      store.testUpdatesDir = tempDir;
 
       try {
         final f1 = File('${tempDir.path}/YuYin_1.4.5_v8a.apk');
@@ -148,13 +149,13 @@ void main() {
 
         expect(tempDir.listSync().length, 3);
 
-        await AppUpdateStore.cleanOldApks();
+        await store.cleanOldApks();
 
         final remaining = tempDir.listSync();
         expect(remaining.length, 1);
         expect(remaining.first.uri.pathSegments.last, 'YuYin_1.4.7_v8a.apk');
       } finally {
-        AppUpdateStore.testUpdatesDir = null;
+        store.testUpdatesDir = null;
         await tempDir.delete(recursive: true);
       }
     });

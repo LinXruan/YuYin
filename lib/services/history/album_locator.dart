@@ -75,7 +75,7 @@ class AlbumLocator {
     HistoryItem item, {
     SaveLocationConfig? config,
   }) async {
-    final currentConfig = config ?? SaveLocationStore.current;
+    final currentConfig = config ?? const SaveLocationConfig();
     if (!item.isUserHome && resolveWorkPrefix(item).isEmpty) {
       return [
         for (final type in MediaType.values)

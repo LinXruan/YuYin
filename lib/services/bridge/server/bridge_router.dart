@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-import '../../../utils/debug/save_page_debug_store.dart';
 import 'agent_automation_server.dart';
 
 /// 请求路由：只做路径分发，具体逻辑在各自端点处理器中。
@@ -54,7 +53,8 @@ class BridgeRouter {
         await server.selectionHandler.handleSelection(request);
       } else if (path == '/api/save-debug' && request.method == 'GET') {
         server.sendJson(request, HttpStatus.ok, {
-          'snapshot': SavePageDebugStore.snapshot ?? {'layer': 'none'},
+          'snapshot':
+              server.stores.savePageDebug.snapshot ?? {'layer': 'none'},
         });
       } else if (path == '/api/history' && request.method == 'GET') {
         await server.historyHandler.handleQuery(request);

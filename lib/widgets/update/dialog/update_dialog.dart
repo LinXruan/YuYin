@@ -15,21 +15,28 @@ class UpdateDialog extends StatelessWidget {
     super.key,
     required this.info,
     this.localApk,
+    this.appUpdateStore,
   });
 
   final UpdateReleaseInfo info;
   final LocalApkInfo? localApk;
+  final AppUpdateStore? appUpdateStore;
 
   /// 便捷展示对话框方法
   static Future<void> show(
     BuildContext context,
     UpdateReleaseInfo info, {
     LocalApkInfo? localApk,
+    AppUpdateStore? appUpdateStore,
   }) {
     return showDialog<void>(
       context: context,
       barrierDismissible: true,
-      builder: (_) => UpdateDialog(info: info, localApk: localApk),
+      builder: (_) => UpdateDialog(
+        info: info,
+        localApk: localApk,
+        appUpdateStore: appUpdateStore,
+      ),
     );
   }
 
@@ -138,7 +145,7 @@ class UpdateDialog extends StatelessWidget {
                   if (hasLocalInstallable) {
                     AppInstaller.installApk(localApk!.file.path);
                   } else {
-                    AppUpdateStore.startDownload(info);
+                    (appUpdateStore ?? AppUpdateStore()).startDownload(info);
                   }
                 },
                 icon: Icon(

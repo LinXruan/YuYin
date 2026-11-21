@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 import '../../app_info.dart';
 import '../../services/sniffer/facade/douyin_sniffer.dart';
 import '../../services/update/client/update_checker.dart';
+import '../../utils/app_stores.dart';
 import '../../utils/debug/log_controller.dart';
 import '../../utils/network_detector.dart';
 import '../../utils/settings/theme_store.dart';
 import '../../utils/thumbnail/history_thumbnail_cache.dart';
-import '../../utils/update/app_update_store.dart';
 import '../../widgets/update/dialog/update_dialog.dart';
 import '../about_page.dart';
 import '../debug_page.dart';
@@ -21,11 +21,13 @@ class SettingsPage extends StatefulWidget {
     super.key,
     required this.logs,
     required this.sniffer,
+    this.stores,
     this.updateChecker,
   });
 
   final LogController logs;
   final DouyinSniffer sniffer;
+  final AppStores? stores;
   final UpdateChecker? updateChecker;
 
   /// 将字节数格式化为易读体积文本
@@ -44,6 +46,7 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage>
     with AutomaticKeepAliveClientMixin {
+  late final AppStores _stores = widget.stores ?? AppStores();
   late final UpdateChecker _checker;
   bool _isChecking = false;
   bool _isClearingCache = false;
@@ -165,7 +168,7 @@ class _SettingsPageState extends State<SettingsPage>
           ? Icon(Icons.check_circle, color: theme.colorScheme.primary)
           : Icon(Icons.radio_button_unchecked, color: theme.colorScheme.outline),
       onTap: () {
-        ThemeStore.setThemeMode(mode);
+        _stores.theme.setThemeMode(mode);
         Navigator.of(context).pop();
       },
     );
@@ -192,10 +195,15 @@ class _SettingsPageState extends State<SettingsPage>
 
     if (result.info != null) {
       final localApk = result.info!.hasUpdate
-          ? await AppUpdateStore.findMatchingApk(result.info!.version)
+          ? await _stores.appUpdate.findMatchingApk(result.info!.version)
           : null;
       if (!mounted) return;
-      UpdateDialog.show(context, result.info!, localApk: localApk);
+      UpdateDialog.show(
+        context,
+        result.info!,
+        localApk: localApk,
+        appUpdateStore: _stores.appUpdate,
+      );
     }
   }
 
@@ -212,7 +220,7 @@ class _SettingsPageState extends State<SettingsPage>
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
         ValueListenableBuilder<ThemeMode>(
-          valueListenable: ThemeStore.themeModeNotifier,
+          valueListenable: _stores.theme.themeModeNotifier,
           builder: (context, currentMode, _) {
             return ListTile(
               leading: const Icon(Icons.brightness_4_outlined),
@@ -231,7 +239,10 @@ class _SettingsPageState extends State<SettingsPage>
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => const DownloadSettingsPage(),
+              builder: (_) => DownloadSettingsPage(
+                saveLocationStore: _stores.saveLocation,
+                downloadSettingsStore: _stores.downloadSettings,
+              ),
             ),
           ),
         ),

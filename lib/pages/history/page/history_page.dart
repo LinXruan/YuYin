@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../utils/history/history_store.dart';
+import '../../../utils/savelocation/save_location_store.dart';
 import '../../../utils/thumbnail/history_thumbnail_cache.dart';
 import '../flow/search/history_search_coordinator.dart';
 import '../flow/selection/history_selection_coordinator.dart';
@@ -10,9 +11,11 @@ import '../widget/frame/history_frame.dart';
 class HistoryPage extends StatefulWidget {
   const HistoryPage({
     super.key,
+    this.saveLocationStore,
     this.onRequestParse,
   });
 
+  final SaveLocationStore? saveLocationStore;
   final ValueChanged<String>? onRequestParse;
 
   @override
@@ -107,6 +110,7 @@ class _HistoryPageState extends State<HistoryPage>
       onDismissSession: () {
         setState(() => _sessionDismissed = true);
       },
+      saveLocationStore: widget.saveLocationStore,
       onPermanentlyDismiss: () async {
         setState(() => _permanentlyDismissed = true);
         await HistoryStore.setPromptDismissed(true);

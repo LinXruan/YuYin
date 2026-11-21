@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../models/common/work_type.dart';
 import '../../../../models/history/saved_media_availability.dart';
 import '../../../../models/history_item.dart';
+import '../../../../utils/savelocation/save_location_store.dart';
 import '../../../../widgets/save_page/save_page_common.dart';
 import 'history_open_popup.dart';
 import 'history_open_scan_flow.dart';
@@ -12,11 +13,13 @@ class HistoryOpenActions extends StatefulWidget {
   const HistoryOpenActions({
     super.key,
     required this.item,
+    this.saveLocationStore,
     this.scanner,
     this.opener,
   });
 
   final HistoryItem item;
+  final SaveLocationStore? saveLocationStore;
   final HistoryMediaScanner? scanner;
   final HistoryMediaOpener? opener;
 
@@ -30,6 +33,7 @@ class _HistoryOpenActionsState extends State<HistoryOpenActions> {
 
   final GlobalKey _badgeKey = GlobalKey();
   late final HistoryOpenScanFlow _flow = HistoryOpenScanFlow(
+    saveLocationStore: widget.saveLocationStore,
     scanner: widget.scanner,
     opener: widget.opener,
   );

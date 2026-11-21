@@ -1,6 +1,7 @@
 import '../../../../models/history/saved_media_availability.dart';
 import '../../../../models/history_item.dart';
 import '../../../../services/history/album_locator.dart';
+import '../../../../utils/savelocation/save_location_store.dart';
 
 typedef HistoryMediaScanner = Future<List<SavedMediaAvailability>> Function(
   HistoryItem item,
@@ -12,9 +13,12 @@ typedef HistoryMediaOpener = Future<bool> Function(
 /// 历史跳转的扫描与打开策略，可注入以便 Widget 测试。
 class HistoryOpenScanFlow {
   HistoryOpenScanFlow({
+    SaveLocationStore? saveLocationStore,
     HistoryMediaScanner? scanner,
     HistoryMediaOpener? opener,
-  })  : _scanner = scanner ?? ((item) => AlbumLocator.scan(item)),
+  })  : _scanner = scanner ??
+            ((item) =>
+                AlbumLocator.scan(item, config: saveLocationStore?.current)),
         _opener = opener ?? ((availability) => AlbumLocator.open(availability));
 
   final HistoryMediaScanner _scanner;

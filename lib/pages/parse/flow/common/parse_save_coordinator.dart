@@ -10,6 +10,7 @@ import '../../../../services/multi_work/article_work_exception.dart';
 import '../../../../services/selection/save_selection_session.dart';
 import '../../../../services/selection/session_work_preparer.dart';
 import '../../../../services/sniffer/facade/douyin_sniffer.dart';
+import '../../../../utils/app_stores.dart';
 import '../../../../utils/debug/log_controller.dart';
 import '../../../../utils/settings/video_quality_utils.dart';
 import '../../../../widgets/save_page/bottom/widget/video_tier_picker_sheet.dart';
@@ -21,10 +22,12 @@ class ParseSaveCoordinator {
   const ParseSaveCoordinator({
     required this.sniffer,
     required this.logs,
+    this.stores,
   });
 
   final DouyinSniffer sniffer;
   final LogController logs;
+  final AppStores? stores;
 
   /// 加载封面/头像所需的统一请求头
   static const Map<String, String> mediaHeaders = {
@@ -85,7 +88,11 @@ class ParseSaveCoordinator {
   ) {
     final row = session.workOf(workUrl);
     if (row == null || !row.behavesAsVideo) return;
-    final tiers = VideoQualityUtils.displayTiers(row.tiers);
+    final tiers = VideoQualityUtils.displayTiers(
+      row.tiers,
+      onlyHighestPerResolution:
+          stores?.downloadSettings.onlyHighestQualityPerResolution ?? true,
+    );
     if (tiers.isEmpty) return;
 
     unawaited(
@@ -121,6 +128,7 @@ class ParseSaveCoordinator {
         items: items,
         headers: mediaHeaders,
         nested: true,
+        debugStore: stores?.savePageDebug,
       ).then((_) {
         if (!context.mounted) return;
         final selected = session.selectedResourceCount(workUrl);
@@ -137,7 +145,11 @@ class ParseSaveCoordinator {
   ) async {
     final row = session.workOf(workUrl);
     if (row == null || !row.behavesAsVideo) return false;
-    final tiers = VideoQualityUtils.displayTiers(row.tiers);
+    final tiers = VideoQualityUtils.displayTiers(
+      row.tiers,
+      onlyHighestPerResolution:
+          stores?.downloadSettings.onlyHighestQualityPerResolution ?? true,
+    );
     if (tiers.isEmpty) return false;
 
     final confirmed = await VideoTierPickerSheet.show(

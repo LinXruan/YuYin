@@ -9,7 +9,6 @@ import 'package:yuyin/models/single_work/media_download_item.dart';
 import 'package:yuyin/models/single_work/single_work_result.dart';
 import 'package:yuyin/services/selection/debug/quality_options_snapshot.dart';
 import 'package:yuyin/services/selection/save_selection_session.dart';
-import 'package:yuyin/utils/settings/download_settings_store.dart';
 import 'package:yuyin/utils/settings/video_quality_utils.dart';
 
 const _realTiers = [
@@ -52,10 +51,6 @@ SaveSelectionSession _session() {
 }
 
 void main() {
-  setUp(() {
-    DownloadSettingsStore.resetForTesting();
-  });
-
   test('过滤后仍保留全量规范排序最后一档', () {
     final session = _session();
     final view = session.workOf('w1')!;
@@ -93,11 +88,13 @@ void main() {
   });
 
   test('关闭仅显示最高画质时保留全量档位', () async {
-    await DownloadSettingsStore.setOnlyHighestQualityPerResolution(false);
     final session = _session();
     final view = session.workOf('w1')!;
 
-    final display = VideoQualityUtils.displayTiers(view.tiers);
+    final display = VideoQualityUtils.displayTiers(
+      view.tiers,
+      onlyHighestPerResolution: false,
+    );
 
     expect(display.length, view.tiers.length);
     expect(display.last.url, view.tiers.last.url);

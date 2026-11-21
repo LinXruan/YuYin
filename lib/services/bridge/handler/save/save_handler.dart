@@ -9,7 +9,6 @@ import '../../../../utils/history/history_store.dart';
 import '../../../../utils/memory/terminal_memory_store.dart';
 import '../../../../utils/save/author_folder_name.dart';
 import '../../../../utils/save/home_save_path.dart';
-import '../../../../utils/savelocation/save_location_store.dart';
 import '../../../../utils/url/batch_input_parser.dart';
 import '../../../../utils/url/url_classifier.dart';
 import '../../../batch_work/work_batch_saver.dart';
@@ -198,7 +197,7 @@ class SaveHandler {
       );
 
       final authorFolder = AuthorFolderName.resolve(home.nickname, home.secUid);
-      final config = SaveLocationStore.current;
+      final config = server.stores.saveLocation.current;
       final quality = server.qualityModeFrom(body['quality']?.toString());
       final memory = TerminalMemoryStore.seed;
       final session = SaveSelectionSession.home(

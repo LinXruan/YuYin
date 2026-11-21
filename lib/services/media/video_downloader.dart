@@ -24,8 +24,11 @@ class DouyinDownloadCancelledException implements Exception {
 
 /// 视频/图片/音频下载与分类保存服务
 class VideoDownloader implements IWorkDownloadDelegate {
-  VideoDownloader({Dio? dio})
-      : _dio = dio ??
+  VideoDownloader({
+    Dio? dio,
+    SaveLocationStore? saveLocationStore,
+  })  : _saveLocationStore = saveLocationStore ?? SaveLocationStore(),
+        _dio = dio ??
             Dio(
               BaseOptions(
                 connectTimeout: const Duration(seconds: 15),
@@ -35,6 +38,7 @@ class VideoDownloader implements IWorkDownloadDelegate {
             );
 
   final Dio _dio;
+  final SaveLocationStore _saveLocationStore;
 
   /// 抖音 CDN 会校验 UA、Referer 和 Cookie，缺失时可能返回 403
   static const Map<String, String> _baseHeaders = {
@@ -104,8 +108,9 @@ class VideoDownloader implements IWorkDownloadDelegate {
 
         // 调用原生分类保存（支持默认 MediaStore、自定义 SAF 与主页作者目录）
         final target = targetResolver?.call(item.type);
-        final treeUri =
-            target != null ? target.treeUri : SaveLocationStore.getTreeUri(item.type);
+        final treeUri = target != null
+            ? target.treeUri
+            : _saveLocationStore.getTreeUri(item.type);
         await MediaSaver.saveMedia(
           tempFilePath: tempPath,
           type: item.type,

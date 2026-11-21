@@ -5,29 +5,34 @@ import 'package:yuyin/utils/settings/download_settings_store.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  late DownloadSettingsStore store;
+
   setUp(() {
-    DownloadSettingsStore.resetForTesting(defaultValue: true);
+    store = DownloadSettingsStore();
+  });
+
+  tearDown(() {
+    store.dispose();
   });
 
   group('DownloadSettingsStore 状态与通知测试', () {
     test('初始状态默认仅显示同分辨率下最高画质 (true)', () {
-      expect(DownloadSettingsStore.onlyHighestQualityPerResolution, isTrue);
-      expect(DownloadSettingsStore.onlyHighestQualityNotifier.value, isTrue);
+      expect(store.onlyHighestQualityPerResolution, isTrue);
+      expect(store.onlyHighestQualityNotifier.value, isTrue);
     });
 
     test('切换开关能够同步修改状态与触发 ValueNotifier 通知', () async {
       bool? notifiedValue;
-      DownloadSettingsStore.onlyHighestQualityNotifier.addListener(() {
-        notifiedValue =
-            DownloadSettingsStore.onlyHighestQualityNotifier.value;
+      store.onlyHighestQualityNotifier.addListener(() {
+        notifiedValue = store.onlyHighestQualityNotifier.value;
       });
 
-      await DownloadSettingsStore.setOnlyHighestQualityPerResolution(false);
-      expect(DownloadSettingsStore.onlyHighestQualityPerResolution, isFalse);
+      await store.setOnlyHighestQualityPerResolution(false);
+      expect(store.onlyHighestQualityPerResolution, isFalse);
       expect(notifiedValue, isFalse);
 
-      await DownloadSettingsStore.setOnlyHighestQualityPerResolution(true);
-      expect(DownloadSettingsStore.onlyHighestQualityPerResolution, isTrue);
+      await store.setOnlyHighestQualityPerResolution(true);
+      expect(store.onlyHighestQualityPerResolution, isTrue);
       expect(notifiedValue, isTrue);
     });
   });
@@ -217,16 +222,16 @@ void main() {
     ];
 
     test('开关开启 (true) 时保留最优与最低档 (2 项)', () {
-      DownloadSettingsStore.resetForTesting(defaultValue: true);
-      final res = DownloadSettingsStore.filterQualities(items);
+      store.resetForTesting(defaultValue: true);
+      final res = store.filterQualities(items);
       expect(res.length, 2);
       expect(res.first.url, 'https://example.com/1.mp4');
       expect(res.last.url, 'https://example.com/2.mp4');
     });
 
     test('开关关闭 (false) 时返回全部画质选项 (2 项)', () {
-      DownloadSettingsStore.resetForTesting(defaultValue: false);
-      final res = DownloadSettingsStore.filterQualities(items);
+      store.resetForTesting(defaultValue: false);
+      final res = store.filterQualities(items);
       expect(res.length, 2);
     });
   });

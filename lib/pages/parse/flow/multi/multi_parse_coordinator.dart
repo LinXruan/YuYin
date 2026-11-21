@@ -108,6 +108,7 @@ class MultiParseCoordinator {
           secUid: SaveSelectionSession.syntheticSecUid,
           headers: ParseSaveCoordinator.mediaHeaders,
           nested: false,
+          debugStore: ctx.stores.savePageDebug,
           onOpenWork: (workUrl, index) =>
               ctx.saveCoordinator.openWorkDetail(ctx.context, session, workUrl),
         );

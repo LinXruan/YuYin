@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/common/save_location_target.dart';
+import '../../utils/savelocation/save_location_store.dart';
 import 'save_location_pickers.dart';
 
 /// 单个保存位置卡片。
@@ -11,12 +12,14 @@ class SaveLocationCard extends StatelessWidget {
     required this.title,
     required this.path,
     required this.isCustom,
+    required this.saveLocationStore,
   });
 
   final SaveLocationTarget target;
   final String title;
   final String path;
   final bool isCustom;
+  final SaveLocationStore saveLocationStore;
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +42,11 @@ class SaveLocationCard extends StatelessWidget {
         ),
       ),
       child: InkWell(
-        onTap: () => SaveLocationPickers.pickDirectory(context, target),
+        onTap: () => SaveLocationPickers.pickDirectory(
+          context,
+          target,
+          saveLocationStore,
+        ),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -131,8 +138,11 @@ class SaveLocationCard extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               OutlinedButton(
-                onPressed: () =>
-                    SaveLocationPickers.pickDirectory(context, target),
+                onPressed: () => SaveLocationPickers.pickDirectory(
+                  context,
+                  target,
+                  saveLocationStore,
+                ),
                 style: OutlinedButton.styleFrom(
                   visualDensity: VisualDensity.compact,
                   padding: const EdgeInsets.symmetric(horizontal: 8),

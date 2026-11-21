@@ -4,8 +4,14 @@ import 'package:yuyin/utils/savelocation/save_location_store.dart';
 import 'package:yuyin/widgets/savelocation/save_location_dialog.dart';
 
 void main() {
+  late SaveLocationStore store;
+
   setUp(() {
-    SaveLocationStore.notifier.value = const SaveLocationConfig();
+    store = SaveLocationStore();
+  });
+
+  tearDown(() {
+    store.dispose();
   });
 
   group('SaveLocationDialog Widget 测试', () {
@@ -15,8 +21,8 @@ void main() {
           theme: ThemeData.light(useMaterial3: true),
           darkTheme: ThemeData.dark(useMaterial3: true),
           themeMode: ThemeMode.light,
-          home: const Scaffold(
-            body: SaveLocationDialog(),
+          home: Scaffold(
+            body: SaveLocationDialog(saveLocationStore: store),
           ),
         ),
       );
@@ -38,7 +44,7 @@ void main() {
     });
 
     testWidgets('自定义路径时显示自定义标记且重置按钮恢复默认', (tester) async {
-      SaveLocationStore.notifier.value = const SaveLocationConfig(
+      store.notifier.value = const SaveLocationConfig(
         videoUri: 'content://tree/custom_video',
         videoDisplayPath: '/CustomVideo/',
       );
@@ -46,8 +52,8 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: ThemeData.dark(useMaterial3: true),
-          home: const Scaffold(
-            body: SaveLocationDialog(),
+          home: Scaffold(
+            body: SaveLocationDialog(saveLocationStore: store),
           ),
         ),
       );
@@ -72,7 +78,7 @@ void main() {
         tester.view.resetDevicePixelRatio();
       });
 
-      SaveLocationStore.notifier.value = const SaveLocationConfig(
+      store.notifier.value = const SaveLocationConfig(
         videoUri: 'content://tree/custom_video',
         videoDisplayPath: '/storage/emulated/0/Movies/CustomVeryLongPath/',
         imageUri: 'content://tree/custom_image',
@@ -84,8 +90,8 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: ThemeData.dark(useMaterial3: true),
-          home: const Scaffold(
-            body: SaveLocationDialog(),
+          home: Scaffold(
+            body: SaveLocationDialog(saveLocationStore: store),
           ),
         ),
       );

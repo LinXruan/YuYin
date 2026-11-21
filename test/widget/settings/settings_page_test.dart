@@ -5,8 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/app_info.dart';
 import 'package:yuyin/pages/settings/settings_page.dart';
 import 'package:yuyin/services/sniffer/facade/douyin_sniffer.dart';
+import 'package:yuyin/utils/app_stores.dart';
 import 'package:yuyin/utils/debug/log_controller.dart';
-import 'package:yuyin/utils/settings/theme_store.dart';
 import 'package:yuyin/utils/thumbnail/history_thumbnail_cache.dart';
 
 class _FakeSniffer implements DouyinSniffer {
@@ -18,15 +18,17 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
+  late AppStores stores;
 
   setUp(() {
     tempDir = Directory.systemTemp.createTempSync('settings_page_test_');
-    ThemeStore.themeModeNotifier.value = ThemeMode.system;
+    stores = AppStores();
     HistoryThumbnailCache.resetForTesting();
     HistoryThumbnailCache.testDir = tempDir;
   });
 
   tearDown(() {
+    stores.dispose();
     HistoryThumbnailCache.resetForTesting();
     try {
       tempDir.deleteSync(recursive: true);
@@ -43,6 +45,7 @@ void main() {
           body: SettingsPage(
             logs: logs,
             sniffer: _FakeSniffer(),
+            stores: stores,
           ),
         ),
       ),
@@ -66,7 +69,7 @@ void main() {
     await tester.tap(find.text('深色模式'));
     await tester.pumpAndSettle();
 
-    expect(ThemeStore.themeModeNotifier.value, ThemeMode.dark);
+    expect(stores.theme.themeModeNotifier.value, ThemeMode.dark);
     expect(find.text('深色模式'), findsOneWidget);
   });
 
@@ -84,6 +87,7 @@ void main() {
           body: SettingsPage(
             logs: logs,
             sniffer: _FakeSniffer(),
+            stores: stores,
           ),
         ),
       ),

@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 
-import '../../utils/settings/download_settings_store.dart';
 import '../../utils/savelocation/save_location_store.dart';
+import '../../utils/settings/download_settings_store.dart';
 import '../../widgets/savelocation/save_location_dialog.dart';
 
 /// 下载与更新二级设置页面：合并管理保存位置、视频画质偏好与自动更新检查
 class DownloadSettingsPage extends StatelessWidget {
-  const DownloadSettingsPage({super.key});
+  const DownloadSettingsPage({
+    super.key,
+    required this.saveLocationStore,
+    required this.downloadSettingsStore,
+  });
+
+  final SaveLocationStore saveLocationStore;
+  final DownloadSettingsStore downloadSettingsStore;
 
   @override
   Widget build(BuildContext context) {
@@ -19,9 +26,9 @@ class DownloadSettingsPage extends StatelessWidget {
         children: [
           // 1. 自定义保存位置
           ValueListenableBuilder<SaveLocationConfig>(
-            valueListenable: SaveLocationStore.notifier,
+            valueListenable: saveLocationStore.notifier,
             builder: (context, _, _) {
-              final isDefault = SaveLocationStore.isAllDefault;
+              final isDefault = saveLocationStore.isAllDefault;
               return ListTile(
                 leading: const Icon(Icons.folder_open_outlined),
                 title: const Text('自定义保存位置'),
@@ -31,7 +38,10 @@ class DownloadSettingsPage extends StatelessWidget {
                       : '已自定义单作品或主页保存路径',
                 ),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () => SaveLocationDialog.show(context),
+                onTap: () => SaveLocationDialog.show(
+                  context,
+                  saveLocationStore: saveLocationStore,
+                ),
               );
             },
           ),
@@ -39,7 +49,7 @@ class DownloadSettingsPage extends StatelessWidget {
 
           // 2. 仅显示同分辨率下最高画质开关
           ValueListenableBuilder<bool>(
-            valueListenable: DownloadSettingsStore.onlyHighestQualityNotifier,
+            valueListenable: downloadSettingsStore.onlyHighestQualityNotifier,
             builder: (context, onlyHighest, _) {
               return SwitchListTile(
                 secondary: const Icon(Icons.high_quality_outlined),
@@ -49,7 +59,8 @@ class DownloadSettingsPage extends StatelessWidget {
                 ),
                 value: onlyHighest,
                 onChanged: (val) {
-                  DownloadSettingsStore.setOnlyHighestQualityPerResolution(val);
+                  downloadSettingsStore
+                      .setOnlyHighestQualityPerResolution(val);
                 },
               );
             },
@@ -58,7 +69,7 @@ class DownloadSettingsPage extends StatelessWidget {
 
           // 3. 自动检查更新开关
           ValueListenableBuilder<bool>(
-            valueListenable: DownloadSettingsStore.autoCheckUpdateNotifier,
+            valueListenable: downloadSettingsStore.autoCheckUpdateNotifier,
             builder: (context, autoCheck, _) {
               return SwitchListTile(
                 secondary: const Icon(Icons.update_rounded),
@@ -68,7 +79,7 @@ class DownloadSettingsPage extends StatelessWidget {
                 ),
                 value: autoCheck,
                 onChanged: (val) {
-                  DownloadSettingsStore.setAutoCheckUpdate(val);
+                  downloadSettingsStore.setAutoCheckUpdate(val);
                 },
               );
             },

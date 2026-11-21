@@ -3,6 +3,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../services/media/video_downloader.dart';
 import '../../../services/sniffer/facade/douyin_sniffer.dart';
+import '../../../utils/app_stores.dart';
 import '../../../utils/debug/log_controller.dart';
 import '../../../utils/update/app_update_store.dart';
 import '../../history/page/history_page.dart';
@@ -15,6 +16,7 @@ class ShellScaffold extends StatelessWidget {
   const ShellScaffold({
     super.key,
     required this.index,
+    required this.stores,
     required this.sniffer,
     required this.downloader,
     required this.logs,
@@ -26,6 +28,7 @@ class ShellScaffold extends StatelessWidget {
   });
 
   final int index;
+  final AppStores stores;
   final DouyinSniffer sniffer;
   final VideoDownloader downloader;
   final LogController logs;
@@ -39,6 +42,7 @@ class ShellScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final appUpdate = stores.appUpdate;
     return Scaffold(
       appBar: index == 1
           ? null
@@ -67,6 +71,7 @@ class ShellScaffold extends StatelessWidget {
                 logs: logs,
                 busy: busy,
                 loggedIn: loggedIn,
+                stores: stores,
                 externalUrlNotifier: pendingInputUrl,
                 onTapAccount: () => onAccountTap(loggedIn.value),
                 // 解析出结果、准备弹选择面板前，确保用户看到的是解析页
@@ -75,12 +80,17 @@ class ShellScaffold extends StatelessWidget {
                 },
               ),
               HistoryPage(
+                saveLocationStore: stores.saveLocation,
                 onRequestParse: (url) {
                   pendingInputUrl.value = url;
                   onTabSelected(0);
                 },
               ),
-              SettingsPage(logs: logs, sniffer: sniffer),
+              SettingsPage(
+                logs: logs,
+                sniffer: sniffer,
+                stores: stores,
+              ),
             ],
           ),
           // 常驻隐藏 WebView：只保留 1x1 透明挂载，切换页面时解析不中断
@@ -102,14 +112,20 @@ class ShellScaffold extends StatelessWidget {
         ],
       ),
       bottomNavigationBar: ValueListenableBuilder<AppUpdateStatus>(
-        valueListenable: AppUpdateStore.statusNotifier,
+        valueListenable: appUpdate.statusNotifier,
         builder: (context, updateStatus, _) {
           final showBanner =
               updateStatus.isDownloading || updateStatus.errorMessage != null;
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (showBanner) ShellUpdateBanner(status: updateStatus),
+              if (showBanner)
+                ShellUpdateBanner(
+                  status: updateStatus,
+                  onCancel: appUpdate.cancelDownload,
+                  onRetry: () => appUpdate.retryLastDownload(),
+                  onDismissError: appUpdate.dismissError,
+                ),
               NavigationBar(
                 selectedIndex: index,
                 onDestinationSelected: onTabSelected,

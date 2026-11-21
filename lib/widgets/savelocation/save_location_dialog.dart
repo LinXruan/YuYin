@@ -7,13 +7,21 @@ import 'save_location_group_title.dart';
 
 /// 自定义保存位置配置弹窗：单作品三项 + 主页链接三项
 class SaveLocationDialog extends StatelessWidget {
-  const SaveLocationDialog({super.key});
+  const SaveLocationDialog({
+    super.key,
+    required this.saveLocationStore,
+  });
+
+  final SaveLocationStore saveLocationStore;
 
   /// 弹出对话框快捷方法
-  static Future<void> show(BuildContext context) {
+  static Future<void> show(
+    BuildContext context, {
+    required SaveLocationStore saveLocationStore,
+  }) {
     return showDialog<void>(
       context: context,
-      builder: (_) => const SaveLocationDialog(),
+      builder: (_) => SaveLocationDialog(saveLocationStore: saveLocationStore),
     );
   }
 
@@ -50,7 +58,7 @@ class SaveLocationDialog extends StatelessWidget {
       content: SizedBox(
         width: double.maxFinite,
         child: ValueListenableBuilder<SaveLocationConfig>(
-          valueListenable: SaveLocationStore.notifier,
+          valueListenable: saveLocationStore.notifier,
           builder: (context, config, _) {
             return SingleChildScrollView(
               child: Column(
@@ -63,6 +71,7 @@ class SaveLocationDialog extends StatelessWidget {
                     title: '视频保存位置',
                     path: config.videoDisplayPath,
                     isCustom: config.videoUri != null,
+                    saveLocationStore: saveLocationStore,
                   ),
                   const SizedBox(height: 8),
                   SaveLocationCard(
@@ -70,6 +79,7 @@ class SaveLocationDialog extends StatelessWidget {
                     title: '图片保存位置',
                     path: config.imageDisplayPath,
                     isCustom: config.imageUri != null,
+                    saveLocationStore: saveLocationStore,
                   ),
                   const SizedBox(height: 8),
                   SaveLocationCard(
@@ -77,6 +87,7 @@ class SaveLocationDialog extends StatelessWidget {
                     title: '音频保存位置',
                     path: config.audioDisplayPath,
                     isCustom: config.audioUri != null,
+                    saveLocationStore: saveLocationStore,
                   ),
                   const SizedBox(height: 16),
                   const SaveLocationGroupTitle(text: '主页链接保存位置（按作者分类）'),
@@ -85,6 +96,7 @@ class SaveLocationDialog extends StatelessWidget {
                     title: '主页视频保存位置',
                     path: config.homeVideoDisplayPath,
                     isCustom: config.homeVideoUri != null,
+                    saveLocationStore: saveLocationStore,
                   ),
                   const SizedBox(height: 8),
                   SaveLocationCard(
@@ -92,6 +104,7 @@ class SaveLocationDialog extends StatelessWidget {
                     title: '主页图片保存位置',
                     path: config.homeImageDisplayPath,
                     isCustom: config.homeImageUri != null,
+                    saveLocationStore: saveLocationStore,
                   ),
                   const SizedBox(height: 8),
                   SaveLocationCard(
@@ -99,6 +112,7 @@ class SaveLocationDialog extends StatelessWidget {
                     title: '主页音频保存位置',
                     path: config.homeAudioDisplayPath,
                     isCustom: config.homeAudioUri != null,
+                    saveLocationStore: saveLocationStore,
                   ),
                 ],
               ),
@@ -108,13 +122,13 @@ class SaveLocationDialog extends StatelessWidget {
       ),
       actions: [
         ValueListenableBuilder<SaveLocationConfig>(
-          valueListenable: SaveLocationStore.notifier,
+          valueListenable: saveLocationStore.notifier,
           builder: (context, config, _) {
             return TextButton.icon(
               onPressed: config.isAllDefault
                   ? null
                   : () async {
-                      await SaveLocationStore.resetToDefault();
+                      await saveLocationStore.resetToDefault();
                     },
               icon: const Icon(Icons.restore_outlined, size: 16),
               label: const Text('重置为默认'),

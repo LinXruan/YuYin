@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../models/history_item.dart';
+import '../../../../utils/savelocation/save_location_store.dart';
 import '../open/history_open_actions.dart';
 import 'history_card_thumbnail.dart';
 
@@ -13,6 +14,7 @@ class HistoryCard extends StatelessWidget {
     required this.isSelected,
     required this.onTap,
     required this.onLongPress,
+    this.saveLocationStore,
     this.onParse,
   });
 
@@ -21,6 +23,7 @@ class HistoryCard extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final SaveLocationStore? saveLocationStore;
   final VoidCallback? onParse;
 
   @override
@@ -125,7 +128,10 @@ class HistoryCard extends StatelessWidget {
                           ],
                           if (item.isSaved) ...[
                             const SizedBox(width: 8),
-                            HistoryOpenActions(item: item),
+                            HistoryOpenActions(
+                              item: item,
+                              saveLocationStore: saveLocationStore,
+                            ),
                           ],
                           if (!isSelectionMode &&
                               onParse != null &&

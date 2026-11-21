@@ -86,37 +86,41 @@ void main() {
   });
 
   group('SaveLocationStore 状态通知测试', () {
+    late SaveLocationStore store;
+
     setUp(() {
-      SaveLocationStore.notifier.value = const SaveLocationConfig();
+      store = SaveLocationStore();
+    });
+
+    tearDown(() {
+      store.dispose();
     });
 
     test('updateLocation 触发全局通知源更新', () {
-      expect(SaveLocationStore.isAllDefault, isTrue);
+      expect(store.isAllDefault, isTrue);
 
-      SaveLocationStore.notifier.value =
-          SaveLocationStore.notifier.value.copyWith(
+      store.notifier.value = store.notifier.value.copyWith(
         videoUri: () => 'content://tree/test',
         videoDisplayPath: '/自定义视频/',
       );
 
       expect(
-        SaveLocationStore.getDisplayPath(MediaType.video),
+        store.getDisplayPath(MediaType.video),
         equals('/自定义视频/'),
       );
-      expect(SaveLocationStore.getTreeUri(MediaType.video), equals('content://tree/test'));
-      expect(SaveLocationStore.isAllDefault, isFalse);
+      expect(store.getTreeUri(MediaType.video), equals('content://tree/test'));
+      expect(store.isAllDefault, isFalse);
 
-      SaveLocationStore.notifier.value =
-          SaveLocationStore.notifier.value.copyWith(
+      store.notifier.value = store.notifier.value.copyWith(
         homeAudioUri: () => 'content://tree/home_audio',
         homeAudioDisplayPath: '/Download/HomeAudio/',
       );
       expect(
-        SaveLocationStore.getHomeDisplayPath(MediaType.audio),
+        store.getHomeDisplayPath(MediaType.audio),
         equals('/Download/HomeAudio/'),
       );
       expect(
-        SaveLocationStore.getHomeTreeUri(MediaType.audio),
+        store.getHomeTreeUri(MediaType.audio),
         equals('content://tree/home_audio'),
       );
     });

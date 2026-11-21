@@ -14,37 +14,37 @@ export '../../models/savelocation/save_location_paths.dart';
 
 /// 保存位置持久化存储门面
 class SaveLocationStore {
-  SaveLocationStore._();
+  SaveLocationStore({
+    SaveLocationConfig initialConfig = const SaveLocationConfig(),
+  }) : notifier = ValueNotifier<SaveLocationConfig>(initialConfig);
 
   static const String _fileName = 'save_locations.json';
 
-  /// 全局通知源，供 UI 与日志实时感知目录变更
-  static final ValueNotifier<SaveLocationConfig> notifier =
-      ValueNotifier(const SaveLocationConfig());
+  /// 通知源，供 UI 与日志实时感知目录变更
+  final ValueNotifier<SaveLocationConfig> notifier;
 
   /// 当前配置
-  static SaveLocationConfig get current => notifier.value;
+  SaveLocationConfig get current => notifier.value;
 
   /// 获取指定类型的当前展示路径（单作品）
-  static String getDisplayPath(MediaType type) =>
-      notifier.value.getDisplayPath(type);
+  String getDisplayPath(MediaType type) => notifier.value.getDisplayPath(type);
 
   /// 获取指定类型的自定义 SAF 授权 Uri（单作品默认时为 null）
-  static String? getTreeUri(MediaType type) => notifier.value.getTreeUri(type);
+  String? getTreeUri(MediaType type) => notifier.value.getTreeUri(type);
 
   /// 获取主页链接的展示基路径
-  static String getHomeDisplayPath(MediaType type) =>
+  String getHomeDisplayPath(MediaType type) =>
       notifier.value.getHomeDisplayPath(type);
 
   /// 获取主页链接的自定义 SAF 授权 Uri（默认时为 null）
-  static String? getHomeTreeUri(MediaType type) =>
+  String? getHomeTreeUri(MediaType type) =>
       notifier.value.getHomeTreeUri(type);
 
   /// 是否全部为默认路径
-  static bool get isAllDefault => notifier.value.isAllDefault;
+  bool get isAllDefault => notifier.value.isAllDefault;
 
   /// 启动时读取本地配置
-  static Future<void> init() async {
+  Future<void> init() async {
     try {
       final file = await _getFile();
       final raw = await AtomicFileWriter.readString(file);
@@ -62,7 +62,7 @@ class SaveLocationStore {
   }
 
   /// 更新单个分类的保存位置（单作品）
-  static Future<void> updateLocation(
+  Future<void> updateLocation(
     MediaType type, {
     String? uri,
     required String displayPath,
@@ -88,7 +88,7 @@ class SaveLocationStore {
   }
 
   /// 更新主页链接中某一类型的基目录
-  static Future<void> updateHomeLocation(
+  Future<void> updateHomeLocation(
     MediaType type, {
     String? uri,
     required String displayPath,
@@ -114,13 +114,15 @@ class SaveLocationStore {
   }
 
   /// 一键重置回系统默认目录
-  static Future<void> resetToDefault() async {
+  Future<void> resetToDefault() async {
     notifier.value = const SaveLocationConfig();
     try {
       final file = await _getFile();
       await AtomicFileWriter.delete(file);
     } catch (_) {}
   }
+
+  void dispose() => notifier.dispose();
 
   static Future<File> _getFile() async {
     final dir = await getApplicationDocumentsDirectory();

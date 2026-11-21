@@ -8,6 +8,7 @@ import '../../../models/parse/parse_status.dart';
 import '../../../services/batch_work/work_batch_saver.dart';
 import '../../../services/media/video_downloader.dart';
 import '../../../services/sniffer/facade/douyin_sniffer.dart';
+import '../../../utils/app_stores.dart';
 import '../../../utils/debug/log_controller.dart';
 import '../../../utils/network_detector.dart';
 import '../../../utils/url/batch_input_parser.dart';
@@ -28,6 +29,7 @@ class ParsePage extends StatefulWidget {
     required this.busy,
     required this.loggedIn,
     required this.onRequestParseTab,
+    this.stores,
     this.onTapAccount,
     this.externalUrlNotifier,
   });
@@ -37,6 +39,7 @@ class ParsePage extends StatefulWidget {
   final LogController logs;
   final ValueNotifier<bool> busy;
   final ValueNotifier<bool> loggedIn;
+  final AppStores? stores;
   final VoidCallback onRequestParseTab;
   final VoidCallback? onTapAccount;
   final ValueNotifier<String?>? externalUrlNotifier;
@@ -57,6 +60,8 @@ class _ParsePageState extends State<ParsePage>
   String _lastProgressKey = '';
   bool _isParsing = false;
 
+  late final AppStores _stores = widget.stores ?? AppStores();
+
   /// 下载/保存中的取消令牌：由 notifier 承载，变化即触发按钮重建
   CancelToken? get _downloadCancelToken => _downloadToken.value;
 
@@ -69,8 +74,11 @@ class _ParsePageState extends State<ParsePage>
   WorkBatchSaver get _workBatchSaver =>
       WorkBatchSaver(downloader: widget.downloader);
 
-  ParseSaveCoordinator get _saveCoordinator =>
-      ParseSaveCoordinator(sniffer: widget.sniffer, logs: widget.logs);
+  ParseSaveCoordinator get _saveCoordinator => ParseSaveCoordinator(
+        sniffer: widget.sniffer,
+        logs: widget.logs,
+        stores: _stores,
+      );
 
   @override
   bool get wantKeepAlive => true;
@@ -175,6 +183,7 @@ class _ParsePageState extends State<ParsePage>
         logs: widget.logs,
         busy: widget.busy,
         loggedIn: widget.loggedIn,
+        stores: _stores,
         onRequestParseTab: widget.onRequestParseTab,
         isParsing: () => _isParsing,
         setParsing: (val) => _isParsing = val,

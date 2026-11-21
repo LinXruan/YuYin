@@ -159,6 +159,7 @@ class HomeParseCoordinator {
           ctx.context,
           session: session,
           headers: ParseSaveCoordinator.mediaHeaders,
+          debugStore: ctx.stores.savePageDebug,
           onOpenAuthor: (secUid, index) => _openAuthorWorks(session, secUid),
         );
         if (!ctx.context.mounted) return;
@@ -202,7 +203,10 @@ class HomeParseCoordinator {
           throw const DouyinDownloadCancelledException();
         }
 
-        final homeSaver = UserHomeBatchSaver(workSaver: ctx.workBatchSaver);
+        final homeSaver = UserHomeBatchSaver(
+          workSaver: ctx.workBatchSaver,
+          locationConfig: ctx.stores.saveLocation.current,
+        );
         ctx.logs.add(
           '开始保存 ${selectedAuthors.length} 位作者（${ParseFlowHelper.qualityLabel(qualityMode)}）...',
         );
@@ -275,6 +279,7 @@ class HomeParseCoordinator {
         secUid: secUid,
         headers: ParseSaveCoordinator.mediaHeaders,
         nested: true,
+        debugStore: ctx.stores.savePageDebug,
         onOpenWork: (workUrl, index) =>
             ctx.saveCoordinator.openWorkDetail(ctx.context, session, workUrl),
       ).then((confirmed) {

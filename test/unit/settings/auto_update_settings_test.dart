@@ -1,23 +1,25 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yuyin/utils/update/app_update_store.dart';
 import 'package:yuyin/utils/settings/download_settings_store.dart';
 import 'package:yuyin/utils/thumbnail/history_thumbnail_cache.dart';
+import 'package:yuyin/utils/update/app_update_store.dart';
 
 void main() {
   group('PLAN_48 单元测试', () {
-    test('DownloadSettingsStore: autoCheckUpdate 默认开启且支持修改与测试重置', () {
-      DownloadSettingsStore.resetForTesting();
-      expect(DownloadSettingsStore.autoCheckUpdate, isTrue);
-      expect(DownloadSettingsStore.autoCheckUpdateNotifier.value, isTrue);
+    test('DownloadSettingsStore: autoCheckUpdate 默认开启且支持修改与测试重置', () async {
+      final store = DownloadSettingsStore();
+      addTearDown(store.dispose);
 
-      DownloadSettingsStore.setAutoCheckUpdate(false);
-      expect(DownloadSettingsStore.autoCheckUpdate, isFalse);
-      expect(DownloadSettingsStore.autoCheckUpdateNotifier.value, isFalse);
+      expect(store.autoCheckUpdate, isTrue);
+      expect(store.autoCheckUpdateNotifier.value, isTrue);
 
-      DownloadSettingsStore.resetForTesting(defaultAutoCheck: true);
-      expect(DownloadSettingsStore.autoCheckUpdate, isTrue);
+      await store.setAutoCheckUpdate(false);
+      expect(store.autoCheckUpdate, isFalse);
+      expect(store.autoCheckUpdateNotifier.value, isFalse);
+
+      store.resetForTesting(defaultAutoCheck: true);
+      expect(store.autoCheckUpdate, isTrue);
     });
 
     test('HistoryThumbnailCache: generateFileName 产生唯一的安全文件名', () {
@@ -56,15 +58,16 @@ void main() {
     });
 
     test('AppUpdateStore: getUpdatesDirectory 正常返回 updates 目录', () async {
+      final store = AppUpdateStore();
       final tempDir = await Directory.systemTemp.createTemp('yuyin_updates_test_');
-      AppUpdateStore.testUpdatesDir = tempDir;
+      store.testUpdatesDir = tempDir;
 
       try {
-        final dir = await AppUpdateStore.getUpdatesDirectory();
+        final dir = await store.getUpdatesDirectory();
         expect(dir.existsSync(), isTrue);
         expect(dir.path, tempDir.path);
       } finally {
-        AppUpdateStore.testUpdatesDir = null;
+        store.testUpdatesDir = null;
         await tempDir.delete(recursive: true);
       }
     });

@@ -27,8 +27,14 @@ class VideoQualityUtils {
   }
 
   /// 保存页展示用的档位列表：先按全局设置过滤，再统一从高到低排序
-  static List<MediaItem> displayTiers(List<MediaItem> tiers) {
-    return sortTiers(DownloadSettingsStore.filterQualities(tiers));
+  static List<MediaItem> displayTiers(
+    List<MediaItem> tiers, {
+    bool onlyHighestPerResolution = true,
+  }) {
+    final filtered = onlyHighestPerResolution
+        ? DownloadSettingsStore.filterHighestQualityPerResolution(tiers)
+        : tiers;
+    return sortTiers(filtered);
   }
 
   /// 按最高/最低偏好挑选档位

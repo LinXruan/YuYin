@@ -8,7 +8,6 @@ import 'package:yuyin/models/single_work/single_work_result.dart';
 import 'package:yuyin/services/multi_work/article_work_exception.dart';
 import 'package:yuyin/services/multi_work/i_multi_work_extractor.dart';
 import 'package:yuyin/services/multi_work/multi_work_extractor.dart';
-import 'package:yuyin/utils/settings/download_settings_store.dart';
 import 'package:yuyin/utils/url/batch_input_parser.dart';
 import 'package:yuyin/utils/url/url_classifier.dart';
 import 'package:yuyin/utils/settings/video_quality_utils.dart';
@@ -69,9 +68,7 @@ SingleWorkResult _imageResult() {
 }
 
 void main() {
-  setUp(() {
-    DownloadSettingsStore.resetForTesting();
-  });
+  setUp(() {});
 
   group('DouyinUrlClassifier 文章识别与批量分类', () {
     test('显式 /article/ 链接识别为文章', () {

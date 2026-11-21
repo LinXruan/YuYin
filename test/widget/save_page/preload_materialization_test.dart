@@ -13,7 +13,6 @@ import 'package:yuyin/models/save_page/work_kind.dart';
 import 'package:yuyin/models/single_work/media_download_item.dart';
 import 'package:yuyin/models/single_work/single_work_result.dart';
 import 'package:yuyin/services/selection/save_selection_session.dart';
-import 'package:yuyin/utils/settings/download_settings_store.dart';
 import 'package:yuyin/utils/settings/video_quality_utils.dart';
 import 'package:yuyin/widgets/save_page/bottom/widget/video_tier_picker_sheet.dart';
 import 'package:yuyin/widgets/save_page/middle_multi_work_sheet.dart';
@@ -79,7 +78,10 @@ Widget _pickerHost(
               context,
               session: session,
               workUrl: 'v1',
-              tiers: VideoQualityUtils.displayTiers(row.tiers),
+              tiers: VideoQualityUtils.displayTiers(
+                row.tiers,
+                onlyHighestPerResolution: false,
+              ),
               nested: nested,
             ),
             child: const Text('open'),
@@ -91,9 +93,7 @@ Widget _pickerHost(
 }
 
 void main() {
-  setUp(() {
-    DownloadSettingsStore.resetForTesting(defaultValue: false);
-  });
+  setUp(() {});
 
   group('PLAN_69 预载结果构造时物化', () {
     test('多作品会话构造即物化预载解析结果', () {

@@ -6,6 +6,7 @@ import '../../models/common/work_type.dart';
 import '../../models/save_page/selection/quality_indicator.dart';
 import '../../models/save_page/work_kind.dart';
 import '../../services/selection/save_selection_session.dart';
+import '../../utils/debug/save_page_debug_store.dart';
 import 'filter/filter_controls.dart';
 import 'filter/filter_strip.dart';
 import 'top/debug/top_debug_snapshot_helper.dart';
@@ -23,6 +24,7 @@ class MultiHomePreviewSheet extends StatefulWidget {
     required this.session,
     this.headers = const {},
     this.onOpenAuthor,
+    this.debugStore,
   });
 
   final SaveSelectionSession session;
@@ -31,12 +33,15 @@ class MultiHomePreviewSheet extends StatefulWidget {
 
   final OnOpenAuthorCallback? onOpenAuthor;
 
+  final SavePageDebugStore? debugStore;
+
   /// 返回 true 表示确认保存；null/false 表示取消
   static Future<bool?> show(
     BuildContext context, {
     required SaveSelectionSession session,
     Map<String, String> headers = const {},
     OnOpenAuthorCallback? onOpenAuthor,
+    SavePageDebugStore? debugStore,
   }) {
     return showModalBottomSheet<bool>(
       context: context,
@@ -46,6 +51,7 @@ class MultiHomePreviewSheet extends StatefulWidget {
         session: session,
         headers: headers,
         onOpenAuthor: onOpenAuthor,
+        debugStore: debugStore,
       ),
     );
   }
@@ -59,7 +65,10 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
   int? _openingIndex;
 
   void _publishDebugState() {
-    TopDebugSnapshotHelper.publish(widget.session);
+    TopDebugSnapshotHelper.publish(
+      widget.session,
+      debugStore: widget.debugStore,
+    );
   }
 
   void _toggleAuthor(int index) {

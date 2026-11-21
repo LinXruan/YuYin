@@ -8,7 +8,6 @@ import 'package:yuyin/models/single_work/media_download_item.dart';
 import 'package:yuyin/models/single_work/single_work_result.dart';
 import 'package:yuyin/models/user_home/user_home_profile.dart';
 import 'package:yuyin/services/selection/save_selection_session.dart';
-import 'package:yuyin/utils/settings/download_settings_store.dart';
 import 'package:yuyin/widgets/save_page/middle_multi_work_sheet.dart';
 import 'package:yuyin/widgets/save_page/top_multi_home_sheet.dart';
 
@@ -65,10 +64,6 @@ Widget _wrap(Widget child) =>
     MaterialApp(home: Scaffold(body: child));
 
 void main() {
-  setUp(() {
-    DownloadSettingsStore.resetForTesting();
-  });
-
   testWidgets('顶层无视频时画质按钮为无视频且不可用', (tester) async {
     final session = _noteSession();
     await tester.pumpWidget(

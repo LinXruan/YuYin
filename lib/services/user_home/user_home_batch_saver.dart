@@ -15,9 +15,13 @@ import '../media/video_downloader.dart';
 
 /// 顶层多作者批量保存：按作者写入分类目录
 class UserHomeBatchSaver {
-  UserHomeBatchSaver({required this.workSaver});
+  UserHomeBatchSaver({
+    required this.workSaver,
+    SaveLocationConfig? locationConfig,
+  }) : locationConfig = locationConfig ?? const SaveLocationConfig();
 
   final IWorkBatchSaver workSaver;
+  final SaveLocationConfig locationConfig;
 
   Future<UserHomeBatchSaveResult> saveAuthors({
     required List<UserHomeProfile> authors,
@@ -62,7 +66,7 @@ class UserHomeBatchSaver {
 
       try {
         final folder = AuthorFolderName.resolve(nickname, secUid);
-        final config = SaveLocationStore.current;
+        final config = locationConfig;
         MediaSaveTarget resolveTarget(MediaType type) =>
             HomeSavePath.buildTarget(config, type, folder);
 

@@ -6,13 +6,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/app_info.dart';
 import 'package:yuyin/models/history_item.dart';
 import 'package:yuyin/services/bridge/server/agent_automation_server.dart';
-import 'package:yuyin/utils/settings/download_settings_store.dart';
+import 'package:yuyin/utils/app_stores.dart';
 import 'package:yuyin/utils/history/history_store.dart';
 import 'package:yuyin/utils/debug/log_controller.dart';
 
 void main() {
   group('AgentAutomationServer 接口测试', () {
     late AgentAutomationServer server;
+    late AppStores stores;
     late LogController logs;
     late ValueNotifier<bool> busy;
     late ValueNotifier<bool> loggedIn;
@@ -20,7 +21,7 @@ void main() {
     late int testPort;
 
     setUp(() async {
-      DownloadSettingsStore.resetForTesting(defaultValue: true);
+      stores = AppStores();
       HistoryStore.resetForTesting(skipSave: true);
       logs = LogController();
       busy = ValueNotifier<bool>(false);
@@ -31,6 +32,7 @@ void main() {
         logs: logs,
         busy: busy,
         loggedIn: loggedIn,
+        stores: stores,
         port: 0,
       );
       await server.start();
@@ -76,7 +78,10 @@ void main() {
       final json1 = jsonDecode(await utf8.decodeStream(resp1)) as Map;
       expect(json1['success'], isTrue);
       expect(json1['onlyHighestQualityPerResolution'], isFalse);
-      expect(DownloadSettingsStore.onlyHighestQualityPerResolution, isFalse);
+      expect(
+        stores.downloadSettings.onlyHighestQualityPerResolution,
+        isFalse,
+      );
 
       // 参数错误时返回 400
       final req2 = await client.postUrl(

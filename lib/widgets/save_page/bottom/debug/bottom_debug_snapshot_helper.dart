@@ -7,9 +7,13 @@ import '../../../../utils/debug/save_page_debug_store.dart';
 /// 底层保存页调试快照同步辅助
 abstract final class BottomDebugSnapshotHelper {
   /// 发布底层快照（仅在调试模式）
-  static void publish(SaveSelectionSession session, String workUrl) {
-    if (!kDebugMode) return;
-    SavePageDebugStore.update(
+  static void publish(
+    SaveSelectionSession session,
+    String workUrl, {
+    SavePageDebugStore? debugStore,
+  }) {
+    if (!kDebugMode || debugStore == null) return;
+    debugStore.update(
       'bottom',
       SelectionSnapshot.bottom(session, workUrl),
     );

@@ -15,7 +15,6 @@ import '../../../../services/sniffer/lifecycle/sniff_cancelled_exception.dart';
 import '../../../../utils/history/history_store.dart';
 import '../../../../utils/memory/terminal_memory_store.dart';
 import '../../../../utils/save/file_name_formatter.dart';
-import '../../../../utils/savelocation/save_location_store.dart';
 import '../../../../utils/url/url_extractor.dart';
 import '../../../../widgets/save_page/bottom_media_sheet.dart';
 import '../common/parse_flow_context.dart';
@@ -128,17 +127,20 @@ class SingleParseCoordinator {
       }
       final locations = <String>[];
       if (savedTypes.contains(MediaType.image)) {
-        final loc = '图片已保存到${SaveLocationStore.getDisplayPath(MediaType.image)}';
+        final loc =
+            '图片已保存到${ctx.stores.saveLocation.getDisplayPath(MediaType.image)}';
         ctx.logs.add(loc);
         locations.add(loc);
       }
       if (savedTypes.contains(MediaType.video)) {
-        final loc = '视频已保存到${SaveLocationStore.getDisplayPath(MediaType.video)}';
+        final loc =
+            '视频已保存到${ctx.stores.saveLocation.getDisplayPath(MediaType.video)}';
         ctx.logs.add(loc);
         locations.add(loc);
       }
       if (savedTypes.contains(MediaType.audio)) {
-        final loc = '音频已保存到${SaveLocationStore.getDisplayPath(MediaType.audio)}';
+        final loc =
+            '音频已保存到${ctx.stores.saveLocation.getDisplayPath(MediaType.audio)}';
         ctx.logs.add(loc);
         locations.add(loc);
       }
@@ -196,6 +198,7 @@ class SingleParseCoordinator {
           workUrl: url,
           items: result.items,
           headers: ParseSaveCoordinator.mediaHeaders,
+          debugStore: ctx.stores.savePageDebug,
         );
         if (!ctx.mounted || confirmed != true) return null;
       } else {

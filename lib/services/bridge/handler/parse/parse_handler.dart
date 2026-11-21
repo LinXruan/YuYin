@@ -4,9 +4,7 @@ import '../../../../app_info.dart';
 import '../../../../models/common/work_type.dart';
 import '../../../../models/history_item.dart';
 import '../../../../utils/history/history_store.dart';
-import '../../../../utils/savelocation/save_location_store.dart';
 import '../../../../utils/settings/display_mode_service.dart';
-import '../../../../utils/settings/download_settings_store.dart';
 import '../../../../utils/url/batch_input_parser.dart';
 import '../../../../utils/url/url_classifier.dart';
 import '../../server/agent_automation_server.dart';
@@ -267,8 +265,8 @@ class ParseHandler {
       'logsCount': server.logs.logs.length,
       'downloadSettings': {
         'onlyHighestQualityPerResolution':
-            DownloadSettingsStore.onlyHighestQualityPerResolution,
-        'isSaveLocationDefault': SaveLocationStore.isAllDefault,
+            server.stores.downloadSettings.onlyHighestQualityPerResolution,
+        'isSaveLocationDefault': server.stores.saveLocation.isAllDefault,
       },
       'display': {
         'activeRefreshRate': DisplayModeService.activeRefreshRate,

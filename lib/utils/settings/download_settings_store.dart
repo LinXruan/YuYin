@@ -9,34 +9,35 @@ import '../atomic_file_writer.dart';
 
 /// 下载与画质过滤、自动更新相关配置持久化存储器
 class DownloadSettingsStore {
-  DownloadSettingsStore._();
+  DownloadSettingsStore({
+    bool onlyHighestQualityPerResolution = true,
+    bool autoCheckUpdate = true,
+  })  : _onlyHighestQualityPerResolution = onlyHighestQualityPerResolution,
+        _autoCheckUpdate = autoCheckUpdate,
+        onlyHighestQualityNotifier =
+            ValueNotifier<bool>(onlyHighestQualityPerResolution),
+        autoCheckUpdateNotifier = ValueNotifier<bool>(autoCheckUpdate);
 
   static const String _fileName = 'download_settings.json';
 
-  /// 是否仅显示同分辨率下最高画质（默认开启）
-  static bool _onlyHighestQualityPerResolution = true;
-
-  /// 是否在启动 2 秒后自动检查更新（默认开启）
-  static bool _autoCheckUpdate = true;
+  bool _onlyHighestQualityPerResolution;
+  bool _autoCheckUpdate;
 
   /// 监听画质选项切换的 Notifier
-  static final ValueNotifier<bool> onlyHighestQualityNotifier =
-      ValueNotifier<bool>(true);
+  final ValueNotifier<bool> onlyHighestQualityNotifier;
 
   /// 监听自动检查更新选项切换的 Notifier
-  static final ValueNotifier<bool> autoCheckUpdateNotifier =
-      ValueNotifier<bool>(true);
+  final ValueNotifier<bool> autoCheckUpdateNotifier;
 
   /// 当前是否仅显示同分辨率下最高画质
-  static bool get onlyHighestQualityPerResolution =>
-      _onlyHighestQualityPerResolution;
+  bool get onlyHighestQualityPerResolution => _onlyHighestQualityPerResolution;
 
   /// 当前是否自动检查更新
-  static bool get autoCheckUpdate => _autoCheckUpdate;
+  bool get autoCheckUpdate => _autoCheckUpdate;
 
   /// 测试重置
   @visibleForTesting
-  static void resetForTesting({
+  void resetForTesting({
     bool defaultValue = true,
     bool defaultOnlyHighest = true,
     bool defaultAutoCheck = true,
@@ -49,7 +50,7 @@ class DownloadSettingsStore {
   }
 
   /// 启动初始化
-  static Future<void> init() async {
+  Future<void> init() async {
     try {
       final file = await _file();
       final content = await AtomicFileWriter.readString(file);
@@ -70,7 +71,7 @@ class DownloadSettingsStore {
   }
 
   /// 切换并持久化“仅显示同分辨率下最高画质”开关
-  static Future<void> setOnlyHighestQualityPerResolution(bool value) async {
+  Future<void> setOnlyHighestQualityPerResolution(bool value) async {
     if (_onlyHighestQualityPerResolution == value) return;
     _onlyHighestQualityPerResolution = value;
     onlyHighestQualityNotifier.value = value;
@@ -78,19 +79,24 @@ class DownloadSettingsStore {
   }
 
   /// 切换并持久化“自动检查更新”开关
-  static Future<void> setAutoCheckUpdate(bool value) async {
+  Future<void> setAutoCheckUpdate(bool value) async {
     if (_autoCheckUpdate == value) return;
     _autoCheckUpdate = value;
     autoCheckUpdateNotifier.value = value;
     await _save();
   }
 
-  /// 根据全局设置对视频画质列表进行过滤
-  static List<MediaItem> filterQualities(List<MediaItem> items) {
+  /// 根据当前设置对视频画质列表进行过滤
+  List<MediaItem> filterQualities(List<MediaItem> items) {
     if (!_onlyHighestQualityPerResolution) {
       return items;
     }
     return filterHighestQualityPerResolution(items);
+  }
+
+  void dispose() {
+    onlyHighestQualityNotifier.dispose();
+    autoCheckUpdateNotifier.dispose();
   }
 
   /// 核心过滤算法：保留同一分辨率下码率最高（或体积最大）的最优画质选项
@@ -167,7 +173,7 @@ class DownloadSettingsStore {
     return File('${dir.path}/$_fileName');
   }
 
-  static Future<void> _save() async {
+  Future<void> _save() async {
     try {
       final file = await _file();
       final map = <String, dynamic>{

@@ -53,7 +53,10 @@ class HistoryHandler {
     final record = await _requireRecord(request);
     if (record == null) return;
 
-    final results = await AlbumLocator.scan(record);
+    final results = await AlbumLocator.scan(
+      record,
+      config: server.stores.saveLocation.current,
+    );
     server.sendJson(request, HttpStatus.ok, {
       'id': record.id,
       'type': record.recordType.name,
@@ -75,7 +78,10 @@ class HistoryHandler {
     final record = await _requireRecord(request, body: body);
     if (record == null) return;
 
-    final results = await AlbumLocator.scan(record);
+    final results = await AlbumLocator.scan(
+      record,
+      config: server.stores.saveLocation.current,
+    );
     SavedMediaAvailability? target;
     for (final item in results) {
       if (item.type.name == typeName) {

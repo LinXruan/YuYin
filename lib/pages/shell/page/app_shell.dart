@@ -9,12 +9,11 @@ import '../../../services/media/video_downloader.dart';
 import '../../../services/sniffer/common/log_message_policy.dart';
 import '../../../services/sniffer/facade/douyin_sniffer.dart';
 import '../../../services/update/client/update_checker.dart';
+import '../../../utils/app_stores.dart';
 import '../../../utils/debug/log_controller.dart';
 import '../../../utils/login_state_store.dart';
 import '../../../utils/network_detector.dart';
 import '../../../utils/settings/display_mode_service.dart';
-import '../../../utils/settings/download_settings_store.dart';
-import '../../../utils/update/app_update_store.dart';
 import '../../../widgets/update/dialog/update_dialog.dart';
 import '../../login_webview_page.dart';
 import '../widget/shell_scaffold.dart';
@@ -24,7 +23,9 @@ import '../widget/shell_scaffold.dart';
 /// 长期服务（捕获器、下载器、日志、登录状态）都由这里统一持有，
 /// 保证切换 Tab 或进入次级页面时后台 WebView 不会被销毁。
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  const AppShell({super.key, required this.stores});
+
+  final AppStores stores;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -32,7 +33,8 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   final DouyinSniffer _sniffer = DouyinSniffer();
-  final VideoDownloader _downloader = VideoDownloader();
+  late final VideoDownloader _downloader =
+      VideoDownloader(saveLocationStore: widget.stores.saveLocation);
   final LogController _logs = LogController();
   final ValueNotifier<bool> _busy = ValueNotifier(false);
   final ValueNotifier<bool> _loggedIn = ValueNotifier(false);
@@ -56,6 +58,7 @@ class _AppShellState extends State<AppShell> {
         logs: _logs,
         busy: _busy,
         loggedIn: _loggedIn,
+        stores: widget.stores,
       )..start();
     }
 
@@ -119,8 +122,8 @@ class _AppShellState extends State<AppShell> {
     _autoCheckUpdateTimer?.cancel();
     _autoCheckUpdateTimer = Timer(const Duration(seconds: 2), () async {
       if (!mounted) return;
-      if (!DownloadSettingsStore.autoCheckUpdate) return;
-      if (AppUpdateStore.statusNotifier.value.isDownloading) return;
+      if (!widget.stores.downloadSettings.autoCheckUpdate) return;
+      if (widget.stores.appUpdate.statusNotifier.value.isDownloading) return;
       final hasNet = await NetworkDetector.hasInternetConnection();
       if (!mounted || !hasNet) return;
 
@@ -131,10 +134,15 @@ class _AppShellState extends State<AppShell> {
           return;
         }
         if (result.info != null && result.info!.hasUpdate) {
-          final localApk =
-              await AppUpdateStore.findMatchingApk(result.info!.version);
+          final localApk = await widget.stores.appUpdate
+              .findMatchingApk(result.info!.version);
           if (!mounted) return;
-          UpdateDialog.show(context, result.info!, localApk: localApk);
+          UpdateDialog.show(
+            context,
+            result.info!,
+            localApk: localApk,
+            appUpdateStore: widget.stores.appUpdate,
+          );
         }
       } catch (_) {
         // 静默异常吞吐，保证不打扰用户
@@ -202,6 +210,7 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     return ShellScaffold(
       index: _index,
+      stores: widget.stores,
       sniffer: _sniffer,
       downloader: _downloader,
       logs: _logs,

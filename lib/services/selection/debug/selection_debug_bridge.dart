@@ -35,12 +35,19 @@ class SelectionDebugBridge {
     return SelectionSnapshot.state(session, withCells: withCells);
   }
 
-  static Map<String, dynamic> qualityOptions(String workUrl) {
+  static Map<String, dynamic> qualityOptions(
+    String workUrl, {
+    bool onlyHighestQualityPerResolution = true,
+  }) {
     final session = _session;
     if (session == null) {
       return {'active': false, 'message': '当前没有活动的保存页会话'};
     }
-    return QualityOptionsSnapshot.of(session, workUrl);
+    return QualityOptionsSnapshot.of(
+      session,
+      workUrl,
+      onlyHighestQualityPerResolution: onlyHighestQualityPerResolution,
+    );
   }
 
   static Map<String, dynamic> verify() {

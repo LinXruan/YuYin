@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../models/history/history_type_filter.dart';
 import '../../../../models/history_item.dart';
+import '../../../../utils/savelocation/save_location_store.dart';
 import '../../flow/action/history_action_helper.dart';
 import '../../flow/search/history_search_coordinator.dart';
 import '../../flow/selection/history_selection_coordinator.dart';
@@ -23,6 +24,7 @@ class HistoryFrame extends StatelessWidget {
     required this.permanentlyDismissed,
     required this.onDismissSession,
     required this.onPermanentlyDismiss,
+    this.saveLocationStore,
     this.onRequestParse,
   });
 
@@ -34,6 +36,7 @@ class HistoryFrame extends StatelessWidget {
   final bool permanentlyDismissed;
   final VoidCallback onDismissSession;
   final VoidCallback onPermanentlyDismiss;
+  final SaveLocationStore? saveLocationStore;
   final ValueChanged<String>? onRequestParse;
 
   @override
@@ -186,6 +189,7 @@ class HistoryFrame extends StatelessWidget {
                             item: item,
                             isSelectionMode: selection.isSelectionMode,
                             isSelected: isSelected,
+                            saveLocationStore: saveLocationStore,
                             onTap: () {
                               if (selection.isSelectionMode) {
                                 selection.toggleItem(item.id);
