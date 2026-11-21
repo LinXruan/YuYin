@@ -72,8 +72,6 @@ class BridgeRouter {
         await server.mediaHandler.handleDisplay(request);
       } else if (path == '/api/thumbnails' && request.method == 'GET') {
         await server.mediaHandler.handleGetThumbnails(request);
-      } else if (path == '/api/thumbnails/clear' && request.method == 'POST') {
-        await server.mediaHandler.handleClearThumbnails(request);
       } else if (path == '/api/thumbnails/preload' && request.method == 'POST') {
         await server.mediaHandler.handlePreloadThumbnails(request);
       } else if (path == '/api/verify/home-covers' && request.method == 'POST') {

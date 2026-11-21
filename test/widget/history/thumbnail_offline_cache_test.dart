@@ -245,7 +245,7 @@ void main() {
       HttpOverrides.global = previousOverrides;
     });
 
-    test('5. /api/thumbnails 接口查询、预加载与清空', () async {
+    test('5. /api/thumbnails 接口查询、预加载可用，且 /api/thumbnails/clear 已物理移除', () async {
       // 准备缓存文件
       final file = File(
           '${tempDir.path}/${HistoryThumbnailCache.generateFileName('api_test')}');
@@ -272,19 +272,16 @@ void main() {
       final preloadJson = jsonDecode(await utf8.decodeStream(preloadResp));
       expect(preloadJson['status'], 'ok');
 
-      // 3. POST /api/thumbnails/clear
+      // 3. POST /api/thumbnails/clear 已彻底移除（返回 404）
       final clearReq = await httpClient.postUrl(
         Uri.parse('http://127.0.0.1:$testPort/api/thumbnails/clear'),
       );
       final clearResp = await clearReq.close();
-      expect(clearResp.statusCode, HttpStatus.ok);
-      final clearJson = jsonDecode(await utf8.decodeStream(clearResp));
-      expect(clearJson['status'], 'ok');
+      expect(clearResp.statusCode, HttpStatus.notFound);
 
-      // 清空后再次查询
+      // 原有缓存文件保持不变
       final statsAfter = await HistoryThumbnailCache.getStats();
-      expect(statsAfter['cachedFilesCount'], 0);
-      expect(statsAfter['inMemoryEntries'], 0);
+      expect(statsAfter['cachedFilesCount'], 1);
     });
   });
 }

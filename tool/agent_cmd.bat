@@ -20,7 +20,6 @@ rem   agent_cmd.bat history [query]
 rem   agent_cmd.bat history-scan "<id>"
 rem   agent_cmd.bat clear-history
 rem   agent_cmd.bat thumbnails
-rem   agent_cmd.bat clear-thumbnails
 rem   agent_cmd.bat preload-thumbnails
 rem   agent_cmd.bat verify-covers
 rem   agent_cmd.bat verify-titles

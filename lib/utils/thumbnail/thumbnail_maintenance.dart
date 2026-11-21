@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'thumbnail_cache_state.dart';
 
-/// 缩略图维护：统计、清空、LRU 上限淘汰与孤儿清理。
+/// 缩略图维护：统计、LRU 上限淘汰与孤儿回收。
 class ThumbnailMaintenance {
   ThumbnailMaintenance._();
 
@@ -32,26 +32,6 @@ class ThumbnailMaintenance {
       'existingFileNamesCount': state.existingFileNames.length,
       'inFlightDownloadsCount': state.inFlight.length,
     };
-  }
-
-  static Future<void> clearCache(ThumbnailCacheState state) async {
-    state.generation++;
-    state.memCache.clear();
-    state.existingFileNames.clear();
-    state.lruSizes.clear();
-    state.inFlight.clear();
-    state.failedUrls.clear();
-    try {
-      final dir = await state.getCacheDirectory();
-      if (dir.existsSync()) {
-        for (final entity in dir.listSync()) {
-          try {
-            entity.deleteSync(recursive: true);
-          } catch (_) {}
-        }
-      }
-    } catch (_) {}
-    state.updateNotifier.value++;
   }
 
   /// 超出数量或体积上限时，按 LRU 顺序淘汰最久未访问的缓存文件。
@@ -118,6 +98,11 @@ class ThumbnailMaintenance {
     ThumbnailCacheState state,
     Set<String> activeIds,
   ) async {
+    if (activeIds.isEmpty) {
+      state.generation++;
+      state.inFlight.clear();
+      state.failedUrls.clear();
+    }
     final validNames = activeIds
         .where((id) => id.trim().isNotEmpty)
         .map(state.generateFileName)

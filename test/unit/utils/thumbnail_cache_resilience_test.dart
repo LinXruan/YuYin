@@ -98,7 +98,7 @@ void main() {
     expect(recovered!.existsSync(), isTrue);
   });
 
-  test('3. clearCache 世代取消：清理前发起的在途下载完成后不得回写缓存', () async {
+  test('3. 全量孤儿回收世代取消：清空历史前发起的在途下载完成后不得回写缓存', () async {
     final started = Completer<void>();
     final gate = Completer<void>();
     final dio = Dio();
@@ -119,7 +119,7 @@ void main() {
     await started.future;
 
     final genBefore = HistoryThumbnailCache.generationForTesting;
-    await HistoryThumbnailCache.clearCache();
+    await HistoryThumbnailCache.pruneOrphans(const {});
     expect(HistoryThumbnailCache.generationForTesting, genBefore + 1);
 
     gate.complete();

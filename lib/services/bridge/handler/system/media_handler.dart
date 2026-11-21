@@ -31,16 +31,6 @@ class MediaHandler {
     });
   }
 
-  /// POST /api/thumbnails/clear：清空本地缩略图缓存
-  Future<void> handleClearThumbnails(HttpRequest request) async {
-    await HistoryThumbnailCache.clearCache();
-    server.logs.add('本地缩略图离线缓存已完全清空');
-    server.sendJson(request, HttpStatus.ok, {
-      'status': 'ok',
-      'message': '缩略图缓存已清空',
-    });
-  }
-
   /// POST /api/thumbnails/preload：对所有未缓存缩略图的历史记录执行后台离线缓存
   Future<void> handlePreloadThumbnails(HttpRequest request) async {
     final records = server.stores.history.records;

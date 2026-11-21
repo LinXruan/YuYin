@@ -384,16 +384,6 @@ switch ($Action.ToLower()) {
 
 
 
-    "clear-thumbnails" {
-
-        $resp = Invoke-RestMethod -Uri "$baseUrl/api/thumbnails/clear" -Method Post
-
-        Write-Host "[AgentBridge] [成功] 本地缩略图离线缓存已完全清空"
-
-    }
-
-
-
     "preload-thumbnails" {
 
         $resp = Invoke-RestMethod -Uri "$baseUrl/api/thumbnails/preload" -Method Post
@@ -624,7 +614,7 @@ switch ($Action.ToLower()) {
 
         Write-Host "未知指令: $Action"
 
-        Write-Host "支持的指令: setup, status, display, quality [on|off], mock-login [on|off], parse, parse-profile, download, logs, clear-logs, history [query], clear-history, thumbnails, clear-thumbnails, preload-thumbnails, verify-covers, verify-titles, verify-profile, selection-load, save-state, quality-options, selection-verify, select-author, select-work, select-cell, select-bottom-category, select-middle-category, select-filter, select-quality, select-tier, selection-ingest, cancel, eval"
+        Write-Host "支持的指令: setup, status, display, quality [on|off], mock-login [on|off], parse, parse-profile, download, logs, clear-logs, history [query], clear-history, thumbnails, preload-thumbnails, verify-covers, verify-titles, verify-profile, selection-load, save-state, quality-options, selection-verify, select-author, select-work, select-cell, select-bottom-category, select-middle-category, select-filter, select-quality, select-tier, selection-ingest, cancel, eval"
 
     }
 

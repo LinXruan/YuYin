@@ -9,13 +9,12 @@ import '../../utils/app_stores.dart';
 import '../../utils/debug/log_controller.dart';
 import '../../utils/network_detector.dart';
 import '../../utils/settings/theme_store.dart';
-import '../../utils/thumbnail/history_thumbnail_cache.dart';
 import '../../widgets/update/dialog/update_dialog.dart';
 import '../about_page.dart';
 import '../debug_page.dart';
 import 'download_settings_page.dart';
 
-/// 设置页：提供“外观设置”、“下载设置”、“缩略图缓存”、“检查更新”、“调试”和“关于”
+/// 设置页：提供“外观设置”、“下载与更新”、“检查更新”、“调试”和“关于”
 class SettingsPage extends StatefulWidget {
   const SettingsPage({
     super.key,
@@ -30,16 +29,6 @@ class SettingsPage extends StatefulWidget {
   final AppStores? stores;
   final UpdateChecker? updateChecker;
 
-  /// 将字节数格式化为易读体积文本
-  static String formatCacheSize(int bytes) {
-    if (bytes <= 0) return '0 B';
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) {
-      return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    }
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
-  }
-
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
@@ -49,9 +38,6 @@ class _SettingsPageState extends State<SettingsPage>
   late final AppStores _stores = widget.stores ?? AppStores();
   late final UpdateChecker _checker;
   bool _isChecking = false;
-  bool _isClearingCache = false;
-  int _cachedCount = 0;
-  int _cachedBytes = 0;
 
   @override
   bool get wantKeepAlive => true;
@@ -60,72 +46,14 @@ class _SettingsPageState extends State<SettingsPage>
   void initState() {
     super.initState();
     _checker = widget.updateChecker ?? UpdateChecker();
-    HistoryThumbnailCache.cacheUpdateNotifier.addListener(_onCacheUpdated);
-    unawaited(_refreshThumbnailStats());
   }
 
   @override
   void dispose() {
-    HistoryThumbnailCache.cacheUpdateNotifier.removeListener(_onCacheUpdated);
     if (widget.updateChecker == null) {
       _checker.dispose();
     }
     super.dispose();
-  }
-
-  void _onCacheUpdated() {
-    if (!mounted) return;
-    unawaited(_refreshThumbnailStats());
-  }
-
-  Future<void> _refreshThumbnailStats() async {
-    final stats = await HistoryThumbnailCache.getStats();
-    if (!mounted) return;
-    final count = (stats['cachedFilesCount'] as int?) ?? 0;
-    final bytes = (stats['totalBytes'] as int?) ?? 0;
-    if (count == _cachedCount && bytes == _cachedBytes) return;
-    setState(() {
-      _cachedCount = count;
-      _cachedBytes = bytes;
-    });
-  }
-
-  Future<void> _onTapThumbnailCache() async {
-    await _refreshThumbnailStats();
-    if (!mounted || _isClearingCache) return;
-    if (_cachedCount == 0) {
-      _showSnack('暂无需要清理的缩略图缓存');
-      return;
-    }
-
-    final sizeText = SettingsPage.formatCacheSize(_cachedBytes);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('清理缩略图缓存'),
-        content: Text(
-          '将删除本地已缓存的 $_cachedCount 张作品封面（约 $sizeText），不影响已保存的本地媒体文件。',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('清理'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    setState(() => _isClearingCache = true);
-    await HistoryThumbnailCache.clearCache();
-    await _refreshThumbnailStats();
-    if (!mounted) return;
-    setState(() => _isClearingCache = false);
-    _showSnack('已清理缩略图缓存');
   }
 
   void _showSnack(String message) {
@@ -207,12 +135,6 @@ class _SettingsPageState extends State<SettingsPage>
     }
   }
 
-  String _cacheSubtitle() {
-    if (_isClearingCache) return '正在清理缩略图缓存...';
-    if (_cachedCount == 0) return '暂无缓存封面';
-    return '已缓存 $_cachedCount 张封面（${SettingsPage.formatCacheSize(_cachedBytes)}）';
-  }
-
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -245,20 +167,6 @@ class _SettingsPageState extends State<SettingsPage>
               ),
             ),
           ),
-        ),
-        const Divider(height: 1),
-        ListTile(
-          leading: const Icon(Icons.photo_library_outlined),
-          title: const Text('缩略图缓存'),
-          subtitle: Text(_cacheSubtitle()),
-          trailing: _isClearingCache
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.cleaning_services_outlined),
-          onTap: _onTapThumbnailCache,
         ),
         const Divider(height: 1),
         ListTile(

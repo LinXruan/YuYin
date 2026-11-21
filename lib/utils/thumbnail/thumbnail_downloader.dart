@@ -87,7 +87,7 @@ class ThumbnailDownloader {
         ),
       );
 
-      // 下载期间若执行了 clearCache()，立刻丢弃结果，防止旧任务回写已清空目录
+      // 下载期间若历史已被全量回收或测试重置（世代变更），立刻丢弃结果防止回写
       if (startGeneration != state.generation) {
         await _safeDelete(tempFile);
         return null;

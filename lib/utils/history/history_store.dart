@@ -193,7 +193,7 @@ class HistoryStore {
     _records.clear();
     recordsNotifier.value = [];
     await _save();
-    unawaited(HistoryThumbnailCache.clearCache());
+    unawaited(HistoryThumbnailCache.pruneOrphans(const {}));
   }
 
   /// 纯内存极速分词搜索：委托给 HistoryQuery 纯函数。
