@@ -1,28 +1,15 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/common/work_type.dart';
-import '../../models/save_page/selection/aggregate_state.dart';
 import '../../models/save_page/selection/quality_indicator.dart';
 import '../../models/save_page/work_kind.dart';
-import '../../services/selection/debug/selection_snapshot.dart';
 import '../../services/selection/save_selection_session.dart';
-import '../../utils/debug/save_page_debug_store.dart';
 import 'filter/filter_controls.dart';
 import 'filter/filter_strip.dart';
-import 'save_page_common.dart';
-
-part 'top/flow/top_author_selection_flow.dart';
-
-part 'top/flow/top_sheet_action_flow.dart';
-
-part 'top/debug/top_debug_snapshot.dart';
-
-part 'top/widget/top_author_tile.dart';
-
-part 'top/widget/top_avatar.dart';
+import 'top/debug/top_debug_snapshot_helper.dart';
+import 'top/widget/top_author_tile.dart';
 
 /// 进入中层（作者作品列表）的回调
 typedef OnOpenAuthorCallback = FutureOr<void> Function(String secUid, int index);
@@ -71,8 +58,53 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
   /// 正在打开中层的作者索引（仅局部加载态）
   int? _openingIndex;
 
-  /// 供流程分片调用的状态刷新入口
-  void _refresh(VoidCallback fn) => setState(fn);
+  void _publishDebugState() {
+    TopDebugSnapshotHelper.publish(widget.session);
+  }
+
+  void _toggleAuthor(int index) {
+    final secUid = widget.session.authors[index].secUid;
+    widget.session.toggleAuthor(secUid);
+    _publishDebugState();
+  }
+
+  void _toggleSelectAll() {
+    widget.session.toggleAll();
+    _publishDebugState();
+  }
+
+  void _toggleResource(MediaType type) {
+    widget.session.toggleTerminalResource(type);
+    _publishDebugState();
+  }
+
+  void _toggleKind(WorkMediaKind kind) {
+    widget.session.toggleTerminalKind(kind);
+    _publishDebugState();
+  }
+
+  void _toggleQuality() {
+    widget.session.toggleTerminalQuality();
+    _publishDebugState();
+  }
+
+  Future<void> _handleOpenAuthor(int index) async {
+    final callback = widget.onOpenAuthor;
+    if (callback == null || _openingIndex != null) return;
+    setState(() => _openingIndex = index);
+    try {
+      final secUid = widget.session.authors[index].secUid;
+      await callback(secUid, index);
+    } finally {
+      if (mounted) setState(() => _openingIndex = null);
+      _publishDebugState();
+    }
+  }
+
+  void _confirm() {
+    _publishDebugState();
+    Navigator.pop(context, true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -138,12 +170,21 @@ class _MultiHomePreviewSheetState extends State<MultiHomePreviewSheet> {
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
-                        ),
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                    ),
                     itemCount: widget.session.authors.length,
-                    itemBuilder: (context, index) => _buildAuthorTile(index),
+                    itemBuilder: (context, index) {
+                      return TopAuthorTile(
+                        session: widget.session,
+                        index: index,
+                        headers: widget.headers,
+                        isOpening: _openingIndex == index,
+                        onTap: () => _toggleAuthor(index),
+                        onOpenAuthor: () => _handleOpenAuthor(index),
+                      );
+                    },
                   ),
                 ),
                 Padding(

@@ -1,9 +1,32 @@
-part of '../../top_multi_home_sheet.dart';
+import 'package:flutter/material.dart';
 
-/// 顶层作者格子：边框完全由派生状态决定
-extension _TopAuthorTile on _MultiHomePreviewSheetState {
-  Widget _buildAuthorTile(int index) {
-    final author = widget.session.authors[index];
+import '../../../../models/save_page/selection/aggregate_state.dart';
+import '../../../../services/selection/save_selection_session.dart';
+import '../../save_page_common.dart';
+import 'top_avatar.dart';
+
+/// 顶层作者网格卡片组件：边框完全由派生状态驱动，集成打开作者徽标与局部加载遮罩
+class TopAuthorTile extends StatelessWidget {
+  const TopAuthorTile({
+    super.key,
+    required this.session,
+    required this.index,
+    required this.headers,
+    required this.isOpening,
+    required this.onTap,
+    required this.onOpenAuthor,
+  });
+
+  final SaveSelectionSession session;
+  final int index;
+  final Map<String, String> headers;
+  final bool isOpening;
+  final VoidCallback onTap;
+  final VoidCallback onOpenAuthor;
+
+  @override
+  Widget build(BuildContext context) {
+    final author = session.authors[index];
     final state = author.selection;
     final isAll = state.isAll;
     final isPartial = state == AggregateState.notAll;
@@ -13,9 +36,9 @@ extension _TopAuthorTile on _MultiHomePreviewSheetState {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          _AuthorAvatarContent(
+          AuthorAvatarContent(
             avatarUrl: author.profile.avatarUrl,
-            headers: widget.headers,
+            headers: headers,
           ),
           if (author.profile.nickname.isNotEmpty)
             Positioned(
@@ -52,10 +75,10 @@ extension _TopAuthorTile on _MultiHomePreviewSheetState {
             child: SaveOpenBadge(
               key: ValueKey('open_author_button_$index'),
               semanticLabel: '打开作者作品列表',
-              onTap: () => _handleOpenAuthor(index),
+              onTap: onOpenAuthor,
             ),
           ),
-          if (_openingIndex == index)
+          if (isOpening)
             Positioned.fill(
               child: Container(
                 color: Colors.black.withValues(alpha: 0.35),
@@ -78,7 +101,7 @@ extension _TopAuthorTile on _MultiHomePreviewSheetState {
     final tile = GestureDetector(
       key: ValueKey('author_tile_$index'),
       behavior: HitTestBehavior.opaque,
-      onTap: () => _toggleAuthor(index),
+      onTap: onTap,
       child: SaveSelectionFrame(
         selected: isAll,
         partial: isPartial,

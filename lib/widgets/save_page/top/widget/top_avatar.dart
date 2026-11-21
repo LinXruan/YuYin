@@ -1,7 +1,12 @@
-part of '../../top_multi_home_sheet.dart';
+import 'package:flutter/material.dart';
 
-class _AuthorAvatarContent extends StatelessWidget {
-  const _AuthorAvatarContent({required this.avatarUrl, required this.headers});
+/// 作者头像内容组件（网络加载、占位与容错兜底）
+class AuthorAvatarContent extends StatelessWidget {
+  const AuthorAvatarContent({
+    super.key,
+    required this.avatarUrl,
+    required this.headers,
+  });
 
   final String avatarUrl;
   final Map<String, String> headers;
