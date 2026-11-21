@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -16,6 +17,20 @@ class LoginStateStore {
   static const String _flagFileName = 'login_state.flag';
   static const String _profileFileName = 'login_profile.json';
   static const String _hidePromptFileName = 'hide_login_prompt.flag';
+  static bool _loginPromptDismissed = false;
+
+  /// 同步读取内存缓存：避免冷启动时横幅首帧闪现
+  static bool get loginPromptDismissed => _loginPromptDismissed;
+
+  @visibleForTesting
+  static void resetForTesting({bool promptDismissed = false}) {
+    _loginPromptDismissed = promptDismissed;
+  }
+
+  /// 启动预加载提示横幅状态
+  static Future<void> init() async {
+    _loginPromptDismissed = await isLoginPromptDismissed();
+  }
 
   /// 是否处于登录状态
   static Future<bool> isLoggedIn() async {
@@ -102,7 +117,9 @@ class LoginStateStore {
   static Future<bool> isLoginPromptDismissed() async {
     try {
       final file = await _hidePromptFile();
-      return await file.exists();
+      final exists = await file.exists();
+      _loginPromptDismissed = exists;
+      return exists;
     } catch (_) {
       return false;
     }
@@ -110,6 +127,7 @@ class LoginStateStore {
 
   /// 设置是否永久隐藏登录提示浮窗（“不再显示”）
   static Future<void> setLoginPromptDismissed(bool dismissed) async {
+    _loginPromptDismissed = dismissed;
     try {
       final file = await _hidePromptFile();
       if (dismissed) {

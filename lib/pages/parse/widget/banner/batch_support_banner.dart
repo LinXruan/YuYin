@@ -13,16 +13,18 @@ class BatchSupportBanner extends StatefulWidget {
 
 class _BatchSupportBannerState extends State<BatchSupportBanner> {
   bool _sessionDismissed = false;
-  bool _permanentlyDismissed = false;
+  late bool _permanentlyDismissed = ParseHintStore.batchHintDismissed;
 
   @override
   void initState() {
     super.initState();
-    ParseHintStore.isBatchHintDismissed().then((dismissed) {
-      if (mounted && dismissed) {
-        setState(() => _permanentlyDismissed = true);
-      }
-    });
+    if (!_permanentlyDismissed) {
+      ParseHintStore.isBatchHintDismissed().then((dismissed) {
+        if (mounted && dismissed) {
+          setState(() => _permanentlyDismissed = true);
+        }
+      });
+    }
   }
 
   @override

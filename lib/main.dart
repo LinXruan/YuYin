@@ -4,21 +4,25 @@ import 'package:flutter/material.dart';
 
 import 'pages/shell/page/app_shell.dart';
 import 'utils/update/app_update_store.dart';
+import 'utils/login_state_store.dart';
 import 'utils/settings/download_settings_store.dart';
 import 'utils/history/history_store.dart';
 import 'utils/savelocation/save_location_store.dart';
 import 'utils/memory/terminal_memory_store.dart';
+import 'utils/settings/parse_hint_store.dart';
 import 'utils/settings/theme_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // 5 个 Store 互不依赖，并行读取缩短冷启动
+  // Store 互不依赖，并行预加载缩短冷启动并防止首帧闪烁
   await Future.wait([
     ThemeStore.init(),
     SaveLocationStore.init(),
     TerminalMemoryStore.init(),
     DownloadSettingsStore.init(),
     HistoryStore.init(),
+    ParseHintStore.init(),
+    LoginStateStore.init(),
   ]);
   unawaited(AppUpdateStore.cleanOldApks());
   runApp(const YuYinApp());

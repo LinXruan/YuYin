@@ -67,6 +67,7 @@ class MiddleMultiWorkSheet extends StatefulWidget {
 
 class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
   int? _openingIndex;
+  String? _openErrorMessage;
 
   List<WorkSelectionView> get _rows => widget.session.rowsOf(widget.secUid);
 
@@ -97,9 +98,18 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
   Future<void> _handleOpenWork(int index) async {
     final callback = widget.onOpenWork;
     if (callback == null || _openingIndex != null) return;
-    setState(() => _openingIndex = index);
+    setState(() {
+      _openingIndex = index;
+      _openErrorMessage = null;
+    });
     try {
       await callback(_rows[index].url, index);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _openErrorMessage = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
     } finally {
       if (mounted) setState(() => _openingIndex = null);
       _publishDebugState();
@@ -178,6 +188,52 @@ class _MiddleMultiWorkSheetState extends State<MiddleMultiWorkSheet> {
                     ],
                   ),
                 ),
+                if (_openErrorMessage != null)
+                  Container(
+                    key: const ValueKey('middle_open_error_banner'),
+                    margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.error_outline_rounded,
+                          size: 18,
+                          color: theme.colorScheme.onErrorContainer,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _openErrorMessage!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onErrorContainer,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.close_rounded,
+                            size: 16,
+                            color: theme.colorScheme.onErrorContainer,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () {
+                            setState(() => _openErrorMessage = null);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
                 Expanded(
                   child: GridView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 12),

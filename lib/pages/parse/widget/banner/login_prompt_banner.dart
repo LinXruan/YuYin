@@ -16,16 +16,18 @@ class LoginPromptBanner extends StatefulWidget {
 
 class _LoginPromptBannerState extends State<LoginPromptBanner> {
   bool _sessionDismissed = false;
-  bool _permanentlyDismissed = false;
+  late bool _permanentlyDismissed = LoginStateStore.loginPromptDismissed;
 
   @override
   void initState() {
     super.initState();
-    LoginStateStore.isLoginPromptDismissed().then((dismissed) {
-      if (mounted && dismissed) {
-        setState(() => _permanentlyDismissed = true);
-      }
-    });
+    if (!_permanentlyDismissed) {
+      LoginStateStore.isLoginPromptDismissed().then((dismissed) {
+        if (mounted && dismissed) {
+          setState(() => _permanentlyDismissed = true);
+        }
+      });
+    }
   }
 
   @override

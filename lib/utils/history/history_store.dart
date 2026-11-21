@@ -20,6 +20,10 @@ class HistoryStore {
 
   /// 内存中常驻的历史记录列表（按最新解析时间降序排列）
   static final List<HistoryItem> _records = [];
+  static bool _promptDismissed = false;
+
+  /// 同步读取历史提示横幅永久隐藏标记（避免冷启动首帧闪现）
+  static bool get promptDismissed => _promptDismissed;
 
   /// 供 UI 响应式监听的 Notifier
   static final ValueNotifier<List<HistoryItem>> recordsNotifier =
@@ -33,14 +37,19 @@ class HistoryStore {
   static bool skipSaveForTesting = false;
 
   @visibleForTesting
-  static void resetForTesting({bool skipSave = false}) {
+  static void resetForTesting({
+    bool skipSave = false,
+    bool promptDismissed = false,
+  }) {
     _records.clear();
     recordsNotifier.value = [];
     skipSaveForTesting = skipSave;
+    _promptDismissed = promptDismissed;
   }
 
   /// 启动时从本地文件恢复历史记录（主文件损坏时回退 .bak）
   static Future<void> init() async {
+    _promptDismissed = await isPromptDismissed();
     try {
       final file = await _getFile();
       final content = await AtomicFileWriter.readString(
@@ -284,7 +293,9 @@ class HistoryStore {
   static Future<bool> isPromptDismissed() async {
     try {
       final file = await _getHidePromptFile();
-      return await file.exists();
+      final exists = await file.exists();
+      _promptDismissed = exists;
+      return exists;
     } catch (_) {
       return false;
     }
@@ -292,6 +303,7 @@ class HistoryStore {
 
   /// 设置是否永久隐藏历史提示卡片（“不再显示”）
   static Future<void> setPromptDismissed(bool dismissed) async {
+    _promptDismissed = dismissed;
     try {
       final file = await _getHidePromptFile();
       if (dismissed) {

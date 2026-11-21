@@ -25,7 +25,7 @@ class _HistoryPageState extends State<HistoryPage>
   late final HistorySearchCoordinator _search;
 
   bool _sessionDismissed = false;
-  bool _permanentlyDismissed = false;
+  late bool _permanentlyDismissed = HistoryStore.promptDismissed;
 
   @override
   bool get wantKeepAlive => true;
@@ -62,11 +62,13 @@ class _HistoryPageState extends State<HistoryPage>
     );
     HistoryThumbnailCache.warmUp();
     HistoryStore.recordsNotifier.addListener(_onRecordsChanged);
-    HistoryStore.isPromptDismissed().then((dismissed) {
-      if (mounted && dismissed) {
-        setState(() => _permanentlyDismissed = true);
-      }
-    });
+    if (!_permanentlyDismissed) {
+      HistoryStore.isPromptDismissed().then((dismissed) {
+        if (mounted && dismissed) {
+          setState(() => _permanentlyDismissed = true);
+        }
+      });
+    }
   }
 
   @override

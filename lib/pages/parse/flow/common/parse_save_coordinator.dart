@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../models/save_page/selection/author_selection_view.dart';
 import '../../../../models/save_page/selection/selected_work.dart';
+import '../../../../models/save_page/work_open_exception.dart';
 import '../../../../models/single_work/media_download_item.dart';
 import '../../../../services/multi_work/article_work_exception.dart';
 import '../../../../services/selection/save_selection_session.dart';
@@ -50,21 +51,24 @@ class ParseSaveCoordinator {
         if (!context.mounted) return;
         session.ingest(workUrl, parsed);
       } on ArticleWorkException catch (e) {
-        if (context.mounted) logs.add('已过滤文章作品：${e.message}');
-        return;
+        final msg = '已过滤文章作品：${e.message}';
+        if (context.mounted) logs.add(msg);
+        throw WorkOpenException(msg);
       } catch (e) {
+        final msg = '作品解析失败：${ParseFlowHelper.friendlyError(e)}';
         if (context.mounted) {
-          logs.add('作品解析失败：${ParseFlowHelper.friendlyError(e)}');
+          logs.add(msg);
         }
-        return;
+        throw WorkOpenException(msg);
       }
     }
     if (!context.mounted) return;
 
     final parsed = session.workOf(workUrl)?.work.parsedResult;
     if (parsed == null || parsed.items.isEmpty) {
-      logs.add('该作品未捕获到可下载资源');
-      return;
+      const msg = '该作品未捕获到可下载资源';
+      logs.add(msg);
+      throw const WorkOpenException(msg);
     }
     if (row.behavesAsVideo) {
       presentWorkTier(context, session, workUrl);
