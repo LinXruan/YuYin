@@ -1,11 +1,36 @@
-part of '../../middle_multi_work_sheet.dart';
+import 'package:flutter/material.dart';
 
-/// 中层作品格子
-extension _MiddleWorkTile on _MiddleMultiWorkSheetState {
-  Widget _buildWorkTile(int index) {
-    final row = _rows[index];
+import '../../../../models/save_page/selection/selection_state.dart';
+import '../../../../models/save_page/selection/work_selection_view.dart';
+import '../../../../services/selection/save_selection_session.dart';
+import '../../save_page_common.dart';
+import 'middle_cover.dart';
+
+/// 中层作品网格卡片组件：边框完全由派生状态驱动，集成打开作品详情徽标与局部加载遮罩
+class MiddleWorkTile extends StatelessWidget {
+  const MiddleWorkTile({
+    super.key,
+    required this.session,
+    required this.row,
+    required this.index,
+    required this.headers,
+    required this.isOpening,
+    required this.onTap,
+    required this.onOpenWork,
+  });
+
+  final SaveSelectionSession session;
+  final WorkSelectionView row;
+  final int index;
+  final Map<String, String> headers;
+  final bool isOpening;
+  final VoidCallback onTap;
+  final VoidCallback onOpenWork;
+
+  @override
+  Widget build(BuildContext context) {
     final work = row.work;
-    final state = widget.session.workState(work.url);
+    final state = session.workState(work.url);
     final isAll = state.isAll;
     final isPartial = state == SelectionState.partial;
 
@@ -14,7 +39,7 @@ extension _MiddleWorkTile on _MiddleMultiWorkSheetState {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          _WorkCoverContent(coverUrl: work.coverUrl, headers: widget.headers),
+          WorkCoverContent(coverUrl: work.coverUrl, headers: headers),
           Positioned(
             top: 4,
             left: 4,
@@ -40,10 +65,10 @@ extension _MiddleWorkTile on _MiddleMultiWorkSheetState {
             child: SaveOpenBadge(
               key: ValueKey('open_work_button_$index'),
               semanticLabel: '打开作品 ${index + 1}',
-              onTap: () => _handleOpenWork(index),
+              onTap: onOpenWork,
             ),
           ),
-          if (_openingIndex == index)
+          if (isOpening)
             Positioned.fill(
               child: Container(
                 color: Colors.black.withValues(alpha: 0.35),
@@ -66,7 +91,7 @@ extension _MiddleWorkTile on _MiddleMultiWorkSheetState {
     final tile = GestureDetector(
       key: ValueKey('work_tile_$index'),
       behavior: HitTestBehavior.opaque,
-      onTap: () => _toggleWork(index),
+      onTap: onTap,
       child: SaveSelectionFrame(
         selected: isAll,
         partial: isPartial,

@@ -1,7 +1,12 @@
-part of '../../middle_multi_work_sheet.dart';
+import 'package:flutter/material.dart';
 
-class _WorkCoverContent extends StatelessWidget {
-  const _WorkCoverContent({required this.coverUrl, required this.headers});
+/// 作品封面内容组件（网络加载、占位与容错兜底）
+class WorkCoverContent extends StatelessWidget {
+  const WorkCoverContent({
+    super.key,
+    required this.coverUrl,
+    required this.headers,
+  });
 
   final String coverUrl;
   final Map<String, String> headers;
