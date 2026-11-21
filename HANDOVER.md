@@ -1,13 +1,13 @@
-# 余音交接清单（截至 1.6.1+236）
+# 余音交接清单（截至 1.6.1+237）
 
 > 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_81~90/PLAN_88.md`。
-> 工作区干净，最近提交为 236_pl88。
+> 工作区干净，最近提交为 237_pl88。
 
 ---
 
 ## 0. 一句话现状
 
-- 版本：`1.6.1+236`（版本名冻结，只递增 build 号）。
+- 版本：`1.6.1+237`（版本名冻结，只递增 build 号）。
 - 门禁：`flutter analyze` 0 issues；`flutter test` 407 全绿；**结构门禁 `part` 上限为 0（全库已彻底实现 0 part）**！
 - 已完成大重构：
   - **全库 0 part**（调试桥、Selection、Shell、Sniffer、ParsePage、HistoryPage、UpdateDialog、SavePage 全部 0 part）。

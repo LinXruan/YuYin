@@ -1,138 +1,46 @@
 # 项目开发守则（余音 / Flutter Android）
 
-## 0. Agent 守则
+## 0. PLAN 迭代铁律（强制执行）
 
-- 项目用 `PLAN/` 管理迭代；先写计划再改代码，计划放在对应的 `PLAN/PLAN_xx~yy/` 目录。
-- 遇到阻塞性问题或难以判断的问题，停下来向用户汇报，不要猜。
-- 调试、模拟器、接口调用与自动化测试前，先读根目录 [DEBUG.md](DEBUG.md)。
+- **先计划后编码**：所有改动必须严格由 `PLAN/PLAN_xx~yy/PLAN_xx.md` 驱动；先写明确计划经对齐后再落地代码。
+- **阶段性推进与门禁**：每个阶段按 `开发改动 -> flutter analyze (0 issues) -> flutter test (100%全绿) -> 设备验证 -> commit` 推进。
+- **提交信息规范**：统一格式 `<build>_pl<编号>：<一句话变更>`。
+- **遇阻即停**：遇到阻塞性问题、时序回归或难以确定的业务意图，立即停下向用户汇报，严禁盲目猜测或私自写兜底回退代码。
 
-## 1. 项目概况
+## 1. 项目概况与常用命令
 
-- **应用**：余音（YuYin），Android 端抖音无水印视频 / 图集 / 实况图下载工具。
-- **包名**：debug 版 `com.debug.yuyin`，release 版 `com.release.yuyin`；版本号以 `pubspec.yaml` 与 `lib/app_info.dart` 为准，两处必须同步。
-- **技术栈**：Flutter（Material 3），仅 Android；依赖 `webview_flutter`、`dio`、`path_provider`、`gal`，不引入第三方状态管理。
-- **主要能力**：链接/口令解析、登录、画质与图集选择、下载、历史记录与搜索、主页批量抓取、四层保存页（Terminal → Author → Work → Resource）、批量保存。
-- **源码**：约 2 万行，按 `models / services / pages / widgets / utils` 分层，详细结构见 §4。
+- **定位**：Android 端抖音无水印视频 / 图集 / 实况图解析与下载工具。
+- **版本规范**：当前版本以 `pubspec.yaml` 与 `lib/app_info.dart` 为准（修改版本时两处必须严格同步）。
+- **常用命令**：
+  - 代码分析：`flutter analyze`（修改 Dart 后必跑，必须 0 issues）
+  - 测试套件：`flutter test`（改动后必须 100% 全绿）
+  - 启动模拟器（带桌面窗口）：`D:\Install\anaconda3\envs\deepseek\python.exe tool\launch_emulator.py`
+  - 调试与自动化接口：统一查阅根目录 [DEBUG.md](DEBUG.md)。
 
-## 2. 常用命令
+## 2. 代码防腐与架构规范（禁止制造史山）
 
-- `flutter pub get`
-- `flutter analyze`（改 Dart 后必跑）
-- `flutter test`
-- 启动模拟器（带桌面窗口）：`D:\Install\anaconda3\envs\deepseek\python.exe tool\launch_emulator.py`
-- 构建 debug：`.\tool\build_debug_apk.bat`
-- 构建 release：`.\tool\build_release_apk.bat [all|v8a|universal]`
-- 安装到真机：`.\tool\install_debug_apk.bat` / `.\tool\install_release_apk.bat`（优先 USB，未连接时自动无线重连）
-- 无线 ADB：`.\tool\wifi_adb.bat [--list] [--serial ip:port]`
-- 清理构建产物：`.\tool\clean_project.bat [quick|full]`
-- 重新生成图标：`D:\Install\anaconda3\envs\deepseek\python.exe tool\generate_app_icon.py`
+> 过去的糟糕实践导致了大量代码膨胀与架构腐化。后续开发必须严格恪守以下代码军规：
 
-## 3. 环境要点
+### 2.1 严禁 `part` 伪拆分（全库 0 part 门禁）
+- 全库已达成 **0 part** 终极门禁（结构门禁上限永久锁定为 0）。
+- **严禁**使用 `part` / `part of` 将文件机械切片假装模块化。
+- 每一个拆分出的文件必须是**完全独立的编译单元**，具备独立精确的 `import` 引用，通过显式构造函数或契约传递依赖。
 
-- **JDK 17**：Flutter 固定使用 JDK 17；Java 版本异常先看 `flutter doctor -v`。
-- **Release 签名**：`android/key.properties` + `android/app/yuyin-release.jks`，均已 gitignore，禁止提交或写入文档。
-- **Python**：工具脚本统一用 conda `deepseek` 环境完整路径，禁止 `python3`。
-- **内存**：物理内存 16GB，Gradle `-Xmx8G`；全量 release 构建时不要同时跑模拟器。
-- **设备**：不得卸载用户已安装的旧版或清除应用数据，统一 `install -r` 覆盖安装。
+### 2.2 单一真相与强类型模型（拒绝字符串反推）
+- **单一真相（Single Source of Truth）**：一个状态只存一份。禁止为同一种业务状态维护多个并行的布尔标志位。
+- **强类型状态驱动**：业务与 UI 状态必须由强类型领域模型（如 `ParseStatus`）驱动；**严禁**依靠分析日志流、字符串匹配（如 `logs.contains(...)`）来反推页面进行状态。
+- **纯函数派生**：展示态、计数、可用性等表现逻辑一律写成纯函数计算，便于无副作用单测。
 
-## 4. 项目结构与关键约束
+### 2.3 彻底删除优先，零兼容壳
+- 重构代码时必须**彻底物理删除**被废弃的旧文件、旧方法与旧分支，不留双份实现。
+- **禁止编写兼容壳**：禁止使用聚合 `export` 转发壳（如已删除的旧 `media_item.dart`、`url_parser.dart`）、禁止保留 `_legacy`、`_v2`、`_old` 或无意义的抽象包装层。所有调用方直连具体领域类，精确按需导入。
 
-统一路径：`lib/<分层>/<领域>/<子领域>/<角色>/<文件>.dart`，最深 5 段（不含 `lib`）。
+### 2.4 单一职责与物理规模硬门禁
+- **单文件硬上限 400 行**：任何文件超过 400 行直接判定为架构违规，必须拆分；业务逻辑类建议 ≤250 行，纯 UI 类建议 ≤200 行；单类 ≤250 行，单方法 ≤50 行。
+- **单一职责（SRP）**：一个类只做一件事。禁止 God Object，禁止建立 `misc`、`utils2` 等无边界垃圾桶目录。
+- **分层清晰**：严格按 `models / services / pages / widgets / utils` 领域分层；页面只负责渲染与事件转发，业务状态与提取逻辑严格下沉到领域层。
 
-- `models/`：按业务域拆分的不可变模型（`single_work`、`user_home`、`save_page`、`history` 等）。
-- `services/`：抓取与执行域，各自带契约与实现（`sniffer`、`share`、`multi_work`、`user_home`、`selection`、`download`、`bridge`、`history`、`update`）。
-- `pages/`：页面骨架 + 流程扩展（`parse`、`history`、`shell`、`settings`）。
-- `widgets/`：可复用 UI（`save_page` 四层、`update`、`savelocation`）。
-- `utils/`：无业务状态的工具（`url`、`save`、`memory`、`thumbnail`、`debug` 等）。
-
-关键约束：
-
-- 常驻隐藏 WebView 只允许挂载一个 `WebViewWidget`；解析任务的生命周期、消息接收与取消统一由 sniffer 门面管理。
-- 跨页共享状态用显式 Session/Store 传递，不引入全局单例。
-- Android 图标与启动页使用 PNG（`mipmap-*/ic_launcher_foreground.png`、`drawable-*/launch_logo.png`），不要改回 vector。
-- `tool/*.bat` 保持 CRLF 换行；注释用英文（`rem` 行含中文会破坏 cmd 解析），中文只放在 `echo` 输出里。
-
-## 5. 工程规范（强制）
-
-> 任何 PLAN、任何提交都必须满足；不满足即视为未完成。
-
-### 5.1 文件规模
-
-- 单文件硬上限 **400 行**，超过必须拆分。
-- 目标：逻辑文件 ≤250 行，纯 UI ≤200 行；单类 ≤250 行，单方法 ≤60 行。
-- 新增文件低于 25 行时，先确认是否应并入同角色的相邻文件。
-
-### 5.2 目录分层
-
-- 同一目录 2~8 个文件；少于 2 个不建目录，超过 8 个再分一层。
-- 禁止 `misc`、`utils2` 等垃圾桶目录；目录名小写蛇形，与文件角色一致。
-
-### 5.3 角色后缀
-
-| 后缀 | 职责 | 禁止 |
-| --- | --- | --- |
-| `_page.dart` | 页面骨架 | 业务流程、解析算法 |
-| `_flow.dart` | 流程单元（mixin / extension） | 新建字段、initState |
-| `_handler.dart` | 单端点请求处理 | 其他端点逻辑 |
-| `_parser.dart` | 纯解析 | 网络、UI、全局状态 |
-| `_picker.dart` | 选择策略 | 副作用 |
-| `_model.dart` / `_row.dart` / `_cell.dart` | 数据模型 | 业务流程 |
-| `_session.dart` | 会话态 | UI |
-| `_store.dart` | 持久化 | 业务判断 |
-| `_tile.dart` / `_card.dart` / `_bar.dart` | 原子组件 | 列表编排 |
-| `_snapshot.dart` | 只读调试快照 | 修改状态 |
-
-### 5.4 单一职责与单一真相
-
-- 一个文件只负责一个核心功能。
-- 一个状态只存一份；勾选、进度、错误等表现一律现算派生，禁止第二份标志位。
-- 禁止哨兵值承载第二种语义（空列表=全选、0=全部、null=默认）。
-- 派生逻辑写成纯函数，便于单测。
-
-### 5.5 删除优先
-
-- 重构必须删除被取代的文件、字段、模型与分支，不留双份实现。
-- 禁止兼容壳：`export` 转发、`_legacy`、`_v2`、`_old`、`Deprecated` 一律不写。
-- 删除后全库 `grep` 确认无残留引用。
-
-### 5.6 面向对象与依赖
-
-- 核心业务先定 `I*` 契约，实现类只做一件事。
-- 门面类只负责生命周期与分发，具体逻辑委托给领域对象。
-- 不允许 God Object 与第三方状态管理库。
-
-### 5.7 UI
-
-- 使用直观的官方组件，复杂 UI 拆成独立 Widget。
-- 页面只渲染与转发事件；选中、派生、保存判断下沉到领域层。
-- 既有的长按复制、无障碍语义、异常提示不得回退。
-
-### 5.8 测试与门禁
-
-- 改 Dart 后：`flutter analyze` 0 issues、`flutter test` 全绿。
-- 行为变更同步更新断言，禁止为迁就旧测试保留错误实现。
-- 新逻辑配纯函数单测，界面状态补 Widget 测试；测试文件同样 ≤400 行。
-
-### 5.9 PLAN 规范
-
-每个 PLAN 包含：根因（文件与行号）、目标语义、新增文件清单（路径+行数）、删除清单、执行步骤与验证、验收清单、风险与回退。预期文件必须符合 §4/§5 的分层与后缀约定。
-
-### 5.10 版本与提交
-
-- 改版本号同步 `pubspec.yaml` 与 `lib/app_info.dart`。
-- 提交信息：`<build>_pl<编号>：<一句话变更>`。
-- 不提交签名文件、`*.jks`、构建产物。
-
-## 6. 包名与 Release 构建
-
-| 构建 | applicationId | 签名 |
-| --- | --- | --- |
-| debug | `com.debug.yuyin` | Flutter 默认 debug keystore |
-| release | `com.release.yuyin` | `android/app/yuyin-release.jks` |
-
-- release 包名在 `android/app/build.gradle.kts` 的 `androidComponents.onVariants` 中单独设置；`namespace` 与 `MainActivity` 仍为 `com.debug.yuyin`。
-- debug 与 release 可同时安装、数据独立，桌面出现两个图标属预期。
-
-## 7. 调试
-
-所有调试、接口调用与自动化验收统一查阅 [DEBUG.md](DEBUG.md)：模拟器必须带桌面窗口运行，Agent 启动统一使用 `tool/launch_emulator.py`。
+### 2.5 测试防腐与环境隔离
+- 所有新增与变更逻辑必须配备对应的纯内存单元测试或 Widget 测试。
+- 涉及网络监听或服务测试，一律使用动态分配绑定（如 `port: 0`），严禁硬编码静态本地端口，防止并发测试端口冲突。
+- 保证测试执行速度与自包含性，禁止在测试中遗留未释放的 Socket 或全局脏状态。
