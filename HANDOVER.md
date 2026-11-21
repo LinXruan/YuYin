@@ -1,14 +1,14 @@
-# 余音交接清单（截至 1.6.1+249）
+# 余音交接清单（截至 1.6.2+252）
 
-> 新对话窗口先读本文件，再读 `GEMINI.md`、`DEBUG.md` 与 `PLAN/PLAN_91~100/PLAN_92.md`。
-> 最近提交为 `57d717b`（`AGENTS.md` 更名为 `GEMINI.md`），最新代码版本提交为 `0d90643`（`249_pl92`）。
+> 新对话窗口先读本文件，再读 `GEMINI.md`、`DEBUG.md` 与 `PLAN/PLAN_91~100/PLAN_93.md`。
+> 最近代码版本提交来自 `PLAN_93`（`250_pl93` / `251_pl93` / `252_pl93`）。
 
 ---
 
 ## 0. 一句话现状
 
-- 版本：`1.6.1+249`（版本名冻结，只递增 build 号）。
-- 门禁：`flutter analyze` 0 issues；`flutter test` 435 全绿；**结构门禁 `part` 上限为 0 且零 `plan_XX` 测试残留**！
+- 版本：`1.6.2+252`（版本名 `1.6.2`，每次提交递增 build 号）。
+- 门禁：`flutter analyze` 0 issues；`flutter test` 436 全绿；**结构门禁 `part` 上限为 0 且零 `plan_XX` 测试残留**！
 - 已完成大重构：
   - **全库 0 part**（调试桥、Selection、Shell、Sniffer、ParsePage、HistoryPage、UpdateDialog、SavePage 全部 0 part）。
   - **全库 0 兼容壳**（彻底删除 `lib/models/media_item.dart` 与 `lib/utils/url_parser.dart` 兼容壳，全域 100% 直连具体领域模型与解析类）。
@@ -17,7 +17,8 @@
   - **历史页多维筛选与一键重新解析**（媒体类型筛选：全部/视频/图文/主页，卡片一键「解析」直达解析页，彻底消除缩略图落盘高频全页重建）。
   - **测试领域重组与门禁收官（PLAN_89）**：38 个历史 `plan_*` 测试全面迁入 `test/unit|widget/<domain>/`，补全核心组件 Widget 测试，门禁禁止新增迭代编号命名。
   - **Wave 3 交互与体验闭环（PLAN_90）**：中层弹窗失败内嵌反馈、冷启动横幅同步预加载零闪现、音频错误态与 200ms 拖动/seek 守卫防抖、全屏多图滑动切换与 `42×42dp` 角标热区。
-  - **缩略图缓存管理闭环与 Sniffer/JS 细节修复（PLAN_91）**：缩略图确定性 64 位 FNV-1a 哈希、失败 URL 指数退避、`clearCache` 世代取消、LRU 上限（600 张/100 MB）与孤儿淘汰、设置页缩略图缓存统计与一键清理入口；`SingleSniffStrategy` 原生 Cookie 读取替换 3 秒 `document.cookie`、iPhone UA 不伪造 `Win32`、`scanTree` 兼容 `image_post_info.images`、API 标题优先于 DOM 文本。
+  - **缩略图与 Sniffer/JS 准确度修复（PLAN_91 / PLAN_93）**：缩略图确定性 64 位 FNV-1a 哈希、失败 URL 指数退避、LRU 上限（600 张/100 MB）与删除/孤儿淘汰；已彻底删除设置页「缩略图缓存」清理入口与 `/api/thumbnails/clear` 清理接口（避免手动清空后联网自动回载的无意义循环）。`SingleSniffStrategy` 原生 Cookie 读取、iPhone UA 不伪造 `Win32`、`scanTree` 兼容 `image_post_info.images`、API 标题优先。
+  - **交互与预览体验完善（PLAN_93）**：`MediaFullscreenPreview` 增加双指触控 `Listener` 物理锁 + `1.0x ~ 4.0x` 双指捏合缩放/平移 + 双击 `1.0x <-> 2.5x` 放缩；历史页移除空集自动退出选择模式逻辑，筛选结果为空时仍可停留在多选态切换分类或手动退出。
 - 后续主要工作：`SessionWorkPreparer` 滑动窗口边解析边下载、Sniffer 启动去冗余 IPC、`StorageBridge` 目录缓存与线程池、选择树单作者增量刷新及 `js_scan_engine` / DOM 回流清理。
 
 ---
@@ -26,15 +27,15 @@
 
 | 规则 | 内容 |
 | --- | --- |
-| 版本名 | 固定 `1.6.1`，**不再改版本名** |
-| build | 每次提交 +1：`1.6.1+212`、`+213`…… |
+| 版本名 | 当前 `1.6.2`（需升版时同步改 `pubspec.yaml` 与 `lib/app_info.dart`） |
+| build | 每次提交 +1：`1.6.2+250`、`+251`…… |
 | 同步 | `pubspec.yaml` 与 `lib/app_info.dart` 必须一致 |
 | 提交信息 | `<build>_pl<编号>：<一句话变更>`，例如 `212_pl82：单作品策略独立` |
 | 禁止提交 | 签名文件、`*.jks`、构建产物 |
 
 ---
 
-## 2. 本轮已完成的 build（192 → 249）
+## 2. 本轮已完成的 build（192 → 252）
 
 | build | PLAN | 内容 |
 | --- | --- | --- |
@@ -93,6 +94,9 @@
 | 247 | 92 | PLAN_92 阶段 1：建立 `AppStores` 容器并完成设置/主题/保存位置/更新/调试 Store 显式注入 |
 | 248 | 92 | PLAN_92 阶段 2：完成历史/记忆/登录/提示 Store 显式注入与真机 WIFI ADB 三链路实测 |
 | 249 | 92 | PLAN_92 阶段 3：补充 `AppStores` 隔离单测并更新交接文档（435 全绿，PLAN_80 架构债清零） |
+| 250 | 93 | PLAN_93 阶段 1：彻底移除设置页/调试桥/缓存层「缩略图清除」功能（434 全绿） |
+| 251 | 93 | PLAN_93 阶段 2：保存页大图预览双指捏合与双击放缩，移除历史页空筛选自动退出选择模式（436 全绿） |
+| 252 | 93 | PLAN_93 阶段 3：真机 WIFI ADB 全链路及 UI 实测验收，同步交接文档（`1.6.2+252` 收官） |
 
 ---
 
@@ -152,7 +156,7 @@
 ```bash
 cd c:/Users/Administrator/Desktop/github/LinXruan/YuYin
 flutter analyze            # 必须 0 issues
-flutter test               # 必须 435 全绿（含 structure_gate_test）
+flutter test               # 必须 436 全绿（含 structure_gate_test）
 flutter build apk --debug  # 校验 Kotlin 与打包
 ```
 
@@ -218,7 +222,7 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 - [ ] `SessionWorkPreparer` 改滑动窗口「边解析边下载」，避免大主页 CDN 签名过期。
 - [ ] `js_scan_engine` / DOM 扫描去全量节点遍历与 `offsetParent/innerText` 强制回流。
 - [ ] `StorageBridge` 目录 DocumentFile 缓存 + 线程池（Cursor 已完成）。
-- [x] 历史缩略图：LRU/孤儿淘汰、失败 URL 退避、确定性哈希、`clearCache` 世代取消。（PLAN_91 已完成）
+- [x] 历史缩略图：LRU/孤儿淘汰、失败 URL 退避、确定性哈希与历史清空世代回收（独立清除功能已于 PLAN_93 彻底移除）。（PLAN_91 / PLAN_93）
 - [ ] 选择树单作者增量刷新（启用 `_authorOfWork`），`SaveSelectionFrame` partial 切换不再重建图片。
 - [x] `history_page` 移除 `build()` 内磁盘 I/O 与全局通知整页重建。（PLAN_88 已完成）
 
@@ -228,8 +232,8 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 - [x] 中层打开未解析作品失败时弹窗内反馈（不再只写后台日志）。（PLAN_90 已完成）
 - [x] 历史页「一键重新解析」与媒体类型筛选。（PLAN_88 已完成）
 - [x] 音频：错误态展示、进度拖动 200ms 防抖、暂停恢复不抖动。（PLAN_90 已完成）
-- [x] 图片全屏滑动切换；22×22dp 极小按钮热区；冷启动已关闭横幅防闪。（PLAN_90 已完成）
-- [x] 设置页缩略图缓存管理入口。（PLAN_91 已完成）
+- [x] 图片全屏滑动切换、双指捏合与双击放缩；22×22dp 极小按钮热区；冷启动已关闭横幅防闪；历史空筛选保留多选。（PLAN_90 / PLAN_93 已完成）
+- [x] ~~设置页缩略图缓存管理入口~~（经实测清空后会自动联网回载，已按 PLAN_93 彻底物理删除清除功能）。
 - [x] 剩余 JS 问题：`jsPlatformPatch` 在 iPhone UA 下伪造 `Win32`；`scanTree` 漏 `image_post_info.images`；DOM 文本覆盖 API 标题。（PLAN_91 已完成）
 
 ### E. PLAN_81 · 测试与门禁
@@ -260,7 +264,7 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 | 主题 | 文件 |
 | --- | --- |
 | 开发守则 | `GEMINI.md`（原 `AGENTS.md`） |
-| 迭代计划 | `PLAN/PLAN_71~80/PLAN_77~80.md`、`PLAN/PLAN_81~90/PLAN_81~90.md`、`PLAN/PLAN_91~100/PLAN_91~92.md` |
+| 迭代计划 | `PLAN/PLAN_71~80/PLAN_77~80.md`、`PLAN/PLAN_81~90/PLAN_81~90.md`、`PLAN/PLAN_91~100/PLAN_91~93.md` |
 | 状态容器 | `lib/utils/app_stores.dart` |
 | 嗅探门面 | `lib/services/sniffer/facade/douyin_sniffer.dart` |
 | 任务态 | `lib/services/sniffer/session/sniff_session.dart` |
@@ -280,7 +284,7 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 ## 8. 新对话开场建议
 
 1. 先读本文件 + `GEMINI.md` + `DEBUG.md`。
-2. 跑 `flutter analyze` 与 `flutter test` 确认基线（应为 `0 issues` / `435 tests all passed`）。
-3. 目前 `part`、兼容壳、Store 静态单例、测试归类、`PLAN_79` 体验与缩略图/JS/Cookie 细节均已清零收官；下一步建议按需从 `5.C` 剩余性能项推进（例如：`SessionWorkPreparer` 滑动窗口边解析边下载、Sniffer 启动去冗余 IPC、`StorageBridge` 目录缓存与线程池、选择树单作者增量刷新等）。
-4. 严格遵守 `GEMINI.md` §0：先写 `PLAN_93.md` 再编码；每完成一个阶段执行 `开发改动 → flutter analyze (0 issues) → flutter test (100%全绿) → 设备验证 → commit`（版本与 `pubspec.yaml`、`lib/app_info.dart` 同步）。
+2. 跑 `flutter analyze` 与 `flutter test` 确认基线（应为 `0 issues` / `436 tests all passed`）。
+3. 目前 `part`、兼容壳、Store 静态单例、测试归类、`PLAN_79` 体验及 `PLAN_93`（移除缩略图清除、大图双指/双击放缩、历史空筛选保留多选）均已收官；下一步建议按需从 `5.C` 剩余性能项推进（例如：`SessionWorkPreparer` 滑动窗口边解析边下载、Sniffer 启动去冗余 IPC、`StorageBridge` 目录缓存与线程池、选择树单作者增量刷新等）。
+4. 严格遵守 `GEMINI.md` §0：先写 `PLAN_94.md` 再编码；每完成一个阶段执行 `开发改动 → flutter analyze (0 issues) → flutter test (100%全绿) → 设备验证 → commit`（版本与 `pubspec.yaml`、`lib/app_info.dart` 同步）。
 5. 任何阶段遇到阻塞（时序回归、无法确定的行为），先停下汇报或记录，严禁用回退兜底掩盖问题。
