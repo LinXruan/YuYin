@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../models/history/history_type_filter.dart';
 import '../../../../models/history_item.dart';
 import '../../flow/action/history_action_helper.dart';
 import '../../flow/search/history_search_coordinator.dart';
@@ -10,7 +11,7 @@ import '../card/history_card.dart';
 import '../empty/history_empty_view.dart';
 import '../filter/history_filter_button.dart';
 
-/// 历史页骨架组件：顶部标题与操作栏、搜索框、提示条、列表视图与底栏删除按钮
+/// 历史页骨架组件：顶部标题与操作栏、搜索框、类型筛选、提示条、列表视图与底栏删除按钮
 class HistoryFrame extends StatelessWidget {
   const HistoryFrame({
     super.key,
@@ -22,6 +23,7 @@ class HistoryFrame extends StatelessWidget {
     required this.permanentlyDismissed,
     required this.onDismissSession,
     required this.onPermanentlyDismiss,
+    this.onRequestParse,
   });
 
   final HistorySelectionCoordinator selection;
@@ -32,6 +34,7 @@ class HistoryFrame extends StatelessWidget {
   final bool permanentlyDismissed;
   final VoidCallback onDismissSession;
   final VoidCallback onPermanentlyDismiss;
+  final ValueChanged<String>? onRequestParse;
 
   @override
   Widget build(BuildContext context) {
@@ -98,7 +101,7 @@ class HistoryFrame extends StatelessWidget {
               ),
 
               // 2. 搜索框（匹配作品完整文案）
-              if (hasAnyRecord || search.searchQuery.isNotEmpty)
+              if (hasAnyRecord || search.searchQuery.isNotEmpty) ...[
                 Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -134,6 +137,24 @@ class HistoryFrame extends StatelessWidget {
                   ),
                 ),
 
+                // 2.3 媒体类型切换胶囊栏
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+                  child: Row(
+                    children: [
+                      for (final filter in HistoryTypeFilter.values) ...[
+                        HistoryFilterButton(
+                          label: filter.label,
+                          isSelected: search.typeFilter == filter,
+                          onTap: () => search.setTypeFilter(filter),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+
               // 2.5 提示栏：在至少存在 1 条历史记录且非多选态时展示
               if (hasAnyRecord &&
                   !selection.isSelectionMode &&
@@ -150,6 +171,7 @@ class HistoryFrame extends StatelessWidget {
                     ? HistoryEmptyView(
                         hasAnyRecord: hasAnyRecord,
                         filterOnlySaved: search.filterOnlySaved,
+                        typeFilter: search.typeFilter,
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.only(top: 6, bottom: 24),
@@ -179,6 +201,10 @@ class HistoryFrame extends StatelessWidget {
                                 selection.toggleItem(item.id);
                               }
                             },
+                            onParse: onRequestParse != null &&
+                                    item.url.isNotEmpty
+                                ? () => onRequestParse!(item.url)
+                                : null,
                           );
                         },
                       ),

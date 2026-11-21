@@ -114,6 +114,9 @@ class _ParsePageState extends State<ParsePage>
     if (_inputScrollController.hasClients) {
       _inputScrollController.jumpTo(0.0);
     }
+    if (!_isParsing && _downloadCancelToken == null) {
+      _startParse();
+    }
   }
 
   void _cancelParse() {

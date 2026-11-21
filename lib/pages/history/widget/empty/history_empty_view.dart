@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 
-/// 历史页空状态视图（支持无记录、无已保存、无搜索结果三种空态）
+import '../../../../models/history/history_type_filter.dart';
+
+/// 历史页空状态视图（支持无记录、无已保存、分类为空、无搜索结果等空态）
 class HistoryEmptyView extends StatelessWidget {
   const HistoryEmptyView({
     super.key,
     required this.hasAnyRecord,
     required this.filterOnlySaved,
+    this.typeFilter = HistoryTypeFilter.all,
   });
 
   final bool hasAnyRecord;
   final bool filterOnlySaved;
+  final HistoryTypeFilter typeFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +30,10 @@ class HistoryEmptyView extends StatelessWidget {
       title = '暂无已保存的记录';
       subtitle = '下载并保存资源后会自动归类到这里';
       icon = Icons.bookmark_border_rounded;
+    } else if (typeFilter != HistoryTypeFilter.all) {
+      title = '暂无${typeFilter.label}记录';
+      subtitle = '未找到该分类下的历史解析记录';
+      icon = Icons.filter_alt_off_rounded;
     } else {
       title = '未找到匹配的作品文案';
       subtitle = '换个文案关键词试试看';

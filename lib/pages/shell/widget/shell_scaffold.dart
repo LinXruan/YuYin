@@ -74,7 +74,12 @@ class ShellScaffold extends StatelessWidget {
                   if (index != 0) onTabSelected(0);
                 },
               ),
-              HistoryPage(),
+              HistoryPage(
+                onRequestParse: (url) {
+                  pendingInputUrl.value = url;
+                  onTabSelected(0);
+                },
+              ),
               SettingsPage(logs: logs, sniffer: sniffer),
             ],
           ),

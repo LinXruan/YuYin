@@ -13,6 +13,7 @@ class HistoryCard extends StatelessWidget {
     required this.isSelected,
     required this.onTap,
     required this.onLongPress,
+    this.onParse,
   });
 
   final HistoryItem item;
@@ -20,6 +21,7 @@ class HistoryCard extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final VoidCallback? onParse;
 
   @override
   Widget build(BuildContext context) {
@@ -124,6 +126,47 @@ class HistoryCard extends StatelessWidget {
                           if (item.isSaved) ...[
                             const SizedBox(width: 8),
                             HistoryOpenActions(item: item),
+                          ],
+                          if (!isSelectionMode &&
+                              onParse != null &&
+                              item.url.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: onParse,
+                              borderRadius: BorderRadius.circular(4),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 1.5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.secondaryContainer
+                                      .withValues(alpha: 0.6),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.refresh_rounded,
+                                      size: 11,
+                                      color: theme
+                                          .colorScheme.onSecondaryContainer,
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      '解析',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: theme
+                                            .colorScheme.onSecondaryContainer,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ],
                         ],
                       ),

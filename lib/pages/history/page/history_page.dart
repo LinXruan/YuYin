@@ -6,9 +6,14 @@ import '../flow/search/history_search_coordinator.dart';
 import '../flow/selection/history_selection_coordinator.dart';
 import '../widget/frame/history_frame.dart';
 
-/// 历史记录页：支持全文模糊检索、多选批量删除、复制链接与保存位置定位
+/// 历史记录页：支持全文模糊检索、多选批量删除、复制链接与一键重新解析
 class HistoryPage extends StatefulWidget {
-  const HistoryPage({super.key});
+  const HistoryPage({
+    super.key,
+    this.onRequestParse,
+  });
+
+  final ValueChanged<String>? onRequestParse;
 
   @override
   State<HistoryPage> createState() => _HistoryPageState();
@@ -96,6 +101,7 @@ class _HistoryPageState extends State<HistoryPage>
       hasAnyRecord: hasAnyRecord,
       sessionDismissed: _sessionDismissed,
       permanentlyDismissed: _permanentlyDismissed,
+      onRequestParse: widget.onRequestParse,
       onDismissSession: () {
         setState(() => _sessionDismissed = true);
       },
