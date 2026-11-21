@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yuyin/models/parse/parse_status.dart';
 import 'package:yuyin/pages/parse/widget/frame/parse_frame.dart';
-import 'package:yuyin/utils/debug/log_controller.dart';
 
 void main() {
   testWidgets('ParseFrame 正常渲染输入框、按钮与状态栏', (tester) async {
@@ -11,7 +11,7 @@ void main() {
     final busy = ValueNotifier<bool>(false);
     final downloadProgress = ValueNotifier<double?>(null);
     final downloadToken = ValueNotifier<CancelToken?>(null);
-    final logs = LogController();
+    final status = ValueNotifier<ParseStatus>(const ParseStatus.idle());
     final loggedIn = ValueNotifier<bool>(false);
 
     await tester.pumpWidget(
@@ -23,7 +23,7 @@ void main() {
             busy: busy,
             downloadProgress: downloadProgress,
             downloadToken: downloadToken,
-            logs: logs,
+            statusListenable: status,
             loggedIn: loggedIn,
             isParsing: false,
             onStartParse: () {},
@@ -45,6 +45,7 @@ void main() {
     busy.dispose();
     downloadProgress.dispose();
     downloadToken.dispose();
+    status.dispose();
     loggedIn.dispose();
   });
 }

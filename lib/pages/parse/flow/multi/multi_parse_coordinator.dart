@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../../models/history_item.dart';
+import '../../../../models/parse/parse_status.dart';
 import '../../../../models/common/batch_video_quality.dart';
 import '../../../../models/save_page/selection/quality_indicator.dart';
 import '../../../../models/save_page/selection/selection_state.dart';
@@ -27,6 +28,11 @@ class MultiParseCoordinator {
   Future<void> parseMultiWorks(List<String> workUrls, String rawInput) async {
     try {
       ctx.logs.add('已识别 ${workUrls.length} 个作品链接，开始逐条捕获封面...');
+      ctx.setStatus(
+        ParseStatus.parsing(
+          message: '已识别 ${workUrls.length} 个作品链接，开始逐条捕获封面...',
+        ),
+      );
       final extractResult = await ctx.sniffer.multiWork.extractWorks(
         workUrls,
         onProgress: (current, total, message) {
@@ -50,6 +56,14 @@ class MultiParseCoordinator {
 
       if (extractResult.works.isEmpty) {
         ctx.logs.add('未捕获到可保存的作品');
+        ctx.setStatus(
+          ParseStatus.failed(
+            message: '未捕获到可保存的作品',
+            failedUrls: extractResult.failedUrls.isNotEmpty
+                ? extractResult.failedUrls
+                : workUrls,
+          ),
+        );
         return;
       }
 
@@ -100,6 +114,7 @@ class MultiParseCoordinator {
         if (!ctx.context.mounted) return;
         if (confirmed != true) {
           ctx.logs.add('已取消多作品保存');
+          ctx.setStatus(const ParseStatus.idle(message: '已取消多作品保存'));
           return;
         }
 
@@ -108,6 +123,7 @@ class MultiParseCoordinator {
             .toList();
         if (urls.isEmpty) {
           ctx.logs.add('未选择任何作品');
+          ctx.setStatus(const ParseStatus.idle(message: '未选择任何作品'));
           return;
         }
 
@@ -120,6 +136,7 @@ class MultiParseCoordinator {
           () => cancelToken.cancel('用户取消保存'),
         );
         ctx.logs.add('正在准备保存 ${urls.length} 个作品...');
+        ctx.setStatus(ParseStatus.saving(message: '正在准备保存 ${urls.length} 个作品...'));
 
         final selected = await SessionWorkPreparer.prepare(
           session,
@@ -138,12 +155,14 @@ class MultiParseCoordinator {
         }
         if (selected.isEmpty) {
           ctx.logs.add('选中作品没有可保存资源');
+          ctx.setStatus(const ParseStatus.failed(message: '选中作品没有可保存资源'));
           return;
         }
 
-        ctx.logs.add(
-          '开始保存 ${selected.length} 个作品（${ParseFlowHelper.qualityLabel(qualityMode)}）...',
-        );
+        final startSaveMsg =
+            '开始保存 ${selected.length} 个作品（${ParseFlowHelper.qualityLabel(qualityMode)}）...';
+        ctx.logs.add(startSaveMsg);
+        ctx.setStatus(ParseStatus.saving(message: startSaveMsg));
         final results = await ctx.workBatchSaver.saveWorks(
           selected,
           cancelToken: cancelToken,
@@ -161,23 +180,40 @@ class MultiParseCoordinator {
         await HistoryStore.markSavedBatch(savedEntries);
 
         final successCount = results.where((item) => item.success).length;
-        ctx.logs.add('多作品保存完成：成功 $successCount/${results.length}');
+        final finishMsg = '多作品保存完成：成功 $successCount/${results.length}';
+        ctx.logs.add(finishMsg);
+        final failed = [for (final r in results) if (!r.success) r.url];
+        if (failed.isEmpty) {
+          ctx.setStatus(ParseStatus.completed(message: finishMsg));
+        } else {
+          ctx.setStatus(
+            ParseStatus.failed(message: finishMsg, failedUrls: failed),
+          );
+        }
       } finally {
         SelectionDebugBridge.detach(session);
         session.close();
       }
     } on DouyinDownloadCancelledException {
-      if (ctx.mounted) ctx.logs.add('已取消多作品保存');
+      if (ctx.mounted) {
+        ctx.logs.add('已取消多作品保存');
+        ctx.setStatus(const ParseStatus.idle(message: '已取消多作品保存'));
+      }
     } on SniffCancelledException {
       if (ctx.mounted) {
         final cancelToken = ctx.getDownloadCancelToken();
-        ctx.logs.add(
-          cancelToken?.isCancelled == true ? '已取消多作品保存' : '已取消解析',
-        );
+        final msg =
+            cancelToken?.isCancelled == true ? '已取消多作品保存' : '已取消解析';
+        ctx.logs.add(msg);
+        ctx.setStatus(ParseStatus.idle(message: msg));
       }
     } catch (e) {
       if (ctx.mounted) {
-        ctx.logs.add('多作品保存失败：${ParseFlowHelper.friendlyError(e)}');
+        final msg = '多作品保存失败：${ParseFlowHelper.friendlyError(e)}';
+        ctx.logs.add(msg);
+        ctx.setStatus(
+          ParseStatus.failed(message: msg, failedUrls: workUrls, error: e),
+        );
       }
     } finally {
       DownloadCancelRegistry.detach();

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../models/parse/parse_status.dart';
 import '../../../../services/batch_work/work_batch_saver.dart';
 import '../../../../services/media/video_downloader.dart';
 import '../../../../services/sniffer/facade/douyin_sniffer.dart';
@@ -26,6 +27,7 @@ class ParseFlowContext {
     required this.saveCoordinator,
     required this.workBatchSaver,
     required this.refresh,
+    required this.statusNotifier,
   });
 
   final BuildContext context;
@@ -46,6 +48,9 @@ class ParseFlowContext {
   final ParseSaveCoordinator saveCoordinator;
   final WorkBatchSaver workBatchSaver;
   final VoidCallback refresh;
+  final ValueNotifier<ParseStatus> statusNotifier;
+
+  void setStatus(ParseStatus status) => statusNotifier.value = status;
 
   bool get mounted => context.mounted;
 }

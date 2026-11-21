@@ -1,41 +1,19 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../../../utils/debug/log_controller.dart';
+import '../../../../models/parse/parse_status.dart';
 
-/// 状态卡片：把日志映射为可读状态文本。
-/// 过程态保持单行极简显示，完成态（下载落盘）智能聚合多分类保存路径全量展示
+/// 状态卡片：强类型消费 ParseStatus 状态模型。
+/// 支持就绪、进行中、完成绿标、失败红标及失败项一键重试。
 class StatusCard extends StatelessWidget {
-  const StatusCard({super.key, required this.logs});
+  const StatusCard({
+    super.key,
+    required this.statusListenable,
+    this.onRetry,
+  });
 
-  final LogController logs;
-
-  /// 智能状态文本解析器：
-  /// - 尾部包含“已保存到”时，向前聚拢本次任务全部连续的保存路径提示；
-  /// - 其余过程态（提取短链、网页捕获、下载进度等）严格单行返回最新一条状态。
-  static String resolveStatusText(List<String> logs) {
-    if (logs.isEmpty) {
-      return '就绪：粘贴抖音链接后点击“解析作品”';
-    }
-    final last = logs.last;
-    if (last.contains('已保存到')) {
-      final savePrompts = <String>[];
-      for (var i = logs.length - 1; i >= 0; i--) {
-        final line = logs[i];
-        if (line.contains('已保存到')) {
-          savePrompts.insert(0, line);
-        } else {
-          break;
-        }
-      }
-      return savePrompts.join('\n');
-    }
-    return last;
-  }
-
-  /// 当前是否处于下载完成落盘状态
-  static bool isCompletionStatus(List<String> logs) {
-    return logs.isNotEmpty && logs.last.contains('已保存到');
-  }
+  final ValueListenable<ParseStatus> statusListenable;
+  final ValueChanged<List<String>>? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -43,53 +21,119 @@ class StatusCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    return ValueListenableBuilder<List<String>>(
-      valueListenable: logs,
-      builder: (context, value, _) {
-        final status = resolveStatusText(value);
-        final isSuccess = isCompletionStatus(value);
+    return ValueListenableBuilder<ParseStatus>(
+      valueListenable: statusListenable,
+      builder: (context, status, _) {
+        final isSuccess = status.isCompleted;
+        final isError = status.isFailed;
+        final isBusy = status.isBusy;
+
+        final Color bgColor;
+        final Border? border;
+        final Color textColor;
+        final Color iconColor;
+        final Widget iconWidget;
+
+        if (isSuccess) {
+          bgColor = colorScheme.primary.withValues(
+            alpha: isDark ? 0.16 : 0.08,
+          );
+          border = Border.all(
+            color: colorScheme.primary.withValues(
+              alpha: isDark ? 0.35 : 0.25,
+            ),
+          );
+          iconColor = colorScheme.primary;
+          textColor = colorScheme.onSurface;
+          iconWidget = Icon(
+            Icons.check_circle_outline,
+            size: 18,
+            color: iconColor,
+          );
+        } else if (isError) {
+          bgColor = colorScheme.error.withValues(
+            alpha: isDark ? 0.16 : 0.08,
+          );
+          border = Border.all(
+            color: colorScheme.error.withValues(
+              alpha: isDark ? 0.35 : 0.25,
+            ),
+          );
+          iconColor = colorScheme.error;
+          textColor = colorScheme.onSurface;
+          iconWidget = Icon(Icons.error_outline, size: 18, color: iconColor);
+        } else if (isBusy) {
+          bgColor = colorScheme.surfaceContainerHighest;
+          border = null;
+          iconColor = colorScheme.primary;
+          textColor = colorScheme.onSurfaceVariant;
+          iconWidget = SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: iconColor,
+            ),
+          );
+        } else {
+          bgColor = colorScheme.surfaceContainerHighest;
+          border = null;
+          iconColor = colorScheme.onSurfaceVariant;
+          textColor = colorScheme.onSurfaceVariant;
+          iconWidget = Icon(Icons.info_outline, size: 18, color: iconColor);
+        }
 
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isSuccess
-                ? colorScheme.primary.withValues(alpha: isDark ? 0.16 : 0.08)
-                : colorScheme.surfaceContainerHighest,
+            color: bgColor,
             borderRadius: BorderRadius.circular(12),
-            border: isSuccess
-                ? Border.all(
-                    color: colorScheme.primary.withValues(
-                      alpha: isDark ? 0.35 : 0.25,
-                    ),
-                  )
-                : null,
+            border: border,
           ),
-          child: Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                isSuccess ? Icons.check_circle_outline : Icons.info_outline,
-                size: 18,
-                color: isSuccess
-                    ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  iconWidget,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      status.displayText,
+                      maxLines: 6,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        height: 1.5,
+                        color: textColor,
+                        fontWeight:
+                            isSuccess ? FontWeight.w500 : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  status,
-                  maxLines: 6,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    height: 1.5,
-                    color: isSuccess
-                        ? colorScheme.onSurface
-                        : colorScheme.onSurfaceVariant,
-                    fontWeight: isSuccess ? FontWeight.w500 : FontWeight.normal,
+              if (isError && status.canRetry && onRetry != null) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () => onRetry!(status.failedUrls),
+                    icon: const Icon(Icons.refresh, size: 15),
+                    label: Text('重试失败项 (${status.failedUrls.length})'),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
         );

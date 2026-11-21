@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 
 import '../../../../models/history/history_record_type.dart';
 import '../../../../models/history_item.dart';
+import '../../../../models/parse/parse_status.dart';
 import '../../../../models/common/batch_video_quality.dart';
 import '../../../../models/save_page/save_work_item.dart';
 import '../../../../models/save_page/selection/quality_indicator.dart';
@@ -60,9 +61,10 @@ class HomeParseCoordinator {
       for (var i = 0; i < orderedHomeUrls.length; i++) {
         if (!ctx.mounted || !ctx.isParsing()) return;
         final homeUrl = orderedHomeUrls[i];
-        ctx.logs.add(
-          '正在捕获主页作品 (${i + 1}/${orderedHomeUrls.length})...',
-        );
+        final parsingMsg =
+            '正在捕获主页作品 (${i + 1}/${orderedHomeUrls.length})...';
+        ctx.logs.add(parsingMsg);
+        ctx.setStatus(ParseStatus.parsing(message: parsingMsg));
         try {
           final homeResult =
               await ctx.sniffer.userHome.extractAllWorks(homeUrl);
@@ -130,6 +132,12 @@ class HomeParseCoordinator {
 
       if (profiles.isEmpty) {
         ctx.logs.add('未捕获到有效作者信息，请检查主页链接或登录状态');
+        ctx.setStatus(
+          ParseStatus.failed(
+            message: '未捕获到有效作者信息，请检查主页链接或登录状态',
+            failedUrls: homeUrls,
+          ),
+        );
         return;
       }
       if (!ctx.context.mounted) return;
@@ -156,6 +164,7 @@ class HomeParseCoordinator {
         if (!ctx.context.mounted) return;
         if (confirmed != true) {
           ctx.logs.add('已取消多主页保存');
+          ctx.setStatus(const ParseStatus.idle(message: '已取消多主页保存'));
           return;
         }
 
@@ -164,6 +173,7 @@ class HomeParseCoordinator {
             .toList();
         if (selectedAuthors.isEmpty) {
           ctx.logs.add('未选择任何作者');
+          ctx.setStatus(const ParseStatus.idle(message: '未选择任何作者'));
           return;
         }
 
@@ -215,25 +225,34 @@ class HomeParseCoordinator {
         });
 
         final successCount = result.authors.where((a) => a.success).length;
-        ctx.logs.add(
-          '主页批量保存完成：成功 $successCount/${result.authors.length} 位作者，共 ${result.totalSaved} 项资源',
-        );
+        final finishMsg =
+            '主页批量保存完成：成功 $successCount/${result.authors.length} 位作者，共 ${result.totalSaved} 项资源';
+        ctx.logs.add(finishMsg);
+        ctx.setStatus(ParseStatus.completed(message: finishMsg));
       } finally {
         SelectionDebugBridge.detach(session);
         session.close();
       }
     } on DouyinDownloadCancelledException {
-      if (ctx.mounted) ctx.logs.add('已取消主页批量保存');
+      if (ctx.mounted) {
+        ctx.logs.add('已取消主页批量保存');
+        ctx.setStatus(const ParseStatus.idle(message: '已取消主页批量保存'));
+      }
     } on SniffCancelledException {
       if (ctx.mounted) {
         final cancelToken = ctx.getDownloadCancelToken();
-        ctx.logs.add(
-          cancelToken?.isCancelled == true ? '已取消主页批量保存' : '已取消解析',
-        );
+        final msg =
+            cancelToken?.isCancelled == true ? '已取消主页批量保存' : '已取消解析';
+        ctx.logs.add(msg);
+        ctx.setStatus(ParseStatus.idle(message: msg));
       }
     } catch (e) {
       if (ctx.mounted) {
-        ctx.logs.add('主页捕获失败：${ParseFlowHelper.friendlyError(e)}');
+        final msg = '主页捕获失败：${ParseFlowHelper.friendlyError(e)}';
+        ctx.logs.add(msg);
+        ctx.setStatus(
+          ParseStatus.failed(message: msg, failedUrls: homeUrls, error: e),
+        );
       }
     } finally {
       DownloadCancelRegistry.detach();

@@ -1,9 +1,10 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../../../utils/debug/log_controller.dart';
+import '../../../../models/parse/parse_status.dart';
 import '../banner/batch_support_banner.dart';
 import '../banner/login_prompt_banner.dart';
 import '../status/status_card.dart';
@@ -18,13 +19,14 @@ class ParseFrame extends StatefulWidget {
     required this.busy,
     required this.downloadProgress,
     required this.downloadToken,
-    required this.logs,
+    required this.statusListenable,
     required this.loggedIn,
     required this.isParsing,
     required this.onStartParse,
     required this.onCancelParse,
     required this.onCancelDownload,
     required this.onPasteFromClipboard,
+    this.onRetry,
     this.onTapAccount,
   });
 
@@ -33,13 +35,14 @@ class ParseFrame extends StatefulWidget {
   final ValueNotifier<bool> busy;
   final ValueNotifier<double?> downloadProgress;
   final ValueNotifier<CancelToken?> downloadToken;
-  final LogController logs;
+  final ValueListenable<ParseStatus> statusListenable;
   final ValueNotifier<bool> loggedIn;
   final bool isParsing;
   final VoidCallback onStartParse;
   final VoidCallback onCancelParse;
   final VoidCallback onCancelDownload;
   final VoidCallback onPasteFromClipboard;
+  final ValueChanged<List<String>>? onRetry;
   final VoidCallback? onTapAccount;
 
   @override
@@ -204,7 +207,10 @@ class _ParseFrameState extends State<ParseFrame> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  StatusCard(logs: widget.logs),
+                  StatusCard(
+                    statusListenable: widget.statusListenable,
+                    onRetry: widget.onRetry,
+                  ),
                   const SizedBox(height: 12),
                   LoginPromptBanner(
                     loggedIn: widget.loggedIn,

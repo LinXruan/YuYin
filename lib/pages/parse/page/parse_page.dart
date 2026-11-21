@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../models/parse/parse_status.dart';
 import '../../../services/batch_work/work_batch_saver.dart';
 import '../../../services/media/video_downloader.dart';
 import '../../../services/sniffer/facade/douyin_sniffer.dart';
@@ -48,6 +49,8 @@ class _ParsePageState extends State<ParsePage>
     with AutomaticKeepAliveClientMixin {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _inputScrollController = ScrollController();
+  final ValueNotifier<ParseStatus> _statusNotifier =
+      ValueNotifier(const ParseStatus.idle());
   final ValueNotifier<double?> _downloadProgress = ValueNotifier(null);
   final ValueNotifier<CancelToken?> _downloadToken = ValueNotifier(null);
   bool _downloadTokenDisposed = false;
@@ -116,6 +119,7 @@ class _ParsePageState extends State<ParsePage>
   void _cancelParse() {
     if (!_isParsing) return;
     _isParsing = false;
+    _statusNotifier.value = const ParseStatus.idle(message: '已取消解析');
     if (mounted) setState(() {});
     widget.sniffer.cancelActiveTask();
   }
@@ -124,6 +128,7 @@ class _ParsePageState extends State<ParsePage>
     final token = _downloadCancelToken;
     if (token == null) return;
     token.cancel('用户取消保存');
+    _statusNotifier.value = const ParseStatus.idle(message: '已取消保存');
     widget.sniffer.cancelActiveTask();
     if (mounted) setState(() {});
   }
@@ -142,6 +147,7 @@ class _ParsePageState extends State<ParsePage>
     if (!mounted) return;
     final prefix = message.startsWith('正在准备') ? '正在准备' : '正在保存';
     widget.logs.upsertLast(prefix, message);
+    _statusNotifier.value = ParseStatus.saving(message: message);
     final overall = total == 0 ? 0.0 : current / total;
     _downloadProgress.value = overall.clamp(0.0, 1.0).toDouble();
   }
@@ -153,7 +159,9 @@ class _ParsePageState extends State<ParsePage>
     _lastProgressKey = key;
 
     final overall = total == 0 ? 0.0 : ((current - 1) + itemProgress) / total;
-    widget.logs.upsertLast('正在下载第', '正在下载第 $current/$total 个资源（$percent%）...');
+    final msg = '正在下载第 $current/$total 个资源（$percent%）...';
+    widget.logs.upsertLast('正在下载第', msg);
+    _statusNotifier.value = ParseStatus.saving(message: msg);
     _downloadProgress.value = overall.clamp(0.0, 1.0).toDouble();
   }
 
@@ -173,10 +181,17 @@ class _ParsePageState extends State<ParsePage>
         updateBatchProgress: _updateBatchProgress,
         saveCoordinator: _saveCoordinator,
         workBatchSaver: _workBatchSaver,
+        statusNotifier: _statusNotifier,
         refresh: () {
           if (mounted) setState(() {});
         },
       );
+
+  void _retryFailed(List<String> failedUrls) {
+    if (failedUrls.isEmpty || widget.busy.value) return;
+    _applyExternalUrl(failedUrls.join('\n'));
+    _startParse();
+  }
 
   Future<void> _startParse() async {
     if (widget.busy.value) return;
@@ -186,11 +201,13 @@ class _ParsePageState extends State<ParsePage>
     if (!mounted) return;
     if (!hasNet) {
       widget.logs.reset('网络未连接，无法解析');
+      _statusNotifier.value = const ParseStatus.failed(message: '网络未连接，无法解析');
       NetworkDetector.showOfflineSnackbar(context);
       return;
     }
 
     widget.logs.reset('正在提取短链...');
+    _statusNotifier.value = const ParseStatus.parsing(message: '正在提取短链...');
     _downloadProgress.value = null;
     _lastProgressKey = '';
     widget.busy.value = true;
@@ -200,6 +217,8 @@ class _ParsePageState extends State<ParsePage>
     final batch = DouyinBatchInputParser.parseBatchInput(_inputController.text);
     if (batch.kind == ParsedBatchKind.empty) {
       widget.logs.add('未识别到有效的抖音链接，请检查粘贴内容');
+      _statusNotifier.value =
+          const ParseStatus.failed(message: '未识别到有效的抖音链接，请检查粘贴内容');
       widget.busy.value = false;
       _isParsing = false;
       if (mounted) setState(() {});
@@ -212,6 +231,8 @@ class _ParsePageState extends State<ParsePage>
 
     if (batch.kind == ParsedBatchKind.articlesOnly) {
       widget.logs.add('未识别到可下载的视频/图文作品（文章作品暂不支持）');
+      _statusNotifier.value =
+          const ParseStatus.failed(message: '未识别到可下载的视频/图文作品（文章作品暂不支持）');
       widget.busy.value = false;
       _isParsing = false;
       if (mounted) setState(() {});
@@ -220,6 +241,8 @@ class _ParsePageState extends State<ParsePage>
 
     if (batch.kind == ParsedBatchKind.mixed) {
       widget.logs.add('检测到同时包含主页链接和作品链接，请分开粘贴解析');
+      _statusNotifier.value =
+          const ParseStatus.failed(message: '检测到同时包含主页链接和作品链接，请分开粘贴解析');
       widget.busy.value = false;
       _isParsing = false;
       if (mounted) setState(() {});
@@ -256,6 +279,7 @@ class _ParsePageState extends State<ParsePage>
     _downloadTokenDisposed = true;
     _downloadToken.dispose();
     _downloadProgress.dispose();
+    _statusNotifier.dispose();
     _inputController.dispose();
     _inputScrollController.dispose();
     super.dispose();
@@ -270,13 +294,14 @@ class _ParsePageState extends State<ParsePage>
       busy: widget.busy,
       downloadProgress: _downloadProgress,
       downloadToken: _downloadToken,
-      logs: widget.logs,
+      statusListenable: _statusNotifier,
       loggedIn: widget.loggedIn,
       isParsing: _isParsing,
       onStartParse: _startParse,
       onCancelParse: _cancelParse,
       onCancelDownload: _cancelDownload,
       onPasteFromClipboard: _pasteFromClipboard,
+      onRetry: _retryFailed,
       onTapAccount: widget.onTapAccount,
     );
   }

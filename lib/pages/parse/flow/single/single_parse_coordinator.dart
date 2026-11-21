@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../../../models/common/work_type.dart';
 import '../../../../models/history_item.dart';
+import '../../../../models/parse/parse_status.dart';
 import '../../../../models/save_page/save_work_item.dart';
 import '../../../../models/save_page/selection/selected_work.dart';
 import '../../../../models/save_page/work_kind.dart';
@@ -30,6 +31,7 @@ class SingleParseCoordinator {
   Future<void> parseSingleWork(String url, String rawInput) async {
     try {
       ctx.logs.add('正在解析作品...');
+      ctx.setStatus(const ParseStatus.parsing(message: '正在解析作品...'));
       final result = await ctx.sniffer.sniffVideoUrl(url);
       if (!ctx.mounted || !ctx.isParsing()) return;
       ctx.setParsing(false);
@@ -37,6 +39,12 @@ class SingleParseCoordinator {
 
       if (result.items.isEmpty) {
         ctx.logs.add('未解析到可下载资源，请检查链接或稍后重试');
+        ctx.setStatus(
+          ParseStatus.failed(
+            message: '未解析到可下载资源，请检查链接或稍后重试',
+            failedUrls: [url],
+          ),
+        );
         return;
       }
 
@@ -87,6 +95,7 @@ class SingleParseCoordinator {
       if (selection == null) {
         ctx.sniffer.cancelActiveTask();
         ctx.logs.add('已取消保存');
+        ctx.setStatus(const ParseStatus.idle(message: '已取消保存'));
         return;
       }
       final selected = selection.items;
@@ -95,7 +104,9 @@ class SingleParseCoordinator {
           ? result.desc!.trim()
           : DouyinUrlExtractor.extractShareText(rawInput);
 
-      ctx.logs.add('开始下载 ${selected.length} 个选中资源...');
+      final startDownloadMsg = '开始下载 ${selected.length} 个选中资源...';
+      ctx.logs.add(startDownloadMsg);
+      ctx.setStatus(ParseStatus.saving(message: startDownloadMsg));
       final baseName = FileNameFormatter.sanitize(
         FileNameFormatter.buildBaseName(candidateDesc),
       );
@@ -115,28 +126,42 @@ class SingleParseCoordinator {
       if (savedTypes.isNotEmpty) {
         HistoryStore.markSavedWithMeta(url, savedBaseName: baseName);
       }
+      final locations = <String>[];
       if (savedTypes.contains(MediaType.image)) {
-        ctx.logs.add(
-          '图片已保存到${SaveLocationStore.getDisplayPath(MediaType.image)}',
-        );
+        final loc = '图片已保存到${SaveLocationStore.getDisplayPath(MediaType.image)}';
+        ctx.logs.add(loc);
+        locations.add(loc);
       }
       if (savedTypes.contains(MediaType.video)) {
-        ctx.logs.add(
-          '视频已保存到${SaveLocationStore.getDisplayPath(MediaType.video)}',
-        );
+        final loc = '视频已保存到${SaveLocationStore.getDisplayPath(MediaType.video)}';
+        ctx.logs.add(loc);
+        locations.add(loc);
       }
       if (savedTypes.contains(MediaType.audio)) {
-        ctx.logs.add(
-          '音频已保存到${SaveLocationStore.getDisplayPath(MediaType.audio)}',
-        );
+        final loc = '音频已保存到${SaveLocationStore.getDisplayPath(MediaType.audio)}';
+        ctx.logs.add(loc);
+        locations.add(loc);
       }
+      ctx.setStatus(
+        ParseStatus.completed(message: '保存完成', savedLocations: locations),
+      );
     } on DouyinDownloadCancelledException {
-      if (ctx.mounted) ctx.logs.add('已取消保存');
+      if (ctx.mounted) {
+        ctx.logs.add('已取消保存');
+        ctx.setStatus(const ParseStatus.idle(message: '已取消保存'));
+      }
     } on SniffCancelledException {
-      if (ctx.mounted) ctx.logs.add('已取消解析');
+      if (ctx.mounted) {
+        ctx.logs.add('已取消解析');
+        ctx.setStatus(const ParseStatus.idle(message: '已取消解析'));
+      }
     } catch (error) {
       if (!ctx.mounted) return;
-      ctx.logs.add('操作失败：${ParseFlowHelper.friendlyError(error)}');
+      final msg = '操作失败：${ParseFlowHelper.friendlyError(error)}';
+      ctx.logs.add(msg);
+      ctx.setStatus(
+        ParseStatus.failed(message: msg, failedUrls: [url], error: error),
+      );
     } finally {
       DownloadCancelRegistry.detach();
       ctx.setDownloadCancelToken(null);
