@@ -32,7 +32,7 @@
 
 ---
 
-## 2. 本轮已完成的 build（192 → 211）
+## 2. 本轮已完成的 build（192 → 243）
 
 | build | PLAN | 内容 |
 | --- | --- | --- |
@@ -144,7 +144,7 @@
 ```bash
 cd c:/Users/Administrator/Desktop/github/LinXruan/YuYin
 flutter analyze            # 必须 0 issues
-flutter test               # 必须 402+ 全绿（含 structure_gate_test）
+flutter test               # 必须 421+ 全绿（含 structure_gate_test）
 flutter build apk --debug  # 校验 Kotlin 与打包
 ```
 
@@ -236,8 +236,8 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 ## 6. 坑与硬约束
 
 1. **字符串插值**：`SniffSession` 字段必须写 `'t${_session.taskId}'`；写成 `'t$_session.taskId'` 会插值对象，导致注入 JS 语法错误、主页 40 秒超时（已在 206 踩过）。
-2. **门面 374 行**：`douyin_sniffer.dart` 距 400 只剩 26 行；新增逻辑先进新类，不要堆门面。
-3. **结构门禁**：`part`+`part of` 上限 102，只能减不能增；单文件 ≤400 行（lib 与 test 都查）。
+2. **门面控制**：`douyin_sniffer.dart` 当前 358 行（硬上限 400）；新增逻辑优先抽入独立策略/领域类，不要堆进门面。
+3. **结构门禁**：`part`/`part of` 永久锁定为 **0**，禁止 `test/` 下新建 `plan_XX` 编号测试，全库 `lib/` 与 `test/` 单文件 **≤ 400 行**。
 4. **sed 批量改字段很危险**：曾误删门面常量块。改动后必须 `flutter analyze`；损坏就 `git checkout -- <file>` 重做。
 5. **锁屏**：设备锁屏会挂起进程，9527 无响应；先 `KEYCODE_WAKEUP` + `am start`。
 6. **模拟器**：必须带窗口启动；慢导致超时不算 bug；构建前先关模拟器。
@@ -251,7 +251,7 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 
 | 主题 | 文件 |
 | --- | --- |
-| 迭代计划 | `PLAN/PLAN_71~80/PLAN_77~80.md`、`PLAN/PLAN_81~90/PLAN_81.md`、`PLAN_82.md` |
+| 迭代计划 | `PLAN/PLAN_71~80/PLAN_77~80.md`、`PLAN/PLAN_81~90/PLAN_81~90.md` |
 | 嗅探门面 | `lib/services/sniffer/facade/douyin_sniffer.dart` |
 | 任务态 | `lib/services/sniffer/session/sniff_session.dart` |
 | 消息路由 | `lib/services/sniffer/message/sniffer_message_router.dart` |
@@ -269,7 +269,8 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 
 ## 8. 新对话开场建议
 
-1. 读本文件 + `AGENTS.md` + `DEBUG.md` + `PLAN_82.md`。
-2. `flutter analyze`、`flutter test` 确认基线（应为 0 / 402）。
-3. 从「5.A 阶段 4：单作品策略」开始，按其验收标准推进；每完成一个阶段：bump build → analyze → test → 真机三链路 → commit。
-4. 任何阶段遇到阻塞（时序回归、无法确定的行为），先停下记录，不要用回退兜底掩盖问题。
+1. 先读本文件 + `AGENTS.md` + `DEBUG.md`。
+2. 跑 `flutter analyze` 与 `flutter test` 确认基线（应为 `0 issues` / `421 tests all passed`）。
+3. 目前所有 `part`、`兼容壳`、`测试归类` 与 `PLAN_79 体验痛点` 均已清零收官；下一步建议按需从 `5.B / 5.C / 5.D` 剩余项挑高优先级推进（例如：`Store 显式注入`、`SessionWorkPreparer 滑动窗口边解析边下载`、`原生 Cookie 读取替换 document.cookie`、`设置页缩略图缓存管理入口` 等）。
+4. 严格遵守 `AGENTS.md` §0：先写 `PLAN_91.md` 再编码；每完成一个阶段执行 `bump build → analyze → test → 设备三链路回归 → commit`。
+5. 任何阶段遇到阻塞（时序回归、无法确定的行为），先停下汇报或记录，严禁用回退兜底掩盖问题。
