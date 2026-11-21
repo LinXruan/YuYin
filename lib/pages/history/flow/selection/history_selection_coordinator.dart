@@ -60,9 +60,6 @@ class HistorySelectionCoordinator {
 
   void pruneDeleted(Set<String> currentIds) {
     selectedIds.removeWhere((id) => !currentIds.contains(id));
-    if (selectedIds.isEmpty && isSelectionMode && currentIds.isEmpty) {
-      isSelectionMode = false;
-    }
   }
 
   void pruneUnsaved(Set<String> savedIds) {
