@@ -90,7 +90,7 @@ class AgentAutomationServer {
     if (_server != null) return;
     try {
       _server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
-      debugPrint('[AgentBridge] 本地自动化控制台已就绪: port=$port (PID=$pid)');
+      debugPrint('[AgentBridge] 本地自动化控制台已就绪: port=${_server!.port} (PID=$pid)');
       _server!.listen(router.handleRequest, onError: (Object err) {
         debugPrint('[AgentBridge] 接收请求异常: $err');
       });

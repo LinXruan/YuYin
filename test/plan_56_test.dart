@@ -81,7 +81,7 @@ void main() {
   group('PLAN_56: Debug 自动化接口头像与昵称比对验证 (AgentAutomationServer)', () {
     late AgentAutomationServer server;
     late LogController logs;
-    const testPort = 9880;
+    late int testPort;
 
     setUp(() async {
       HttpOverrides.global = null;
@@ -90,9 +90,10 @@ void main() {
         logs: logs,
         busy: ValueNotifier(false),
         loggedIn: ValueNotifier(false),
-        port: testPort,
+        port: 0,
       );
       await server.start();
+      testPort = server.boundPort!;
     });
 
     tearDown(() async {

@@ -12,7 +12,7 @@ void main() {
     late AgentAutomationServer server;
     late LogController logs;
     late HttpClient client;
-    final int port = 9878;
+    late int port;
 
     setUp(() async {
       client = HttpClient();
@@ -27,9 +27,10 @@ void main() {
         logs: logs,
         busy: ValueNotifier<bool>(false),
         loggedIn: ValueNotifier<bool>(false),
-        port: port,
+        port: 0,
       );
       await server.start();
+      port = server.boundPort!;
     });
 
     tearDown(() async {

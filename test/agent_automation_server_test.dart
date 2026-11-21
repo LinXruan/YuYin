@@ -17,7 +17,7 @@ void main() {
     late ValueNotifier<bool> busy;
     late ValueNotifier<bool> loggedIn;
     late HttpClient client;
-    const testPort = 9876;
+    late int testPort;
 
     setUp(() async {
       DownloadSettingsStore.resetForTesting(defaultValue: true);
@@ -31,9 +31,10 @@ void main() {
         logs: logs,
         busy: busy,
         loggedIn: loggedIn,
-        port: testPort,
+        port: 0,
       );
       await server.start();
+      testPort = server.boundPort!;
     });
 
     tearDown(() async {

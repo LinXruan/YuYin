@@ -221,7 +221,7 @@ void main() {
     late AgentAutomationServer server;
     late HttpClient httpClient;
     late HttpOverrides? previousOverrides;
-    const testPort = 9877;
+    late int testPort;
 
     setUp(() async {
       previousOverrides = HttpOverrides.current;
@@ -231,9 +231,10 @@ void main() {
         logs: LogController(),
         busy: ValueNotifier(false),
         loggedIn: ValueNotifier(false),
-        port: testPort,
+        port: 0,
       );
       await server.start();
+      testPort = server.boundPort!;
     });
 
     tearDown(() async {

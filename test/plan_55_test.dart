@@ -72,7 +72,7 @@ void main() {
   group('PLAN_55: Debug 自动化接口标题比对验证 (AgentAutomationServer)', () {
     late AgentAutomationServer server;
     late LogController logs;
-    const testPort = 9879;
+    late int testPort;
 
     setUp(() async {
       HttpOverrides.global = null;
@@ -81,9 +81,10 @@ void main() {
         logs: logs,
         busy: ValueNotifier(false),
         loggedIn: ValueNotifier(false),
-        port: testPort,
+        port: 0,
       );
       await server.start();
+      testPort = server.boundPort!;
     });
 
     tearDown(() async {

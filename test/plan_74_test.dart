@@ -48,7 +48,7 @@ void main() {
       late AgentAutomationServer server;
       late LogController logs;
       late HttpClient client;
-      const port = 9898;
+      late int port;
       const homeUrl =
           'https://www.douyin.com/user/MS4wLjABAAAA8YYeky7_h9eHILUHN6UF3mUatKki7QS81NMfbzLHO04';
 
@@ -59,9 +59,10 @@ void main() {
           logs: logs,
           busy: ValueNotifier<bool>(false),
           loggedIn: ValueNotifier<bool>(false),
-          port: port,
+          port: 0,
         );
         await server.start();
+        port = server.boundPort!;
       });
 
       tearDown(() async {
