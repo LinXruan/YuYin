@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../models/history/history_type_filter.dart';
 import '../../models/history_item.dart';
 import '../atomic_file_writer.dart';
 import '../thumbnail/history_thumbnail_cache.dart';
@@ -175,8 +176,17 @@ class HistoryStore {
   }
 
   /// 纯内存极速分词搜索：委托给 HistoryQuery 纯函数。
-  static List<HistoryItem> search(String query, {bool onlySaved = false}) =>
-      HistoryQuery.search(_records, query, onlySaved: onlySaved);
+  static List<HistoryItem> search(
+    String query, {
+    bool onlySaved = false,
+    HistoryTypeFilter typeFilter = HistoryTypeFilter.all,
+  }) =>
+      HistoryQuery.search(
+        _records,
+        query,
+        onlySaved: onlySaved,
+        typeFilter: typeFilter,
+      );
 
   /// 纯函数：应用一条新增记录并返回实际入库项
   static HistoryItem _applyAdd(HistoryItem item) {

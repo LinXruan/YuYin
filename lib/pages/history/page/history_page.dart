@@ -46,9 +46,16 @@ class _HistoryPageState extends State<HistoryPage>
           _selection.pruneUnsaved(savedIds);
         }
       },
+      onTypeFilterChanged: (filter) {
+        final validIds = HistoryStore.search(
+          _search.searchQuery,
+          onlySaved: _search.filterOnlySaved,
+          typeFilter: filter,
+        ).map((item) => item.id).toSet();
+        _selection.pruneDeleted(validIds);
+      },
     );
     HistoryThumbnailCache.warmUp();
-    HistoryThumbnailCache.cacheUpdateNotifier.addListener(_onCacheUpdated);
     HistoryStore.recordsNotifier.addListener(_onRecordsChanged);
     HistoryStore.isPromptDismissed().then((dismissed) {
       if (mounted && dismissed) {
@@ -59,15 +66,9 @@ class _HistoryPageState extends State<HistoryPage>
 
   @override
   void dispose() {
-    HistoryThumbnailCache.cacheUpdateNotifier.removeListener(_onCacheUpdated);
     HistoryStore.recordsNotifier.removeListener(_onRecordsChanged);
     _search.dispose();
     super.dispose();
-  }
-
-  void _onCacheUpdated() {
-    if (!mounted) return;
-    setState(() {});
   }
 
   void _onRecordsChanged() {
@@ -84,6 +85,7 @@ class _HistoryPageState extends State<HistoryPage>
     final displayedItems = HistoryStore.search(
       _search.searchQuery,
       onlySaved: _search.filterOnlySaved,
+      typeFilter: _search.typeFilter,
     );
     final hasAnyRecord = HistoryStore.records.isNotEmpty;
 

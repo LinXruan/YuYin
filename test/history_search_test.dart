@@ -1,5 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yuyin/models/history/history_record_type.dart';
+import 'package:yuyin/models/history/history_type_filter.dart';
 import 'package:yuyin/models/history_item.dart';
+import 'package:yuyin/pages/history/flow/search/history_search_coordinator.dart';
 import 'package:yuyin/utils/history/history_store.dart';
 
 void main() {
@@ -100,6 +103,130 @@ void main() {
 
       // 100 次搜索总耗时应非常小（远低于 100ms）
       expect(stopwatch.elapsedMilliseconds, lessThan(200));
+    });
+  });
+
+  group('HistoryTypeFilter 媒体类型过滤测试', () {
+    late HistoryItem videoItem;
+    late HistoryItem imageItem;
+    late HistoryItem homeItem;
+
+    setUp(() async {
+      HistoryStore.resetForTesting(skipSave: true);
+      videoItem = HistoryItem(
+        id: 'v1',
+        url: 'https://v.douyin.com/video1/',
+        fullDesc: '精彩视频片段',
+        isImagePost: false,
+        recordType: HistoryRecordType.work,
+        isSaved: true,
+      );
+      imageItem = HistoryItem(
+        id: 'img1',
+        url: 'https://v.douyin.com/image1/',
+        fullDesc: '高清图集分享',
+        isImagePost: true,
+        recordType: HistoryRecordType.work,
+        isSaved: false,
+      );
+      homeItem = HistoryItem(
+        id: 'home1',
+        url: 'https://www.douyin.com/user/1',
+        fullDesc: '作者主页个人展示',
+        recordType: HistoryRecordType.userHome,
+        isSaved: true,
+      );
+
+      await HistoryStore.addRecord(videoItem);
+      await HistoryStore.addRecord(imageItem);
+      await HistoryStore.addRecord(homeItem);
+    });
+
+    test('HistoryTypeFilter 枚举 matches 行为符合预期', () {
+      expect(HistoryTypeFilter.all.matches(videoItem), isTrue);
+      expect(HistoryTypeFilter.all.matches(imageItem), isTrue);
+      expect(HistoryTypeFilter.all.matches(homeItem), isTrue);
+
+      expect(HistoryTypeFilter.video.matches(videoItem), isTrue);
+      expect(HistoryTypeFilter.video.matches(imageItem), isFalse);
+      expect(HistoryTypeFilter.video.matches(homeItem), isFalse);
+
+      expect(HistoryTypeFilter.image.matches(videoItem), isFalse);
+      expect(HistoryTypeFilter.image.matches(imageItem), isTrue);
+      expect(HistoryTypeFilter.image.matches(homeItem), isFalse);
+
+      expect(HistoryTypeFilter.userHome.matches(videoItem), isFalse);
+      expect(HistoryTypeFilter.userHome.matches(imageItem), isFalse);
+      expect(HistoryTypeFilter.userHome.matches(homeItem), isTrue);
+    });
+
+    test('HistoryStore.search 支持媒体类型精确过滤与多维联动', () {
+      // 默认全部
+      expect(HistoryStore.search('').length, 3);
+
+      // 仅视频
+      final videos = HistoryStore.search('', typeFilter: HistoryTypeFilter.video);
+      expect(videos.length, 1);
+      expect(videos.first.id, 'v1');
+
+      // 仅图文
+      final images = HistoryStore.search('', typeFilter: HistoryTypeFilter.image);
+      expect(images.length, 1);
+      expect(images.first.id, 'img1');
+
+      // 仅主页
+      final homes = HistoryStore.search('', typeFilter: HistoryTypeFilter.userHome);
+      expect(homes.length, 1);
+      expect(homes.first.id, 'home1');
+
+      // 联动：已保存 + 视频
+      final savedVideos = HistoryStore.search(
+        '',
+        onlySaved: true,
+        typeFilter: HistoryTypeFilter.video,
+      );
+      expect(savedVideos.length, 1);
+      expect(savedVideos.first.id, 'v1');
+
+      // 联动：已保存 + 图文（图文未保存，应为空）
+      final savedImages = HistoryStore.search(
+        '',
+        onlySaved: true,
+        typeFilter: HistoryTypeFilter.image,
+      );
+      expect(savedImages, isEmpty);
+
+      // 联动：关键词 + 主页
+      final searchedHomes = HistoryStore.search(
+        '作者',
+        typeFilter: HistoryTypeFilter.userHome,
+      );
+      expect(searchedHomes.length, 1);
+      expect(searchedHomes.first.id, 'home1');
+    });
+
+    test('HistorySearchCoordinator 正常触发 setTypeFilter 与回调', () {
+      var changedCount = 0;
+      HistoryTypeFilter? lastChangedFilter;
+
+      final coordinator = HistorySearchCoordinator(
+        onChanged: () => changedCount++,
+        onFilterSavedChanged: (_) {},
+        onTypeFilterChanged: (filter) => lastChangedFilter = filter,
+      );
+
+      expect(coordinator.typeFilter, HistoryTypeFilter.all);
+
+      coordinator.setTypeFilter(HistoryTypeFilter.video);
+      expect(coordinator.typeFilter, HistoryTypeFilter.video);
+      expect(changedCount, 1);
+      expect(lastChangedFilter, HistoryTypeFilter.video);
+
+      // 相同过滤不重复触发
+      coordinator.setTypeFilter(HistoryTypeFilter.video);
+      expect(changedCount, 1);
+
+      coordinator.dispose();
     });
   });
 }
