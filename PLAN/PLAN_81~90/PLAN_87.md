@@ -47,7 +47,7 @@
   - `test/plan_55_test.dart`
   - `test/plan_56_test.dart`
   - `test/plan_74_test.dart`
-- **提交规范**：`231_pl87：测试套件 HTTP 端口改为动态分配 (port 0)`
+- **提交规范**：`231_pl87：测试套件 HTTP 端口改为动态分配 (port 0)`（已完成，commit `bf520d5`）
 
 ### 阶段 2（build 232）：ParseStatus 强类型状态机与 StatusCard 重构
 - **涉及文件**：
@@ -55,14 +55,19 @@
   - 改造 `lib/pages/parse/widget/status/status_card.dart`
   - 改造 `lib/pages/parse/flow/common/parse_flow_context.dart`
   - 改造 `lib/pages/parse/page/parse_page.dart` 及三大 Coordinator（`Single`/`Multi`/`Home`）
-  - 新增/更新 `test/parse_status_test.dart` 与对应 UI 测试
-- **提交规范**：`232_pl87：实现 ParseStatus 强类型状态机，StatusCard 解耦纯字符串反推`
+  - 新增/更新 `test/parse_page_status_test.dart` 与 `test/parse_frame_widget_test.dart`
+- **提交规范**：`232_pl87：实现 ParseStatus 强类型状态机，StatusCard 解耦纯字符串反推`（已完成，commit `287c422`）
 
 ### 阶段 3（build 233）：模拟器端三链路回归与文档更新
 - **涉及文件**：
   - `HANDOVER.md`
   - `PLAN/PLAN_81~90/PLAN_87.md`
-- **提交规范**：`233_pl87：模拟器端功能回归与交接文档更新`
+- **实测结果**：
+  - 启动带桌面窗口 Android 模拟器（`Medium_Phone_API_37.0` / `emulator-5554`），建立 19527 端口映射。
+  - 单视频链路：`https://www.douyin.com/video/7699742794776932454` 实测成功返回 12 个档位（1080P/720P/540P）。
+  - 单图文链路：`https://www.douyin.com/note/7701683319334910554` 实测成功解析 4 项资源（3 图 + 1 配乐音频）。
+  - 主页批量链路：`https://www.douyin.com/user/MS4wLjABAAAA8YYeky7_h9eHILUHN6UF3mUatKki7QS81NMfbzLHO04?from_tab_name=main` 实测成功抓取作者【宁采君】及全量 317 条作品与 317 张封面，标注 312 个。
+- **提交规范**：`233_pl87：模拟器端三链路实测验证与文档更新（ParseStatus 重构收官）`
 
 ---
 
