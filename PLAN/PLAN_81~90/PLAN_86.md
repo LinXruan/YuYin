@@ -37,17 +37,23 @@
 - **涉及文件**：
   - 替换 19 处 `lib/` 引用与 7 处 `test/` 引用。
   - `git rm lib/utils/url_parser.dart`。
-- **提交规范**：`228_pl86：消除 UrlParser 兼容壳，全域直连 URL 领域对象`
+- **提交规范**：`228_pl86：消除 UrlParser 兼容壳，全域直连 URL 领域对象`（已完成，commit `6673d14`）
 
 ### 阶段 2（build 229）：MediaItem 聚合导出壳消除（按需精确导入）
 - **目标**：全域替换 `models/media_item.dart` 为精确的领域模型路径，安全删除 `lib/models/media_item.dart`。
 - **涉及文件**：
-  - 替换约 46 处 `lib/` 引用与 24 处 `test/` 引用。
+  - 替换 46 处 `lib/` 引用与 33 处 `test/` 引用。
   - `git rm lib/models/media_item.dart`。
-- **提交规范**：`229_pl86：消除 MediaItem 聚合导出壳，全域按需精确导入领域模型`
+- **提交规范**：`229_pl86：消除 MediaItem 聚合导出壳，全域按需精确导入领域模型`（已完成，commit `25da1f3`）
 
 ### 阶段 3（build 230）：真机端三链路实测与交接文档更新
 - **目标**：覆盖安装最新 Debug 包到真机（无线 ADB），执行状态与三链路（视频、图文、主页）自动化测试，更新 `HANDOVER.md`。
+- **实测结果**：
+  - 状态端点：`120 Hz` 自适应高刷跟随，`version: 1.6.1+230` 正常识别。
+  - 单视频链路：`https://www.douyin.com/video/7699742794776932454` 成功返回 12 个档位。
+  - 单图文链路：`https://www.douyin.com/note/7701683319334910554` 成功解析 4 张图集图片。
+  - 主页批量链路：`https://www.douyin.com/user/MS4wLjABAAAA8YYeky7_h9eHILUHN6UF3mUatKki7QS81NMfbzLHO04?from_tab_name=main` 成功捕获作者【宁采君】及首屏 18 条作品。
+- **提交规范**：`230_pl86：真机端三链路实测验证与文档更新（全库 0 兼容壳达成）`
 
 ---
 

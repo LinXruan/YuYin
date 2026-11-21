@@ -1,16 +1,18 @@
-# 余音交接清单（截至 1.6.1+227）
+# 余音交接清单（截至 1.6.1+230）
 
-> 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_81~90/PLAN_85.md`。
-> 工作区干净，最近提交为 227_pl85。
+> 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_81~90/PLAN_86.md`。
+> 工作区干净，最近提交为 230_pl86。
 
 ---
 
 ## 0. 一句话现状
 
-- 版本：`1.6.1+227`（版本名冻结，只递增 build 号）。
+- 版本：`1.6.1+230`（版本名冻结，只递增 build 号）。
 - 门禁：`flutter analyze` 0 issues；`flutter test` 403 全绿；**结构门禁 `part` 上限为 0（全库已彻底实现 0 part）**！
-- 已完成大重构：**全库 0 part（调试桥、Selection、Shell、Sniffer、ParsePage、HistoryPage、UpdateDialog、SavePage 全部 0 part）**。
-- 后续主要工作：删除聚合导出壳（`media_item.dart`/`url_parser.dart`）、Store 显式注入、PLAN_78 性能优化项、PLAN_79 体验优化项。
+- 已完成大重构：
+  - **全库 0 part**（调试桥、Selection、Shell、Sniffer、ParsePage、HistoryPage、UpdateDialog、SavePage 全部 0 part）。
+  - **全库 0 兼容壳**（彻底删除 `lib/models/media_item.dart` 与 `lib/utils/url_parser.dart` 兼容壳，全域 100% 直连具体领域模型与解析类）。
+- 后续主要工作：Store 显式注入、PLAN_78 性能优化项、PLAN_79 体验优化项。
 
 ---
 
@@ -63,6 +65,9 @@
 | 225 | 85 | TopMultiHomeSheet 解耦：作者磁贴与头像组件独立化（TopAuthorTile + AuthorAvatarContent），part 上限降至 28 |
 | 226 | 85 | MiddleMultiWorkSheet 解耦：作品磁贴与封面组件独立化（MiddleWorkTile + WorkCoverContent），part 上限降至 14 |
 | 227 | 85 | BottomMediaSheet 解耦收官：全库彻底 0 part，结构门禁上限设为 0（全库 0 part 终极里程碑达成） |
+| 228 | 86 | PLAN_86 阶段 1：消除 `UrlParser` 兼容壳，全域 19 处 `lib/` 和 7 处 `test/` 直连 URL 领域对象，删除 `url_parser.dart` |
+| 229 | 86 | PLAN_86 阶段 2：消除 `MediaItem` 聚合导出壳，全域 46 处 `lib/` 和 33 处 `test/` 按需精确导入领域模型，删除 `media_item.dart` |
+| 230 | 86 | PLAN_86 阶段 3：真机端三链路实测通过（视频 12 档、图文 4 图、主页 18 条），交接文档与状态更新（全库 0 兼容壳达成） |
 
 ---
 
@@ -177,7 +182,7 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 - [x] **HistoryPage（16 条）**：`lib/pages/history/page/history_page.dart` + 8 个 part；拆为 HistoryCard/HistoryThumbnail/HistoryFilterButton/HistoryPromptBanner/HistoryEmptyView/HistoryFrame 独立组件，彻底 **0 part**。
 - [x] **widgets/update（4 条）**：UpdateDialog 拆为 MarkdownRenderView 与 ReleaseNotesBox 独立组件，彻底 **0 part**。
 - [x] **widgets/save_page（38 条）**：top/middle/bottom 三个 sheet 拆为独立 Tile/Cover/Avatar/Preview 组件与 DebugSnapshotHelper，彻底 **0 part**。
-- [ ] **删除聚合导出壳**：`lib/models/media_item.dart`（几十处 import 改为按域导入）、`lib/utils/url_parser.dart`（转发到 `utils/url/`）。
+- [x] **删除聚合导出壳**：`lib/models/media_item.dart` 与 `lib/utils/url_parser.dart` 彻底删除，全域 100% 直连领域模型与解析对象（全库 0 兼容壳达成）。
 - [ ] **Store 显式注入**：`HistoryStore`/`TerminalMemoryStore` 等静态单例改为 `main.dart` 构造并注入，符合 AGENTS §4。
 - [ ] 清理 `_FlowFlow` 命名残余、`ignore_for_file`。
 
