@@ -107,8 +107,17 @@
 
 ## 5. 验收标准
 
-1. 全库 0 个 `part` 指令，0 个 `part of` 指令。
-2. 单文件规模硬约束：所有文件行数严格 ≤400 行（逻辑 ≤250 行，UI ≤200 行）。
-3. `flutter analyze` 0 issues。
-4. `flutter test` 100% 全绿（门禁上限为 0）。
+1. 全库 0 个 `part` 指令，0 个 `part of` 指令。（已达成：0 part）
+2. 单文件规模硬约束：所有文件行数严格 ≤400 行（逻辑 ≤250 行，UI ≤200 行）。（已达成）
+3. `flutter analyze` 0 issues。（已达成）
+4. `flutter test` 100% 全绿（门禁上限为 0）。（已达成：403 测试全绿）
 5. 模拟器端三链路回归实测全通。
+
+---
+
+## 6. 实施完成记录
+
+- **阶段 1（build 224，commit `79726cb`）**：UpdateDialog 解耦，公开 `MarkdownRenderView` 与 `ReleaseNotesBox`，part 上限降至 38。
+- **阶段 2（build 225，commit `7031da6`）**：TopMultiHomeSheet 解耦，公开 `TopAuthorTile`、`AuthorAvatarContent`，新增 `TopDebugSnapshotHelper`，part 上限降至 28。
+- **阶段 3（build 226，commit `8cb2da5`）**：MiddleMultiWorkSheet 解耦，公开 `MiddleWorkTile`、`WorkCoverContent`，新增 `MiddleDebugSnapshotHelper`，part 上限降至 14。
+- **阶段 4（build 227，commit `3405891`）**：BottomMediaSheet 解耦收官，公开 `BottomMediaTile`、`MediaFullscreenPreview`，新增 `BottomDebugSnapshotHelper`，**全库彻底 0 part**，门禁上限设为 0！
