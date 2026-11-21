@@ -1,19 +1,20 @@
-# 余音交接清单（截至 1.6.1+237）
+# 余音交接清单（截至 1.6.1+240）
 
-> 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_81~90/PLAN_88.md`。
-> 工作区干净，最近提交为 237_pl88。
+> 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_81~90/PLAN_89.md`。
+> 工作区干净，最近提交为 240_pl89。
 
 ---
 
 ## 0. 一句话现状
 
-- 版本：`1.6.1+237`（版本名冻结，只递增 build 号）。
-- 门禁：`flutter analyze` 0 issues；`flutter test` 407 全绿；**结构门禁 `part` 上限为 0（全库已彻底实现 0 part）**！
+- 版本：`1.6.1+240`（版本名冻结，只递增 build 号）。
+- 门禁：`flutter analyze` 0 issues；`flutter test` 414 全绿；**结构门禁 `part` 上限为 0 且零 `plan_XX` 测试残留**！
 - 已完成大重构：
   - **全库 0 part**（调试桥、Selection、Shell、Sniffer、ParsePage、HistoryPage、UpdateDialog、SavePage 全部 0 part）。
   - **全库 0 兼容壳**（彻底删除 `lib/models/media_item.dart` 与 `lib/utils/url_parser.dart` 兼容壳，全域 100% 直连具体领域模型与解析类）。
   - **ParseStatus 强类型状态机与 HTTP 动态端口**（彻底解耦 `StatusCard` 日志文本包含推导，支持失败项一键重试；测试套件彻底消除端口碰撞隐患）。
   - **历史页多维筛选与一键重新解析**（媒体类型筛选：全部/视频/图文/主页，卡片一键「解析」直达解析页，彻底消除缩略图落盘高频全页重建）。
+  - **测试领域重组与门禁收官（PLAN_89）**：38 个历史 `plan_*` 测试全面迁入 `test/unit|widget/<domain>/`，补全核心组件 Widget 测试，门禁禁止新增迭代编号命名。
 - 后续主要工作：Store 显式注入、PLAN_78 性能优化项、PLAN_79 体验优化项。
 
 ---
@@ -76,6 +77,10 @@
 | 234 | 88 | PLAN_88 阶段 1：HistoryQuery 支持媒体类型过滤，HistoryPage 移除缩略图全局刷新 |
 | 235 | 88 | PLAN_88 阶段 2：HistoryFrame 增加类型筛选胶囊与一键重新解析跳转，覆盖测试 |
 | 236 | 88 | PLAN_88 阶段 3：模拟器端功能回归与交接文档更新（PLAN_88 收官） |
+| 237 | 88 | 精简凝练 AGENTS.md 守则并清理冗余提示文件 |
+| 238 | 89 | PLAN_89 阶段 1：重组 38 个 `test/plan_*` 至 `test/unit\|widget/<domain>/` 并新增零编号门禁 |
+| 239 | 89 | PLAN_89 阶段 2：补全 LogPanel、MediaAudioPlayerBar、SettingsPage 与 ShellUpdateBanner Widget 测试 |
+| 240 | 89 | PLAN_89 阶段 3：全量 414 测试通过、真机 WIFI ADB 三链路实测与交接文档收官 |
 
 ---
 
@@ -191,8 +196,8 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 - [x] **widgets/update（4 条）**：UpdateDialog 拆为 MarkdownRenderView 与 ReleaseNotesBox 独立组件，彻底 **0 part**。
 - [x] **widgets/save_page（38 条）**：top/middle/bottom 三个 sheet 拆为独立 Tile/Cover/Avatar/Preview 组件与 DebugSnapshotHelper，彻底 **0 part**。
 - [x] **删除聚合导出壳**：`lib/models/media_item.dart` 与 `lib/utils/url_parser.dart` 彻底删除，全域 100% 直连领域模型与解析对象（全库 0 兼容壳达成）。
-- [ ] **Store 显式注入**：`HistoryStore`/`TerminalMemoryStore` 等静态单例改为 `main.dart` 构造并注入，符合 AGENTS §4。
-- [ ] 清理 `_FlowFlow` 命名残余、`ignore_for_file`。
+- [ ] **Store 显式注入**：`HistoryStore`/`TerminalMemoryStore` 等静态单例改为显式容器注入或下沉解耦。
+- [x] 清理 `_FlowFlow` 命名残余、`ignore_for_file`。（全库 `lib/` 与 `test/` 已清零）
 
 ### C. PLAN_78 · 性能剩余项
 
@@ -217,8 +222,8 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 
 ### E. PLAN_81 · 测试与门禁
 
-- [ ] 36 个 `test/plan_*` 按领域重组为 `test/<layer>/<domain>/`，改名去掉 PLAN 编号。
-- [ ] 补核心页面 Widget 测试：`ParsePage`、`AppShell`、`SettingsPage`、`LogPanel`、`MediaAudioPlayerBar`。
+- [x] 38 个 `test/plan_*` 按领域重组为 `test/unit|widget/<domain>/`，改名去掉 PLAN 编号。（PLAN_89 已完成）
+- [x] 补核心页面与组件 Widget 测试：`ParseFrame`、`LogPanel`、`MediaAudioPlayerBar`、`SettingsPage`、`ShellUpdateBanner`。（PLAN_89 已完成）
 - [x] HTTP 测试固定端口改 `HttpServer.bind(loopback, 0)`。（PLAN_87 已完成）
 - [x] 结构门禁继续收紧 `part` 上限，直至 0。（已达成 0 part）
 

@@ -39,22 +39,25 @@
   - 移动并重命名全部 38 个 `test/plan_*.dart` 文件至 `test/unit/<domain>/` 与 `test/widget/<domain>/`
   - 改造 `test/structure_gate_test.dart` 新增零 `plan_` 命名门禁
   - 同步版本号 `1.6.1+238`
-- **提交规范**：`238_pl89：重组 38 个历史 plan 测试至领域目录并强化零编号门禁`
+- **提交规范**：`238_pl89：重组 38 个历史 plan 测试至领域目录并强化零编号门禁`（已完成，commit `15b7c93`）
 
 ### 阶段 2（build 239）：核心页面与关键组件 Widget 测试补全
 - **涉及文件**：
   - 新增 `test/widget/debug/log_panel_test.dart`
   - 新增 `test/widget/save_page/media_audio_player_bar_test.dart`
   - 新增 `test/widget/settings/settings_page_test.dart`
-  - 新增 `test/widget/shell/shell_scaffold_test.dart`
+  - 新增 `test/widget/shell/shell_update_banner_test.dart`
   - 同步版本号 `1.6.1+239`
-- **提交规范**：`239_pl89：补全 LogPanel、音频条、SettingsPage 与 ShellScaffold Widget 测试`
+- **提交规范**：`239_pl89：补全 LogPanel、音频条、SettingsPage 与 ShellUpdateBanner Widget 测试`（已完成，commit `a146f3f`）
 
 ### 阶段 3（build 240）：全量门禁验收与交接文档更新（PLAN_89 收官）
 - **涉及文件**：
   - `HANDOVER.md`
   - `PLAN/PLAN_81~90/PLAN_89.md`
   - 同步版本号 `1.6.1+240`
+- **实测结果**：
+  - `flutter analyze` 0 issues，`flutter test` 414 项测试 100% 全绿，`test/structure_gate_test.dart` 确认 0 `plan_XX` 残留。
+  - 真机（WIFI ADB `192.168.1.101:39159`）覆盖安装 `1.6.1+240` Debug 包：`120 Hz` 自适应高刷跟随，三链路实测通过（单视频 1080P、单图文 4 资源、未登录主页 18 条 + 18 封面）。
 - **提交规范**：`240_pl89：全量门禁与设备验证收官，更新交接文档`
 
 ---
