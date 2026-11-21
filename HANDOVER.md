@@ -1,18 +1,19 @@
-# 余音交接清单（截至 1.6.1+233）
+# 余音交接清单（截至 1.6.1+236）
 
-> 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_81~90/PLAN_87.md`。
-> 工作区干净，最近提交为 233_pl87。
+> 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_81~90/PLAN_88.md`。
+> 工作区干净，最近提交为 236_pl88。
 
 ---
 
 ## 0. 一句话现状
 
-- 版本：`1.6.1+233`（版本名冻结，只递增 build 号）。
-- 门禁：`flutter analyze` 0 issues；`flutter test` 403 全绿；**结构门禁 `part` 上限为 0（全库已彻底实现 0 part）**！
+- 版本：`1.6.1+236`（版本名冻结，只递增 build 号）。
+- 门禁：`flutter analyze` 0 issues；`flutter test` 407 全绿；**结构门禁 `part` 上限为 0（全库已彻底实现 0 part）**！
 - 已完成大重构：
   - **全库 0 part**（调试桥、Selection、Shell、Sniffer、ParsePage、HistoryPage、UpdateDialog、SavePage 全部 0 part）。
   - **全库 0 兼容壳**（彻底删除 `lib/models/media_item.dart` 与 `lib/utils/url_parser.dart` 兼容壳，全域 100% 直连具体领域模型与解析类）。
   - **ParseStatus 强类型状态机与 HTTP 动态端口**（彻底解耦 `StatusCard` 日志文本包含推导，支持失败项一键重试；测试套件彻底消除端口碰撞隐患）。
+  - **历史页多维筛选与一键重新解析**（媒体类型筛选：全部/视频/图文/主页，卡片一键「解析」直达解析页，彻底消除缩略图落盘高频全页重建）。
 - 后续主要工作：Store 显式注入、PLAN_78 性能优化项、PLAN_79 体验优化项。
 
 ---
@@ -72,6 +73,9 @@
 | 231 | 87 | PLAN_87 阶段 1：测试套件 HTTP 端口改为动态分配绑定（`port: 0`），改造 7 个测试文件彻底消除并发端口冲突 |
 | 232 | 87 | PLAN_87 阶段 2：实现 `ParseStatus` 强类型状态机模型与失败一键重试，`StatusCard` 全面解耦日志文本匹配 |
 | 233 | 87 | PLAN_87 阶段 3：模拟器端三链路（视频 12 档、图文 4 资源、主页 317 条作品）回归实测全通，交接文档与状态更新 |
+| 234 | 88 | PLAN_88 阶段 1：HistoryQuery 支持媒体类型过滤，HistoryPage 移除缩略图全局刷新 |
+| 235 | 88 | PLAN_88 阶段 2：HistoryFrame 增加类型筛选胶囊与一键重新解析跳转，覆盖测试 |
+| 236 | 88 | PLAN_88 阶段 3：模拟器端功能回归与交接文档更新（PLAN_88 收官） |
 
 ---
 
@@ -199,13 +203,13 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 - [ ] `StorageBridge` 目录 DocumentFile 缓存 + 线程池（Cursor 已完成）。
 - [ ] 历史缩略图：LRU/孤儿淘汰、失败 URL 退避、确定性哈希、`clearCache` 世代取消。
 - [ ] 选择树单作者增量刷新（启用 `_authorOfWork`），`SaveSelectionFrame` partial 切换不再重建图片。
-- [ ] `history_page` 移除 `build()` 内磁盘 I/O 与全局通知整页重建。
+- [x] `history_page` 移除 `build()` 内磁盘 I/O 与全局通知整页重建。（PLAN_88 已完成）
 
 ### D. PLAN_79 · 体验与准确度剩余项
 
 - [x] `ParseStatus` 强类型（idle/running/success/partialFailure/failure）+ 失败项一键重试；`StatusCard` 消费新模型。（PLAN_87 已完成）
 - [ ] 中层打开未解析作品失败时弹窗内反馈（不再只写后台日志）。
-- [ ] 历史页「一键重新解析」与媒体类型筛选。
+- [x] 历史页「一键重新解析」与媒体类型筛选。（PLAN_88 已完成）
 - [ ] 音频：错误态展示、进度拖动 200ms 防抖、暂停恢复不抖动。
 - [ ] 图片全屏滑动切换；22×22dp 极小按钮热区；冷启动已关闭横幅防闪。
 - [ ] 设置页缩略图缓存管理入口。

@@ -49,23 +49,30 @@
   - 改造 `lib/utils/history/history_store.dart`
   - 改造 `lib/pages/history/flow/search/history_search_coordinator.dart`
   - 改造 `lib/pages/history/page/history_page.dart`
-  - 改造 `test/history_search_test.dart` 与 `test/history_page_test.dart`
-- **提交规范**：`234_pl88：HistoryQuery 支持媒体类型过滤，HistoryPage 移除缩略图全局刷新`
+  - 改造 `test/history_search_test.dart`
+- **提交规范**：`234_pl88：HistoryQuery 支持媒体类型过滤，HistoryPage 移除缩略图全局刷新`（已完成，commit `2155e3e`）
 
 ### 阶段 2（build 235）：媒体类型筛选 UI 与一键重新解析跳转打通
 - **涉及文件**：
-  - 改造 `lib/pages/history/widget/filter/history_filter_button.dart`（或新建类型选择器）
+  - 改造 `lib/pages/history/widget/empty/history_empty_view.dart`
   - 改造 `lib/pages/history/widget/frame/history_frame.dart`
   - 改造 `lib/pages/history/widget/card/history_card.dart`
   - 改造 `lib/pages/history/page/history_page.dart`
   - 改造 `lib/pages/shell/widget/shell_scaffold.dart`
-  - 补充 Widget 测试
-- **提交规范**：`235_pl88：HistoryFrame 增加类型筛选胶囊与一键重新解析跳转`
+  - 改造 `lib/pages/parse/page/parse_page.dart`
+  - 新增 `test/history_page_filter_actions_test.dart`
+- **提交规范**：`235_pl88：HistoryFrame 增加类型筛选胶囊与一键重新解析跳转`（已完成，commit `1a3a2a4`）
 
 ### 阶段 3（build 236）：模拟器端回归与交接文档更新
 - **涉及文件**：
   - `HANDOVER.md`
   - `PLAN/PLAN_81~90/PLAN_88.md`
+- **实测结果**：
+  - 模拟器（`Medium_Phone_API_37.0` / `emulator-5554`）覆盖安装 `1.6.1+236` Debug 包并启动。
+  - 端口映射 `19527` 连通正常，`/api/status` 识别 `1.6.1+236`。
+  - `/api/history` 与 `/api/history?q=宁采君` 查询验证正常。
+  - 单视频 `https://www.douyin.com/video/7699742794776932454` 实测 12 档解析通过。
+  - 407 项自动化测试（含新增媒体类型筛选与卡片一键解析跳转测试）100% 全绿。
 - **提交规范**：`236_pl88：模拟器端功能回归与交接文档更新（PLAN_88 收官）`
 
 ---
