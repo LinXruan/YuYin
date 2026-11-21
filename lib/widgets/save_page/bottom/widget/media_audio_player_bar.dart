@@ -49,8 +49,15 @@ class MediaAudioPlayerBar extends StatelessWidget {
             builder: (context, state, _) {
               final isPlaying = state == AudioPreviewState.playing;
               final isBuffering = state == AudioPreviewState.buffering;
+              final isError = state == AudioPreviewState.error;
               return IconButton.filledTonal(
                 iconSize: 26,
+                style: isError
+                    ? IconButton.styleFrom(
+                        backgroundColor: theme.colorScheme.errorContainer,
+                        foregroundColor: theme.colorScheme.onErrorContainer,
+                      )
+                    : null,
                 onPressed: () {
                   if (isPlaying) {
                     audioService.pause();
@@ -65,9 +72,11 @@ class MediaAudioPlayerBar extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2.5),
                       )
                     : Icon(
-                        isPlaying
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
+                        isError
+                            ? Icons.refresh_rounded
+                            : (isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded),
                       ),
               );
             },
@@ -115,9 +124,33 @@ class MediaAudioPlayerBar extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 2),
-                ScrubrableProgressBar(
-                  key: const ValueKey('scrubbable_progress_bar'),
-                  audioService: audioService,
+                ValueListenableBuilder<AudioPreviewState>(
+                  valueListenable: audioService.state,
+                  builder: (context, state, _) {
+                    if (state != AudioPreviewState.error) {
+                      return ScrubrableProgressBar(
+                        key: const ValueKey('scrubbable_progress_bar'),
+                        audioService: audioService,
+                      );
+                    }
+                    return ValueListenableBuilder<String?>(
+                      valueListenable: audioService.errorMessage,
+                      builder: (context, err, _) {
+                        final msg = (err != null && err.trim().isNotEmpty)
+                            ? '播放失败：$err'
+                            : '播放失败，点击左侧按钮重试';
+                        return Text(
+                          msg,
+                          key: const ValueKey('audio_player_error_text'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.error,
+                          ),
+                        );
+                      },
+                    );
+                  },
                 ),
               ],
             ),

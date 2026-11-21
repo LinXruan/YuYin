@@ -1,8 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../services/media/audio_preview_service.dart';
 
-/// 支持无滑块手势横向拖动与轻触定位的平滑进度条
+/// 支持无滑块手势横向拖动（200ms 防抖提交原生 seek）与轻触定位的平滑进度条
 class ScrubrableProgressBar extends StatefulWidget {
   const ScrubrableProgressBar({super.key, required this.audioService});
 
@@ -15,6 +17,20 @@ class ScrubrableProgressBar extends StatefulWidget {
 class _ScrubrableProgressBarState extends State<ScrubrableProgressBar> {
   bool _isDragging = false;
   double _dragRatio = 0.0;
+  Timer? _seekDebounceTimer;
+
+  @override
+  void dispose() {
+    _seekDebounceTimer?.cancel();
+    super.dispose();
+  }
+
+  void _commitSeek(double ratio) {
+    final total = widget.audioService.duration.value.inMilliseconds;
+    if (total <= 0) return;
+    final target = Duration(milliseconds: (total * ratio).round());
+    widget.audioService.seek(target);
+  }
 
   void _updateDrag(Offset localPosition, double width) {
     if (width <= 0) return;
@@ -28,16 +44,18 @@ class _ScrubrableProgressBarState extends State<ScrubrableProgressBar> {
         milliseconds: (total * ratio).round(),
       );
     }
+    _seekDebounceTimer?.cancel();
+    _seekDebounceTimer = Timer(const Duration(milliseconds: 200), () {
+      if (!mounted || !_isDragging) return;
+      _commitSeek(_dragRatio);
+    });
   }
 
   void _finishDrag() {
     if (!_isDragging) return;
     _isDragging = false;
-    final total = widget.audioService.duration.value.inMilliseconds;
-    if (total > 0) {
-      final target = Duration(milliseconds: (total * _dragRatio).round());
-      widget.audioService.seek(target);
-    }
+    _seekDebounceTimer?.cancel();
+    _commitSeek(_dragRatio);
   }
 
   @override

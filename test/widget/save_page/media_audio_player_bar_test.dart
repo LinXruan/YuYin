@@ -58,6 +58,17 @@ void main() {
     expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
     expect(find.text('01:05 / 02:05'), findsOneWidget);
 
+    // 模拟错误态 -> 展示重试按钮与错误提示文案
+    service.errorMessage.value = '网络超时';
+    service.state.value = AudioPreviewState.error;
+    await tester.pump();
+    expect(find.byIcon(Icons.refresh_rounded), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('audio_player_error_text')),
+      findsOneWidget,
+    );
+    expect(find.text('播放失败：网络超时'), findsOneWidget);
+
     // 点击关闭按钮触发回调
     await tester.tap(find.byKey(const ValueKey('audio_player_close_button')));
     expect(closed, isTrue);

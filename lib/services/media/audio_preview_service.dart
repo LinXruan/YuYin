@@ -36,6 +36,7 @@ class AudioPreviewService {
   final ValueNotifier<String?> errorMessage = ValueNotifier<String?>(null);
 
   Timer? _progressTimer;
+  DateTime? _seekGuardUntil;
   bool _disposed = false;
   Map<String, String>? _lastHeaders;
 
@@ -107,18 +108,22 @@ class AudioPreviewService {
       await _channel.invokeMethod('play', args);
       if (_disposed) return;
       state.value = AudioPreviewState.playing;
+      errorMessage.value = null;
       _startProgressTimer();
     } on MissingPluginException {
       if (_disposed) return;
       state.value = AudioPreviewState.playing;
     } catch (e) {
-      debugPrint('[AudioPreviewService] resume error: $e');
+      if (_disposed) return;
+      state.value = AudioPreviewState.error;
+      errorMessage.value = e.toString();
     }
   }
 
   /// 跳转到指定播放进度
   Future<void> seek(Duration target) async {
     if (_disposed) return;
+    _seekGuardUntil = DateTime.now().add(const Duration(milliseconds: 450));
     position.value = target;
     try {
       await _channel.invokeMethod('seek', {
@@ -135,6 +140,7 @@ class AudioPreviewService {
   Future<void> stop() async {
     if (_disposed) return;
     _stopProgressTimer();
+    _seekGuardUntil = null;
     try {
       await _channel.invokeMethod('stop');
     } catch (_) {}
@@ -199,7 +205,15 @@ class AudioPreviewService {
       }
       try {
         final res = await _channel.invokeMethod<Map>('getPosition');
-        if (_disposed || res == null) return;
+        if (_disposed ||
+            res == null ||
+            state.value != AudioPreviewState.playing) {
+          return;
+        }
+        final guard = _seekGuardUntil;
+        if (guard != null && DateTime.now().isBefore(guard)) {
+          return;
+        }
         final posMs = res['position'] as int? ?? 0;
         final durMs = res['duration'] as int? ?? 0;
         position.value = Duration(milliseconds: posMs);

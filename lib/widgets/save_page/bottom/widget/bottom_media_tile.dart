@@ -78,72 +78,78 @@ class BottomMediaTile extends StatelessWidget {
               content,
               if (isImage)
                 Positioned(
-                  bottom: 4,
-                  right: 4,
+                  bottom: 0,
+                  right: 0,
                   child: GestureDetector(
                     key: ValueKey('eye_button_$index'),
                     behavior: HitTestBehavior.opaque,
                     onTap: () => onPreview?.call(item),
-                    child: Container(
-                      width: 22,
-                      height: 22,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.55),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.visibility_rounded,
-                        color: Colors.white,
-                        size: 13,
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.55),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.visibility_rounded,
+                          color: Colors.white,
+                          size: 13,
+                        ),
                       ),
                     ),
                   ),
                 ),
               if (isAudio && audioService != null)
                 Positioned(
-                  bottom: 4,
-                  right: 4,
+                  bottom: 0,
+                  right: 0,
                   child: GestureDetector(
                     key: const ValueKey('audio_play_button'),
                     behavior: HitTestBehavior.opaque,
                     onTap: () => onTogglePlayAudio?.call(item),
-                    child: ValueListenableBuilder<AudioPreviewState>(
-                      valueListenable: audioService!.state,
-                      builder: (context, state, _) {
-                        final isThisPlaying =
-                            currentPlayingItem?.url == item.url &&
-                            state == AudioPreviewState.playing;
-                        final isThisBuffering =
-                            currentPlayingItem?.url == item.url &&
-                            state == AudioPreviewState.buffering;
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: ValueListenableBuilder<AudioPreviewState>(
+                        valueListenable: audioService!.state,
+                        builder: (context, state, _) {
+                          final isThisPlaying =
+                              currentPlayingItem?.url == item.url &&
+                              state == AudioPreviewState.playing;
+                          final isThisBuffering =
+                              currentPlayingItem?.url == item.url &&
+                              state == AudioPreviewState.buffering;
 
-                        return Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: isThisBuffering
-                                ? SizedBox(
-                                    width: 10,
-                                    height: 10,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 1.5,
+                          return Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: isThisBuffering
+                                  ? SizedBox(
+                                      width: 10,
+                                      height: 10,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 1.5,
+                                        color: theme.colorScheme.onPrimary,
+                                      ),
+                                    )
+                                  : Icon(
+                                      isThisPlaying
+                                          ? Icons.pause_rounded
+                                          : Icons.play_arrow_rounded,
                                       color: theme.colorScheme.onPrimary,
+                                      size: 13,
                                     ),
-                                  )
-                                : Icon(
-                                    isThisPlaying
-                                        ? Icons.pause_rounded
-                                        : Icons.play_arrow_rounded,
-                                    color: theme.colorScheme.onPrimary,
-                                    size: 13,
-                                  ),
-                          ),
-                        );
-                      },
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),

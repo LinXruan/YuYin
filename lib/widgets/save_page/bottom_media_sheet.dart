@@ -148,9 +148,14 @@ class _ImagePreviewSheetState extends State<ImagePreviewSheet> {
   }
 
   void _showPreview(MediaItem item) {
+    final imageItems =
+        widget.items.where((m) => m.type == MediaType.image).toList();
+    final items = imageItems.isEmpty ? [item] : imageItems;
+    final initialIndex = items.indexWhere((m) => m.url == item.url);
     MediaFullscreenPreview.show(
       context,
-      item: item,
+      items: items,
+      initialIndex: initialIndex < 0 ? 0 : initialIndex,
       headers: widget.headers,
     );
   }
