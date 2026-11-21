@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../../../utils/url_parser.dart';
+import '../../../utils/url/url_classifier.dart';
+import '../../../utils/url/url_extractor.dart';
 import '../channel/sniffer_channel_parser.dart';
 import '../lifecycle/sniffer_page_lifecycle.dart';
 import '../script/sniffer_script_injector.dart';
@@ -42,7 +43,7 @@ class SnifferNavigationPolicy {
   /// 导航白名单拦截
   NavigationDecision onNavigationRequest(NavigationRequest request) {
     final url = request.url;
-    if (UrlParser.isAllowedNavigationUrl(url)) {
+    if (DouyinUrlClassifier.isAllowedNavigationUrl(url)) {
       return NavigationDecision.navigate;
     }
     _blockedSchemes.add(SnifferPageLifecycle.schemeOf(url));
@@ -69,11 +70,11 @@ class SnifferNavigationPolicy {
     pageLifecycle.markPageReset(url);
     if (url.startsWith('about:')) return;
     if (!isTaskActive()) return;
-    if (!UrlParser.isAllowedNavigationUrl(url)) {
+    if (!DouyinUrlClassifier.isAllowedNavigationUrl(url)) {
       pageLifecycle.logNonWebPage(url);
       return;
     }
-    final startedId = UrlParser.extractAwemeId(url);
+    final startedId = DouyinUrlExtractor.extractAwemeId(url);
     if (session.retiredAwemeId != null &&
         startedId != null &&
         startedId == session.retiredAwemeId) {
@@ -99,7 +100,7 @@ class SnifferNavigationPolicy {
     pageLifecycle.markPageReset(url);
     if (url.startsWith('about:')) return;
     if (!isTaskActive()) return;
-    if (!UrlParser.isAllowedNavigationUrl(url)) {
+    if (!DouyinUrlClassifier.isAllowedNavigationUrl(url)) {
       pageLifecycle.logNonWebPage(url);
       return;
     }
@@ -111,13 +112,13 @@ class SnifferNavigationPolicy {
   /// 记录最终页面 URL，并派发给单作品策略处理
   void handlePageUrl(String? url, int taskId) {
     if (url == null || url.isEmpty || isDisposed() || taskId != session.taskId) return;
-    if (!UrlParser.isAllowedNavigationUrl(url)) {
+    if (!DouyinUrlClassifier.isAllowedNavigationUrl(url)) {
       pageLifecycle.logNonWebPage(url);
       return;
     }
     if (!session.taskPageStarted &&
         session.retiredAwemeId != null &&
-        UrlParser.extractAwemeId(url) == session.retiredAwemeId) {
+        DouyinUrlExtractor.extractAwemeId(url) == session.retiredAwemeId) {
       return;
     }
     session.lastPageUrl = url;

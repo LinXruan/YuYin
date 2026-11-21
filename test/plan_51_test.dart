@@ -2,7 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
-import 'package:yuyin/utils/url_parser.dart';
+import 'package:yuyin/utils/url/url_classifier.dart';
+import 'package:yuyin/utils/url/url_extractor.dart';
 
 void main() {
   group('PLAN_51: 抖音主页作品数量 Tag 捕获单元测试', () {
@@ -24,10 +25,10 @@ void main() {
       final lines = content.split('\n').map((l) => l.trim()).toList();
       for (final line in lines) {
         if (line.isEmpty) continue;
-        final url = UrlParser.extractDouyinUrl(line);
+        final url = DouyinUrlExtractor.extractDouyinUrl(line);
         expect(url, isNotNull);
-        expect(UrlParser.isUserHomeUrl(url), isTrue);
-        expect(UrlParser.extractSecUid(url), isNotNull);
+        expect(DouyinUrlClassifier.isUserHomeUrl(url), isTrue);
+        expect(DouyinUrlExtractor.extractSecUid(url), isNotNull);
       }
     });
 

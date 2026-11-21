@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import '../../../models/user_home/user_home_profile.dart';
 import '../../../models/user_home/user_home_result.dart';
-import '../../../utils/url_parser.dart';
+import '../../../utils/url/url_classifier.dart';
 import '../channel/sniffer_channel_parser.dart';
 import '../common/log_message_policy.dart';
 import 'login_message_handler.dart';
@@ -101,7 +101,7 @@ class SnifferMessageRouter {
     final workTitles = _stringMap(data['workTitles']);
 
     // 过滤纯文章作品及其对应的封面/标题映射，避免进入中层保存页
-    final articleUrls = workUrls.where(UrlParser.isArticleUrl).toSet();
+    final articleUrls = workUrls.where(DouyinUrlClassifier.isArticleUrl).toSet();
     if (articleUrls.isNotEmpty) {
       workUrls.removeWhere(articleUrls.contains);
       workCovers.removeWhere((key, _) => articleUrls.contains(key));

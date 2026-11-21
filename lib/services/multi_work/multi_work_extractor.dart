@@ -5,7 +5,8 @@ import '../../models/save_page/multi_work_extract_result.dart';
 import '../../models/save_page/save_work_item.dart';
 import '../../models/save_page/work_kind.dart';
 import '../../models/single_work/single_work_result.dart';
-import '../../utils/url_parser.dart';
+import '../../utils/url/url_classifier.dart';
+import '../../utils/url/url_extractor.dart';
 import '../sniffer/lifecycle/sniff_cancelled_exception.dart';
 import 'article_work_exception.dart';
 import 'i_multi_work_extractor.dart';
@@ -46,14 +47,14 @@ class MultiWorkExtractor implements IMultiWorkExtractor {
         );
       }
 
-      if (UrlParser.isArticleUrl(workUrl)) {
+      if (DouyinUrlClassifier.isArticleUrl(workUrl)) {
         filteredArticleCount++;
         onLog?.call('已过滤文章作品: $workUrl');
         report('已过滤文章');
         continue;
       }
 
-      final explicitAwemeId = UrlParser.extractAwemeId(workUrl);
+      final explicitAwemeId = DouyinUrlExtractor.extractAwemeId(workUrl);
       if (explicitAwemeId != null &&
           indexByAwemeId.containsKey(explicitAwemeId)) {
         onLog?.call('重复作品已去重（保留网址形式）: $workUrl');

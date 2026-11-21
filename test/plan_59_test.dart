@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
 import 'package:yuyin/services/selection/save_selection_session.dart';
-import 'package:yuyin/utils/url_parser.dart';
+import 'package:yuyin/utils/url/batch_input_parser.dart';
 import 'package:yuyin/widgets/save_page/top_multi_home_sheet.dart';
 
 SaveSelectionSession _session() {
@@ -105,11 +105,11 @@ void main() {
     });
   });
 
-  group('UrlParser.parseBatchInput 粘贴板多链接识别与分类测试', () {
+  group('DouyinBatchInputParser.parseBatchInput 粘贴板多链接识别与分类测试', () {
     test('口令主页链接（无日期参数）识别为 userHomes', () {
       const text =
           '5- 长按复制此条消息，打开抖音搜索，查看TA的更多作品。 https://v.douyin.com/1YtriCIWMK0/ 3@1.com :7pm';
-      final result = UrlParser.parseBatchInput(text);
+      final result = DouyinBatchInputParser.parseBatchInput(text);
       expect(result.kind, ParsedBatchKind.userHomes);
       expect(result.homeUrls, ['https://v.douyin.com/1YtriCIWMK0/']);
       expect(result.workUrls, isEmpty);
@@ -118,7 +118,7 @@ void main() {
     test('口令作品链接（含 MM/dd 日期参数）识别为 singleWork', () {
       const text =
           '5.61 复制打开抖音，看看【非影Q的作品】关于妹妹突然对我非常殷勤这件事…… # 二次元 #... https://v.douyin.com/mWWRFO2hyA8/ NJV:/ R@k.cN 05/22 :2pm';
-      final result = UrlParser.parseBatchInput(text);
+      final result = DouyinBatchInputParser.parseBatchInput(text);
       expect(result.kind, ParsedBatchKind.singleWork);
       expect(result.workUrls, ['https://v.douyin.com/mWWRFO2hyA8/']);
       expect(result.homeUrls, isEmpty);
@@ -129,7 +129,7 @@ void main() {
 5- 长按复制此条消息，打开抖音搜索，查看TA的更多作品。 https://v.douyin.com/1YtriCIWMK0/ 3@1.com :7pm
 https://www.douyin.com/user/MS4wLjABAAAAVKdwm0VboixgMdyotVl-8jTDdimg5wXZ4c0wSTHOu6FTSKUrAWG6gIqfJC8Eti-g?from_tab_name=main&relation=2&vid=7697159257049500763
 ''';
-      final result = UrlParser.parseBatchInput(text);
+      final result = DouyinBatchInputParser.parseBatchInput(text);
       expect(result.kind, ParsedBatchKind.userHomes);
       expect(result.homeUrls.length, 2);
       expect(result.workUrls, isEmpty);
@@ -140,7 +140,7 @@ https://www.douyin.com/user/MS4wLjABAAAAVKdwm0VboixgMdyotVl-8jTDdimg5wXZ4c0wSTHO
 5.61 复制打开抖音，看看【非影Q的作品】https://v.douyin.com/mWWRFO2hyA8/ NJV:/ R@k.cN 05/22 :2pm
 https://www.douyin.com/jingxuan?modal_id=7696132501084917042
 ''';
-      final result = UrlParser.parseBatchInput(text);
+      final result = DouyinBatchInputParser.parseBatchInput(text);
       expect(result.kind, ParsedBatchKind.multiWork);
       expect(result.workUrls.length, 2);
       expect(result.homeUrls, isEmpty);
@@ -151,7 +151,7 @@ https://www.douyin.com/jingxuan?modal_id=7696132501084917042
 5- 长按复制此条消息，打开抖音搜索，查看TA的更多作品。 https://v.douyin.com/1YtriCIWMK0/ 3@1.com :7pm
 5.61 复制打开抖音，看看【非影Q的作品】https://v.douyin.com/mWWRFO2hyA8/ NJV:/ R@k.cN 05/22 :2pm
 ''';
-      final result = UrlParser.parseBatchInput(text);
+      final result = DouyinBatchInputParser.parseBatchInput(text);
       expect(result.kind, ParsedBatchKind.mixed);
       expect(result.homeUrls.length, 1);
       expect(result.workUrls.length, 1);

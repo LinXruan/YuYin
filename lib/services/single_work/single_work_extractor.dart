@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import '../../models/single_work/single_work_result.dart';
-import '../../utils/url_parser.dart';
+import '../../utils/url/url_classifier.dart';
+import '../../utils/url/url_extractor.dart';
 import 'i_single_work_extractor.dart';
 
 /// 单作品嗅探底座代理契约（解耦具体 WebViewController）
@@ -18,8 +19,8 @@ class SingleWorkExtractor implements ISingleWorkExtractor {
 
   @override
   String? extractShareUrl(String text) {
-    final url = UrlParser.extractDouyinUrl(text);
-    if (url != null && !UrlParser.isUserHomeUrl(url)) {
+    final url = DouyinUrlExtractor.extractDouyinUrl(text);
+    if (url != null && !DouyinUrlClassifier.isUserHomeUrl(url)) {
       return url;
     }
     return null;

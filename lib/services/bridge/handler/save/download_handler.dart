@@ -6,7 +6,7 @@ import '../../../../models/media_item.dart';
 import '../../../../utils/history/history_store.dart';
 import '../../../../utils/save/file_name_formatter.dart';
 import '../../../../utils/savelocation/save_location_store.dart';
-import '../../../../utils/url_parser.dart';
+import '../../../../utils/url/url_extractor.dart';
 import '../../server/agent_automation_server.dart';
 
 /// 下载端点：把最近一次解析结果落盘。
@@ -52,7 +52,7 @@ class DownloadHandler {
 
     final candidateDesc = (result.desc?.trim().isNotEmpty ?? false)
         ? result.desc!.trim()
-        : UrlParser.extractShareText(server.lastRawInput ?? '');
+        : DouyinUrlExtractor.extractShareText(server.lastRawInput ?? '');
 
     try {
       final downloader = server.downloader;

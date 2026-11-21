@@ -4,7 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../models/media_item.dart';
-import '../../../utils/url_parser.dart';
+import '../../../utils/url/url_classifier.dart';
+import '../../../utils/url/url_extractor.dart';
 import '../../multi_work/i_multi_work_extractor.dart';
 import '../../multi_work/multi_work_extractor.dart';
 import '../../single_work/i_single_work_extractor.dart';
@@ -302,8 +303,8 @@ class DouyinSniffer
   // ==========================================
   @override
   String? extractShareUrl(String text) {
-    final url = UrlParser.extractDouyinUrl(text);
-    if (url != null && !UrlParser.isUserHomeUrl(url)) return url;
+    final url = DouyinUrlExtractor.extractDouyinUrl(text);
+    if (url != null && !DouyinUrlClassifier.isUserHomeUrl(url)) return url;
     return null;
   }
 
@@ -312,8 +313,8 @@ class DouyinSniffer
 
   @override
   String? extractHomeUrl(String text) {
-    final url = UrlParser.extractDouyinUrl(text);
-    if (url != null && UrlParser.isUserHomeUrl(url)) return url;
+    final url = DouyinUrlExtractor.extractDouyinUrl(text);
+    if (url != null && DouyinUrlClassifier.isUserHomeUrl(url)) return url;
     return null;
   }
 

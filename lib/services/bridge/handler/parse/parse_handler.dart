@@ -7,7 +7,8 @@ import '../../../../utils/history/history_store.dart';
 import '../../../../utils/savelocation/save_location_store.dart';
 import '../../../../utils/settings/display_mode_service.dart';
 import '../../../../utils/settings/download_settings_store.dart';
-import '../../../../utils/url_parser.dart';
+import '../../../../utils/url/batch_input_parser.dart';
+import '../../../../utils/url/url_classifier.dart';
 import '../../server/agent_automation_server.dart';
 
 /// 解析与状态端点：单作品/主页解析、应用状态。
@@ -36,7 +37,7 @@ class ParseHandler {
       return;
     }
 
-    final batch = UrlParser.parseBatchInput(text);
+    final batch = DouyinBatchInputParser.parseBatchInput(text);
     if (batch.kind == ParsedBatchKind.empty) {
       server.sendJson(request, HttpStatus.badRequest, {
         'error': '未识别到有效的抖音链接',
@@ -76,7 +77,7 @@ class ParseHandler {
       logs.add('已自动过滤 ${batch.filteredArticleCount} 条文章作品链接');
     }
 
-    if (UrlParser.isUserHomeUrl(url)) {
+    if (DouyinUrlClassifier.isUserHomeUrl(url)) {
       await _parseHome(request, text, url);
       return;
     }

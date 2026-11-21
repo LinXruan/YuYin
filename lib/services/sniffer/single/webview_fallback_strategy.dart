@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import '../../../utils/url_parser.dart';
+import '../../../models/url/douyin_link_kind.dart';
 import '../../share/client/douyin_share_api.dart';
 import '../session/sniff_session.dart';
 import '../sniffer_time_budget.dart';

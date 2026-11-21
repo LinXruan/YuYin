@@ -2,6 +2,8 @@ import '../../models/url/douyin_link_kind.dart';
 import 'url_classifier.dart';
 import 'url_extractor.dart';
 
+export '../../models/url/douyin_link_kind.dart';
+
 /// 批量粘贴解析对象：把整段粘贴文本归类为作品/主页/文章集合。
 class DouyinBatchInputParser {
   DouyinBatchInputParser._();

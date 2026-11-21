@@ -2,7 +2,8 @@ import 'dart:async';
 
 import '../../models/user_home/user_home_profile.dart';
 import '../../models/user_home/user_home_result.dart';
-import '../../utils/url_parser.dart';
+import '../../utils/url/url_classifier.dart';
+import '../../utils/url/url_extractor.dart';
 import 'i_user_home_extractor.dart';
 
 /// 主页嗅探底座代理契约（解耦具体 WebViewController）
@@ -20,8 +21,8 @@ class UserHomeExtractor implements IUserHomeExtractor {
 
   @override
   String? extractHomeUrl(String text) {
-    final url = UrlParser.extractDouyinUrl(text);
-    if (url != null && UrlParser.isUserHomeUrl(url)) {
+    final url = DouyinUrlExtractor.extractDouyinUrl(text);
+    if (url != null && DouyinUrlClassifier.isUserHomeUrl(url)) {
       return url;
     }
     return null;

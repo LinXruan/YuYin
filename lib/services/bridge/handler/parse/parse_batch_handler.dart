@@ -1,7 +1,9 @@
 import 'dart:io';
 
 import '../../../../models/save_page/work_kind.dart';
-import '../../../../utils/url_parser.dart';
+import '../../../../utils/url/batch_input_parser.dart';
+import '../../../../utils/url/url_classifier.dart';
+import '../../../../utils/url/url_extractor.dart';
 import '../../server/agent_automation_server.dart';
 
 /// 批量解析端点：多作品、多主页与主页作者资料。
@@ -30,7 +32,7 @@ class ParseBatchHandler {
       return;
     }
 
-    final batch = UrlParser.parseBatchInput(text);
+    final batch = DouyinBatchInputParser.parseBatchInput(text);
     if (batch.kind == ParsedBatchKind.empty ||
         batch.kind == ParsedBatchKind.articlesOnly) {
       server.sendJson(request, HttpStatus.badRequest, {
@@ -110,7 +112,7 @@ class ParseBatchHandler {
 
     final body = await server.readJsonBody(request);
     final text = body['text']?.toString() ?? body['url']?.toString() ?? '';
-    final batch = UrlParser.parseBatchInput(text);
+    final batch = DouyinBatchInputParser.parseBatchInput(text);
     if (batch.homeUrls.isEmpty) {
       server.sendJson(request, HttpStatus.badRequest, {
         'error': '未识别到主页链接',
@@ -185,7 +187,7 @@ class ParseBatchHandler {
       return;
     }
 
-    final url = UrlParser.extractDouyinUrl(text) ?? text.trim();
+    final url = DouyinUrlExtractor.extractDouyinUrl(text) ?? text.trim();
     if (url.isEmpty) {
       server.sendJson(request, HttpStatus.badRequest, {
         'error': '未提取到有效 URL',
@@ -193,7 +195,7 @@ class ParseBatchHandler {
       });
       return;
     }
-    if (!UrlParser.isUserHomeUrl(url)) {
+    if (!DouyinUrlClassifier.isUserHomeUrl(url)) {
       server.sendJson(request, HttpStatus.badRequest, {
         'error': '给定的链接不是抖音用户主页链接: $url',
         'code': 400,

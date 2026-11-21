@@ -9,7 +9,7 @@ import '../../../services/media/video_downloader.dart';
 import '../../../services/sniffer/facade/douyin_sniffer.dart';
 import '../../../utils/debug/log_controller.dart';
 import '../../../utils/network_detector.dart';
-import '../../../utils/url_parser.dart';
+import '../../../utils/url/batch_input_parser.dart';
 import '../flow/common/parse_flow_context.dart';
 import '../flow/common/parse_save_coordinator.dart';
 import '../flow/home/home_parse_coordinator.dart';
@@ -197,7 +197,7 @@ class _ParsePageState extends State<ParsePage>
     _isParsing = true;
     if (mounted) setState(() {});
 
-    final batch = UrlParser.parseBatchInput(_inputController.text);
+    final batch = DouyinBatchInputParser.parseBatchInput(_inputController.text);
     if (batch.kind == ParsedBatchKind.empty) {
       widget.logs.add('未识别到有效的抖音链接，请检查粘贴内容');
       widget.busy.value = false;

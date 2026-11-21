@@ -10,7 +10,8 @@ import 'package:yuyin/utils/settings/display_mode_service.dart';
 import 'package:yuyin/utils/history/history_store.dart';
 import 'package:yuyin/utils/thumbnail/history_thumbnail_cache.dart';
 import 'package:yuyin/utils/debug/log_controller.dart';
-import 'package:yuyin/utils/url_parser.dart';
+import 'package:yuyin/models/url/douyin_link_kind.dart';
+import 'package:yuyin/utils/url/url_classifier.dart';
 
 class _ErrorMockAdapter implements HttpClientAdapter {
   _ErrorMockAdapter(this.errorBuilder);
@@ -142,36 +143,36 @@ void main() {
     });
 
     group('3. 30 秒超时与单作品链接识别边界校验', () {
-      test('UrlParser.isUserHomeUrl 正确识别标准主页及 /share/user/ 变体链接', () {
+      test('DouyinUrlClassifier.isUserHomeUrl 正确识别标准主页及 /share/user/ 变体链接', () {
         expect(
-          UrlParser.isUserHomeUrl('https://www.douyin.com/user/MS4wLjABAAAAabc123?from_tab_name=main'),
+          DouyinUrlClassifier.isUserHomeUrl('https://www.douyin.com/user/MS4wLjABAAAAabc123?from_tab_name=main'),
           isTrue,
         );
         expect(
-          UrlParser.isUserHomeUrl('https://www.iesdouyin.com/share/user/MS4wLjABAAAAabc123'),
+          DouyinUrlClassifier.isUserHomeUrl('https://www.iesdouyin.com/share/user/MS4wLjABAAAAabc123'),
           isTrue,
         );
         expect(
-          UrlParser.isUserHomeUrl('https://www.douyin.com/share/user/MS4wLjABAAAAabc123'),
+          DouyinUrlClassifier.isUserHomeUrl('https://www.douyin.com/share/user/MS4wLjABAAAAabc123'),
           isTrue,
         );
         expect(
-          UrlParser.isUserHomeUrl('https://www.douyin.com/video/7681695622663032794'),
+          DouyinUrlClassifier.isUserHomeUrl('https://www.douyin.com/video/7681695622663032794'),
           isFalse,
         );
       });
 
-      test('UrlParser.classifyWorkPage 识别 /share/user/ 为 userHome 类型', () {
+      test('DouyinUrlClassifier.classifyWorkPage 识别 /share/user/ 为 userHome 类型', () {
         expect(
-          UrlParser.classifyWorkPage('https://www.iesdouyin.com/share/user/MS4wLjABAAAAabc123'),
+          DouyinUrlClassifier.classifyWorkPage('https://www.iesdouyin.com/share/user/MS4wLjABAAAAabc123'),
           DouyinWorkPage.userHome,
         );
         expect(
-          UrlParser.classifyWorkPage('https://www.douyin.com/user/self'),
+          DouyinUrlClassifier.classifyWorkPage('https://www.douyin.com/user/self'),
           DouyinWorkPage.userHome,
         );
         expect(
-          UrlParser.classifyWorkPage('https://www.douyin.com/video/7681695622663032794'),
+          DouyinUrlClassifier.classifyWorkPage('https://www.douyin.com/video/7681695622663032794'),
           DouyinWorkPage.video,
         );
       });

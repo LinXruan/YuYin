@@ -11,7 +11,7 @@ import '../../../../utils/history/history_store.dart';
 import '../../../../utils/memory/terminal_memory_store.dart';
 import '../../../../utils/save/file_name_formatter.dart';
 import '../../../../utils/savelocation/save_location_store.dart';
-import '../../../../utils/url_parser.dart';
+import '../../../../utils/url/url_extractor.dart';
 import '../../../../widgets/save_page/bottom_media_sheet.dart';
 import '../common/parse_flow_context.dart';
 import '../common/parse_flow_helper.dart';
@@ -40,7 +40,7 @@ class SingleParseCoordinator {
           ? result.desc!.trim()
           : (result.title?.trim().isNotEmpty ?? false
                 ? result.title!.trim()
-                : (UrlParser.extractShareText(rawInput) ?? rawInput));
+                : (DouyinUrlExtractor.extractShareText(rawInput) ?? rawInput));
 
       String? historyCover = (result.coverUrl?.trim().isNotEmpty ?? false)
           ? result.coverUrl!.trim()
@@ -89,7 +89,7 @@ class SingleParseCoordinator {
 
       final candidateDesc = (result.desc?.trim().isNotEmpty ?? false)
           ? result.desc!.trim()
-          : UrlParser.extractShareText(rawInput);
+          : DouyinUrlExtractor.extractShareText(rawInput);
 
       ctx.logs.add('开始下载 ${selected.length} 个选中资源...');
       final baseName = FileNameFormatter.sanitize(

@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart';
 
 import '../../../models/media_item.dart';
 import '../../../utils/login_state_store.dart';
-import '../../../utils/url_parser.dart';
+import '../../../models/url/douyin_link_kind.dart';
+import '../../../utils/url/url_classifier.dart';
+import '../../../utils/url/url_extractor.dart';
 import '../../multi_work/article_work_exception.dart';
 import '../../share/client/douyin_share_api.dart';
 import '../channel/sniffer_channel_parser.dart';
@@ -249,7 +251,7 @@ class SingleSniffStrategy {
       awemeId: awemeId,
     );
     session.retiredAwemeId =
-        awemeId ?? UrlParser.extractAwemeId(session.lastPageUrl ?? '');
+        awemeId ?? DouyinUrlExtractor.extractAwemeId(session.lastPageUrl ?? '');
     final audioPart =
         result.audioCount > 0 ? '、${result.audioCount} 首配乐音频' : '';
     final summary = isImagePost
@@ -278,14 +280,14 @@ class SingleSniffStrategy {
   void handlePageUrl(String url, int taskId) {
     if (session.completer == null || session.completer!.isCompleted) return;
 
-    if (!session.webviewShareFallback && UrlParser.isArticleUrl(url)) {
+    if (!session.webviewShareFallback && DouyinUrlClassifier.isArticleUrl(url)) {
       host.reportUserLog('检测到文章作品链接，已自动过滤');
       finishWithError(const ArticleWorkException(), taskId: taskId);
       return;
     }
 
     if (!session.webviewShareFallback) {
-      final kind = UrlParser.classifyWorkPage(url);
+      final kind = DouyinUrlClassifier.classifyWorkPage(url);
       final wasNote = session.workPageKind == DouyinWorkPage.note;
       if (kind != DouyinWorkPage.unknown) {
         session.workPageKind = kind;
@@ -300,7 +302,7 @@ class SingleSniffStrategy {
         return;
       }
 
-      final awemeId = UrlParser.extractAwemeId(url);
+      final awemeId = DouyinUrlExtractor.extractAwemeId(url);
       if (awemeId != null &&
           (session.awemePageUrl == null || kind == DouyinWorkPage.note)) {
         session.awemePageUrl = url;
@@ -318,7 +320,7 @@ class SingleSniffStrategy {
       }
     }
 
-    final awemeId = UrlParser.extractAwemeId(url);
+    final awemeId = DouyinUrlExtractor.extractAwemeId(url);
     if (awemeId == null) return;
     shareFallback.maybeStart(awemeId, taskId);
   }

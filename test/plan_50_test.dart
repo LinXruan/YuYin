@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
-import 'package:yuyin/utils/url_parser.dart';
+import 'package:yuyin/models/url/douyin_link_kind.dart';
+import 'package:yuyin/utils/url/url_classifier.dart';
+import 'package:yuyin/utils/url/url_extractor.dart';
 
 void main() {
   group('PLAN_50: 抖音主页链接捕获与登录守卫单元测试', () {
@@ -11,49 +13,49 @@ void main() {
     const sampleSecUid =
         'MS4wLjABAAAAVKdwm0VboixgMdyotVl-8jTDdimg5wXZ4c0wSTHOu6FTSKUrAWG6gIqfJC8Eti-g';
 
-    test('UrlParser.isUserHomeUrl 精确识别主页链接', () {
-      expect(UrlParser.isUserHomeUrl(sampleHomeUrl), isTrue);
+    test('DouyinUrlClassifier.isUserHomeUrl 精确识别主页链接', () {
+      expect(DouyinUrlClassifier.isUserHomeUrl(sampleHomeUrl), isTrue);
       expect(
-        UrlParser.isUserHomeUrl('https://www.douyin.com/user/$sampleSecUid'),
+        DouyinUrlClassifier.isUserHomeUrl('https://www.douyin.com/user/$sampleSecUid'),
         isTrue,
       );
       expect(
-        UrlParser.isUserHomeUrl('https://www.douyin.com/user/$sampleSecUid#tab'),
+        DouyinUrlClassifier.isUserHomeUrl('https://www.douyin.com/user/$sampleSecUid#tab'),
         isTrue,
       );
 
       // 非主页链接测试
       expect(
-        UrlParser.isUserHomeUrl('https://www.douyin.com/video/7391965576757628212'),
+        DouyinUrlClassifier.isUserHomeUrl('https://www.douyin.com/video/7391965576757628212'),
         isFalse,
       );
       expect(
-        UrlParser.isUserHomeUrl('https://www.douyin.com/note/7701683319334910554'),
+        DouyinUrlClassifier.isUserHomeUrl('https://www.douyin.com/note/7701683319334910554'),
         isFalse,
       );
       expect(
-        UrlParser.isUserHomeUrl('https://www.douyin.com/article/7697159257049500763'),
+        DouyinUrlClassifier.isUserHomeUrl('https://www.douyin.com/article/7697159257049500763'),
         isFalse,
       );
-      expect(UrlParser.isUserHomeUrl(null), isFalse);
-      expect(UrlParser.isUserHomeUrl(''), isFalse);
+      expect(DouyinUrlClassifier.isUserHomeUrl(null), isFalse);
+      expect(DouyinUrlClassifier.isUserHomeUrl(''), isFalse);
     });
 
-    test('UrlParser.extractSecUid 准确提取 sec_uid', () {
-      expect(UrlParser.extractSecUid(sampleHomeUrl), sampleSecUid);
+    test('DouyinUrlExtractor.extractSecUid 准确提取 sec_uid', () {
+      expect(DouyinUrlExtractor.extractSecUid(sampleHomeUrl), sampleSecUid);
       expect(
-        UrlParser.extractSecUid('https://www.douyin.com/user/abc123456?a=1'),
+        DouyinUrlExtractor.extractSecUid('https://www.douyin.com/user/abc123456?a=1'),
         'abc123456',
       );
       expect(
-        UrlParser.extractSecUid('https://www.douyin.com/video/7391965576757628212'),
+        DouyinUrlExtractor.extractSecUid('https://www.douyin.com/video/7391965576757628212'),
         isNull,
       );
     });
 
-    test('UrlParser.classifyWorkPage 识别主页链接为 userHome', () {
+    test('DouyinUrlClassifier.classifyWorkPage 识别主页链接为 userHome', () {
       expect(
-        UrlParser.classifyWorkPage(sampleHomeUrl),
+        DouyinUrlClassifier.classifyWorkPage(sampleHomeUrl),
         DouyinWorkPage.userHome,
       );
     });
@@ -97,7 +99,7 @@ void main() {
 
       expect(lines.first.startsWith('主页链接：'), isTrue);
       final homeUrl = lines.first.substring('主页链接：'.length).trim();
-      expect(UrlParser.isUserHomeUrl(homeUrl), isTrue);
+      expect(DouyinUrlClassifier.isUserHomeUrl(homeUrl), isTrue);
 
       // 第一行是主页链接，后续 http 开头的行均为作品链接
       final works = lines.where((l) => l.startsWith('http')).toList();

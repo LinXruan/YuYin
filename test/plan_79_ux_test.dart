@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
 import 'package:yuyin/models/media_item.dart';
-import 'package:yuyin/models/url/douyin_link_kind.dart';
 import 'package:yuyin/services/batch_work/i_work_batch_saver.dart';
 import 'package:yuyin/services/user_home/user_home_batch_saver.dart';
 import 'package:yuyin/utils/network_detector.dart';

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import '../../../models/user_home/user_home_profile.dart';
 import '../../../utils/login_state_store.dart';
-import '../../../utils/url_parser.dart';
+import '../../../models/url/douyin_link_kind.dart';
 import '../facade/douyin_sniffer.dart';
 import '../lifecycle/sniff_cancelled_exception.dart';
 import '../session/sniff_session.dart';

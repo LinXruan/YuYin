@@ -7,7 +7,8 @@ import '../../../../utils/memory/terminal_memory_store.dart';
 import '../../../../utils/save/author_folder_name.dart';
 import '../../../../utils/save/home_save_path.dart';
 import '../../../../utils/savelocation/save_location_store.dart';
-import '../../../../utils/url_parser.dart';
+import '../../../../utils/url/batch_input_parser.dart';
+import '../../../../utils/url/url_classifier.dart';
 import '../../../batch_work/work_batch_saver.dart';
 import '../../../selection/save_selection_session.dart';
 import '../../../selection/session_work_preparer.dart';
@@ -39,7 +40,7 @@ class SaveHandler {
       return;
     }
 
-    final batch = UrlParser.parseBatchInput(text);
+    final batch = DouyinBatchInputParser.parseBatchInput(text);
     if (batch.workUrls.isEmpty) {
       server.sendJson(request, HttpStatus.badRequest, {
         'error': '未识别到作品链接',
@@ -147,8 +148,8 @@ class SaveHandler {
       final home = await sniffer.userHome.extractAllWorks(url);
       final works = <SaveWorkItem>[];
       for (final workUrl in home.workUrls) {
-        if (UrlParser.isArticleUrl(workUrl)) continue;
-        final kind = UrlParser.classifyWorkPage(workUrl) == DouyinWorkPage.note
+        if (DouyinUrlClassifier.isArticleUrl(workUrl)) continue;
+        final kind = DouyinUrlClassifier.classifyWorkPage(workUrl) == DouyinWorkPage.note
             ? WorkMediaKind.image
             : WorkMediaKind.video;
         works.add(

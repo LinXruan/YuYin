@@ -13,7 +13,8 @@ import '../../../../services/user_home/user_home_batch_saver.dart';
 import '../../../../utils/history/history_store.dart';
 import '../../../../utils/login_state_store.dart';
 import '../../../../utils/memory/terminal_memory_store.dart';
-import '../../../../utils/url_parser.dart';
+import '../../../../models/url/douyin_link_kind.dart';
+import '../../../../utils/url/url_classifier.dart';
 import '../../../../widgets/save_page/middle_multi_work_sheet.dart';
 import '../../../../widgets/save_page/top_multi_home_sheet.dart';
 import '../common/parse_flow_context.dart';
@@ -44,8 +45,8 @@ class HomeParseCoordinator {
     final worksBySecUid = <String, List<SaveWorkItem>>{};
     final seenHomeKeys = <String>{};
     final orderedHomeUrls = <String>[
-      ...homeUrls.where(UrlParser.isUserHomeUrl),
-      ...homeUrls.where((url) => !UrlParser.isUserHomeUrl(url)),
+      ...homeUrls.where(DouyinUrlClassifier.isUserHomeUrl),
+      ...homeUrls.where((url) => !DouyinUrlClassifier.isUserHomeUrl(url)),
     ];
 
     try {
@@ -264,8 +265,8 @@ class HomeParseCoordinator {
   List<SaveWorkItem> _buildHomeWorks(UserHomeResult result) {
     final works = <SaveWorkItem>[];
     for (final url in result.workUrls) {
-      if (UrlParser.isArticleUrl(url)) continue;
-      final kind = UrlParser.classifyWorkPage(url) == DouyinWorkPage.note
+      if (DouyinUrlClassifier.isArticleUrl(url)) continue;
+      final kind = DouyinUrlClassifier.classifyWorkPage(url) == DouyinWorkPage.note
           ? WorkMediaKind.image
           : WorkMediaKind.video;
       works.add(

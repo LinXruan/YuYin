@@ -2,7 +2,8 @@ import 'dart:io';
 
 import '../../../../models/media_item.dart';
 import '../../../../utils/memory/terminal_memory_store.dart';
-import '../../../../utils/url_parser.dart';
+import '../../../../utils/url/batch_input_parser.dart';
+import '../../../../utils/url/url_classifier.dart';
 import '../../../selection/debug/selection_debug_bridge.dart';
 import '../../../selection/save_selection_session.dart';
 import '../../server/agent_automation_server.dart';
@@ -127,7 +128,7 @@ class SelectionHandler {
     if (text.trim().isEmpty) {
       return {'success': false, 'error': 'text is required'};
     }
-    final batch = UrlParser.parseBatchInput(text);
+    final batch = DouyinBatchInputParser.parseBatchInput(text);
 
     if (source == 'home') {
       final profiles = <UserHomeProfile>[];
@@ -139,10 +140,10 @@ class SelectionHandler {
         profiles.add(home.profile);
         works[secUid] = [
           for (final workUrl in home.workUrls)
-            if (!UrlParser.isArticleUrl(workUrl))
+            if (!DouyinUrlClassifier.isArticleUrl(workUrl))
               SaveWorkItem(
                 url: workUrl,
-                kind: UrlParser.classifyWorkPage(workUrl) == DouyinWorkPage.note
+                kind: DouyinUrlClassifier.classifyWorkPage(workUrl) == DouyinWorkPage.note
                     ? WorkMediaKind.image
                     : WorkMediaKind.video,
                 title: home.getTitle(workUrl) ?? '',

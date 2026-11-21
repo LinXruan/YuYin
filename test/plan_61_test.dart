@@ -4,7 +4,8 @@ import 'package:yuyin/services/multi_work/article_work_exception.dart';
 import 'package:yuyin/services/multi_work/i_multi_work_extractor.dart';
 import 'package:yuyin/services/multi_work/multi_work_extractor.dart';
 import 'package:yuyin/utils/settings/download_settings_store.dart';
-import 'package:yuyin/utils/url_parser.dart';
+import 'package:yuyin/utils/url/batch_input_parser.dart';
+import 'package:yuyin/utils/url/url_classifier.dart';
 import 'package:yuyin/utils/settings/video_quality_utils.dart';
 
 /// 多作品抓取代理 Fake：按 URL 返回预置结果
@@ -67,31 +68,31 @@ void main() {
     DownloadSettingsStore.resetForTesting();
   });
 
-  group('UrlParser 文章识别与批量分类', () {
+  group('DouyinUrlClassifier 文章识别与批量分类', () {
     test('显式 /article/ 链接识别为文章', () {
       expect(
-        UrlParser.isArticleUrl(
+        DouyinUrlClassifier.isArticleUrl(
           'https://www.douyin.com/article/7697159257049500763',
         ),
         isTrue,
       );
       expect(
-        UrlParser.isArticleUrl(
+        DouyinUrlClassifier.isArticleUrl(
           'https://www.iesdouyin.com/share/article/7697159257049500763/',
         ),
         isTrue,
       );
       expect(
-        UrlParser.isArticleUrl(
+        DouyinUrlClassifier.isArticleUrl(
           'https://www.douyin.com/video/7697159257049500763',
         ),
         isFalse,
       );
-      expect(UrlParser.isArticleUrl(null), isFalse);
+      expect(DouyinUrlClassifier.isArticleUrl(null), isFalse);
     });
 
     test('仅文章链接归类为 articlesOnly 并从作品列表剔除', () {
-      final result = UrlParser.parseBatchInput(
+      final result = DouyinBatchInputParser.parseBatchInput(
         'https://www.douyin.com/article/7697159257049500763',
       );
       expect(result.kind, ParsedBatchKind.articlesOnly);
@@ -101,7 +102,7 @@ void main() {
     });
 
     test('作品链接混入文章链接时只保留作品并记录过滤数量', () {
-      final result = UrlParser.parseBatchInput('''
+      final result = DouyinBatchInputParser.parseBatchInput('''
 https://www.douyin.com/video/7300000000000000001
 https://www.douyin.com/article/7697159257049500763
 https://www.douyin.com/note/7300000000000000002
@@ -113,7 +114,7 @@ https://www.douyin.com/note/7300000000000000002
     });
 
     test('同一作品网址的不同查询参数按 awemeId 去重', () {
-      final result = UrlParser.parseBatchInput('''
+      final result = DouyinBatchInputParser.parseBatchInput('''
 https://www.douyin.com/video/7300000000000000001?from=feed
 https://www.douyin.com/video/7300000000000000001?from=profile
 ''');
@@ -122,7 +123,7 @@ https://www.douyin.com/video/7300000000000000001?from=profile
     });
 
     test('同一主页网址的不同查询参数按 secUid 去重', () {
-      final result = UrlParser.parseBatchInput('''
+      final result = DouyinBatchInputParser.parseBatchInput('''
 https://www.douyin.com/user/MS4wLjABAAAAabc123?from=feed
 https://www.douyin.com/user/MS4wLjABAAAAabc123?from=profile
 ''');
@@ -131,7 +132,7 @@ https://www.douyin.com/user/MS4wLjABAAAAabc123?from=profile
     });
 
     test('同一主页的口令短链与网址同屏混贴时归类为 userHomes', () {
-      final result = UrlParser.parseBatchInput(
+      final result = DouyinBatchInputParser.parseBatchInput(
         'https://v.douyin.com/1YtriCIWMK0/ '
         'https://www.douyin.com/user/MS4wLjABAAAAabc123?from=tab',
       );
@@ -141,7 +142,7 @@ https://www.douyin.com/user/MS4wLjABAAAAabc123?from=profile
     });
 
     test('同一作品的口令短链与网址同屏混贴时归类为 multiWork', () {
-      final result = UrlParser.parseBatchInput(
+      final result = DouyinBatchInputParser.parseBatchInput(
         'https://v.douyin.com/mWWRFO2hyA8/ '
         'https://www.douyin.com/video/7300000000000000001',
       );

@@ -2,7 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yuyin/models/media_item.dart';
-import 'package:yuyin/utils/url_parser.dart';
+import 'package:yuyin/utils/url/url_classifier.dart';
+import 'package:yuyin/utils/url/url_extractor.dart';
 
 void main() {
   group('PLAN_52: 主页作品滚动加载与节流日志统计单元测试', () {
@@ -46,15 +47,15 @@ void main() {
       final parsedUrls = <String>[];
       for (final line in lines) {
         if (line.isEmpty) continue;
-        final url = UrlParser.extractDouyinUrl(line);
-        if (url != null && UrlParser.isUserHomeUrl(url)) {
+        final url = DouyinUrlExtractor.extractDouyinUrl(line);
+        if (url != null && DouyinUrlClassifier.isUserHomeUrl(url)) {
           parsedUrls.add(url);
         }
       }
 
       expect(parsedUrls.length, 3);
       for (final u in parsedUrls) {
-        expect(UrlParser.extractSecUid(u), isNotNull);
+        expect(DouyinUrlExtractor.extractSecUid(u), isNotNull);
       }
     });
   });
