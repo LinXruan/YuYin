@@ -46,7 +46,7 @@
   - 改造 `lib/pages/settings/settings_page.dart`
   - 同步版本 `pubspec.yaml`、`lib/app_info.dart` → `1.6.1+244`
   - 新增 `test/unit/utils/thumbnail_cache_resilience_test.dart`，更新 `test/widget/settings/settings_page_test.dart`
-- **提交规范**：`244_pl91：缩略图缓存补齐确定性哈希、退避、世代取消与设置页清理入口`
+- **提交规范**：`244_pl91：缩略图缓存补齐确定性哈希、退避、世代取消与设置页清理入口`（已完成，commit `652ca41`）
 
 ### 阶段 2（build 245）：原生 Cookie 读取与 JS/Sniffer 细节修复
 - **涉及文件**：
@@ -54,13 +54,15 @@
   - 改造 `lib/services/script/douyin/chunk/js_platform_patch.dart`、`js_media_collect.dart`、`js_scan_engine.dart`、`js_state_header.dart`、`js_bootstrap.dart`、`js_home_collect.dart`、`js_home_dispatch.dart`
   - 同步版本 `pubspec.yaml`、`lib/app_info.dart` → `1.6.1+245`
   - 新增 `test/unit/sniffer/sniffer_js_and_cookie_test.dart`
-- **提交规范**：`245_pl91：原生 Cookie 替换 JS 读取，修复 iPhone UA 伪装与图文/标题兼容`
+- **提交规范**：`245_pl91：原生 Cookie 替换 JS 读取，修复 iPhone UA 伪装与图文/标题兼容`（已完成，commit `47e58df`）
 
 ### 阶段 3（build 246）：真机 WIFI ADB 全链路回归与交接文档收官
 - **涉及文件**：
   - 更新 `HANDOVER.md`、`PLAN/PLAN_91~100/PLAN_91.md`
   - 同步版本 `pubspec.yaml`、`lib/app_info.dart` → `1.6.1+246`
-- **验收**：`flutter analyze` 0 issues、`flutter test` 全绿、`flutter build apk --debug` 成功、真机 WIFI ADB 三链路与 `/api/thumbnails` 实测通过
+- **实测结果**：
+  - `flutter analyze` 0 issues，`flutter test` 433 项测试 100% 全绿。
+  - 真机（WIFI ADB `192.168.1.101:39159`）安装 `1.6.1+245` Debug 包：`120 Hz` 自适应高刷，单视频 `1920x1200`（1080P）、图文 4 资源（3 图 + 1 配乐）、主页 18 条（18 封面 / 18 标题 / 0 失败）及 `/api/thumbnails` 实测通过。
 - **提交规范**：`246_pl91：真机 WIFI ADB 回归验收与交接文档更新（PLAN_91 收官）`
 
 ---

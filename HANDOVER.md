@@ -1,14 +1,14 @@
-# 余音交接清单（截至 1.6.1+243）
+# 余音交接清单（截至 1.6.1+246）
 
-> 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_81~90/PLAN_90.md`。
-> 工作区干净，最近提交为 243_pl90。
+> 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_91~100/PLAN_91.md`。
+> 工作区干净，最近提交为 246_pl91。
 
 ---
 
 ## 0. 一句话现状
 
-- 版本：`1.6.1+243`（版本名冻结，只递增 build 号）。
-- 门禁：`flutter analyze` 0 issues；`flutter test` 421 全绿；**结构门禁 `part` 上限为 0 且零 `plan_XX` 测试残留**！
+- 版本：`1.6.1+246`（版本名冻结，只递增 build 号）。
+- 门禁：`flutter analyze` 0 issues；`flutter test` 433 全绿；**结构门禁 `part` 上限为 0 且零 `plan_XX` 测试残留**！
 - 已完成大重构：
   - **全库 0 part**（调试桥、Selection、Shell、Sniffer、ParsePage、HistoryPage、UpdateDialog、SavePage 全部 0 part）。
   - **全库 0 兼容壳**（彻底删除 `lib/models/media_item.dart` 与 `lib/utils/url_parser.dart` 兼容壳，全域 100% 直连具体领域模型与解析类）。
@@ -16,7 +16,8 @@
   - **历史页多维筛选与一键重新解析**（媒体类型筛选：全部/视频/图文/主页，卡片一键「解析」直达解析页，彻底消除缩略图落盘高频全页重建）。
   - **测试领域重组与门禁收官（PLAN_89）**：38 个历史 `plan_*` 测试全面迁入 `test/unit|widget/<domain>/`，补全核心组件 Widget 测试，门禁禁止新增迭代编号命名。
   - **Wave 3 交互与体验闭环（PLAN_90）**：中层弹窗失败内嵌反馈、冷启动横幅同步预加载零闪现、音频错误态与 200ms 拖动/seek 守卫防抖、全屏多图滑动切换与 `42×42dp` 角标热区。
-- 后续主要工作：Store 显式注入、PLAN_78 性能优化项、设置页缓存管理与 JS 细节。
+  - **缩略图缓存管理闭环与 Sniffer/JS 细节修复（PLAN_91）**：缩略图确定性 64 位 FNV-1a 哈希、失败 URL 指数退避、`clearCache` 世代取消、LRU 上限（600 张/100 MB）与孤儿淘汰、设置页缩略图缓存统计与一键清理入口；`SingleSniffStrategy` 原生 Cookie 读取替换 3 秒 `document.cookie`、iPhone UA 不伪造 `Win32`、`scanTree` 兼容 `image_post_info.images`、API 标题优先于 DOM 文本。
+- 后续主要工作：Store 显式注入、`SessionWorkPreparer` 滑动窗口边解析边下载、`StorageBridge` 目录缓存与线程池、选择树单作者增量刷新及 `js_scan_engine` / DOM 回流清理。
 
 ---
 
@@ -85,6 +86,9 @@
 | 241 | 90 | PLAN_90 阶段 1：中层打开失败弹窗内反馈，冷启动横幅同步预加载防闪 |
 | 242 | 90 | PLAN_90 阶段 2：音频错误态与防抖修复，大图全屏滑动与 42×42dp 热区优化 |
 | 243 | 90 | PLAN_90 阶段 3：真机 WIFI ADB 全链路实测通过（421 全绿）与交接文档收官 |
+| 244 | 91 | PLAN_91 阶段 1：缩略图缓存补齐确定性哈希、退避、世代取消、LRU/孤儿淘汰与设置页清理入口 |
+| 245 | 91 | PLAN_91 阶段 2：原生 Cookie 替换 `document.cookie`，修复 iPhone UA 伪装与 `image_post_info`/API 标题覆盖 |
+| 246 | 91 | PLAN_91 阶段 3：真机 WIFI ADB 全链路实测通过（433 全绿）与交接文档收官 |
 
 ---
 
@@ -205,12 +209,12 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 
 ### C. PLAN_78 · 性能剩余项
 
-- [ ] 原生 Cookie 读取替换 `message_result_flow` 的 3 秒 `document.cookie`。
+- [x] 原生 Cookie 读取替换 `SingleSniffStrategy` 的 3 秒 `document.cookie`。（PLAN_91 已完成）
 - [ ] 任务启动去掉冗余 `about:blank`/`setUserAgent`/reset IPC；已知 `awemeId` 时立即启动分享页兜底。
 - [ ] `SessionWorkPreparer` 改滑动窗口「边解析边下载」，避免大主页 CDN 签名过期。
-- [ ] `js_scan_engine` 去全量 `div,span,a,button` 扫描与 `offsetParent/innerText` 强制回流。
+- [ ] `js_scan_engine` / DOM 扫描去全量节点遍历与 `offsetParent/innerText` 强制回流。
 - [ ] `StorageBridge` 目录 DocumentFile 缓存 + 线程池（Cursor 已完成）。
-- [ ] 历史缩略图：LRU/孤儿淘汰、失败 URL 退避、确定性哈希、`clearCache` 世代取消。
+- [x] 历史缩略图：LRU/孤儿淘汰、失败 URL 退避、确定性哈希、`clearCache` 世代取消。（PLAN_91 已完成）
 - [ ] 选择树单作者增量刷新（启用 `_authorOfWork`），`SaveSelectionFrame` partial 切换不再重建图片。
 - [x] `history_page` 移除 `build()` 内磁盘 I/O 与全局通知整页重建。（PLAN_88 已完成）
 
@@ -221,8 +225,8 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 - [x] 历史页「一键重新解析」与媒体类型筛选。（PLAN_88 已完成）
 - [x] 音频：错误态展示、进度拖动 200ms 防抖、暂停恢复不抖动。（PLAN_90 已完成）
 - [x] 图片全屏滑动切换；22×22dp 极小按钮热区；冷启动已关闭横幅防闪。（PLAN_90 已完成）
-- [ ] 设置页缩略图缓存管理入口。
-- [ ] 剩余 JS 问题：`jsPlatformPatch` 在 iPhone UA 下伪造 `Win32`；`scanTree` 漏 `image_post_info.images`；DOM 文本覆盖 API 标题。
+- [x] 设置页缩略图缓存管理入口。（PLAN_91 已完成）
+- [x] 剩余 JS 问题：`jsPlatformPatch` 在 iPhone UA 下伪造 `Win32`；`scanTree` 漏 `image_post_info.images`；DOM 文本覆盖 API 标题。（PLAN_91 已完成）
 
 ### E. PLAN_81 · 测试与门禁
 
@@ -270,7 +274,7 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 ## 8. 新对话开场建议
 
 1. 先读本文件 + `AGENTS.md` + `DEBUG.md`。
-2. 跑 `flutter analyze` 与 `flutter test` 确认基线（应为 `0 issues` / `421 tests all passed`）。
-3. 目前所有 `part`、`兼容壳`、`测试归类` 与 `PLAN_79 体验痛点` 均已清零收官；下一步建议按需从 `5.B / 5.C / 5.D` 剩余项挑高优先级推进（例如：`Store 显式注入`、`SessionWorkPreparer 滑动窗口边解析边下载`、`原生 Cookie 读取替换 document.cookie`、`设置页缩略图缓存管理入口` 等）。
-4. 严格遵守 `AGENTS.md` §0：先写 `PLAN_91.md` 再编码；每完成一个阶段执行 `bump build → analyze → test → 设备三链路回归 → commit`。
+2. 跑 `flutter analyze` 与 `flutter test` 确认基线（应为 `0 issues` / `433 tests all passed`）。
+3. 目前 `part`、兼容壳、测试归类、`PLAN_79` 体验与缩略图/JS/Cookie 细节均已收官；下一步建议按需从 `5.B / 5.C` 剩余项挑高优先级推进（例如：`SessionWorkPreparer` 滑动窗口边解析边下载、Sniffer 启动去冗余 IPC、Store 显式注入、`StorageBridge` 目录缓存与线程池等）。
+4. 严格遵守 `AGENTS.md` §0：先写 `PLAN_92.md` 再编码；每完成一个阶段执行 `bump build → analyze → test → 设备三链路回归 → commit`。
 5. 任何阶段遇到阻塞（时序回归、无法确定的行为），先停下汇报或记录，严禁用回退兜底掩盖问题。
