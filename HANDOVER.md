@@ -1,7 +1,7 @@
 # 余音交接清单（截至 1.6.1+249）
 
-> 新对话窗口先读本文件，再读 `AGENTS.md`、`DEBUG.md` 与 `PLAN/PLAN_91~100/PLAN_92.md`。
-> 工作区干净，最近提交为 249_pl92。
+> 新对话窗口先读本文件，再读 `GEMINI.md`、`DEBUG.md` 与 `PLAN/PLAN_91~100/PLAN_92.md`。
+> 最近提交为 `57d717b`（`AGENTS.md` 更名为 `GEMINI.md`），最新代码版本提交为 `0d90643`（`249_pl92`）。
 
 ---
 
@@ -34,7 +34,7 @@
 
 ---
 
-## 2. 本轮已完成的 build（192 → 243）
+## 2. 本轮已完成的 build（192 → 249）
 
 | build | PLAN | 内容 |
 | --- | --- | --- |
@@ -80,7 +80,7 @@
 | 234 | 88 | PLAN_88 阶段 1：HistoryQuery 支持媒体类型过滤，HistoryPage 移除缩略图全局刷新 |
 | 235 | 88 | PLAN_88 阶段 2：HistoryFrame 增加类型筛选胶囊与一键重新解析跳转，覆盖测试 |
 | 236 | 88 | PLAN_88 阶段 3：模拟器端功能回归与交接文档更新（PLAN_88 收官） |
-| 237 | 88 | 精简凝练 AGENTS.md 守则并清理冗余提示文件 |
+| 237 | 88 | 精简凝练 AGENTS.md（现 `GEMINI.md`）守则并清理冗余提示文件 |
 | 238 | 89 | PLAN_89 阶段 1：重组 38 个 `test/plan_*` 至 `test/unit\|widget/<domain>/` 并新增零编号门禁 |
 | 239 | 89 | PLAN_89 阶段 2：补全 LogPanel、MediaAudioPlayerBar、SettingsPage 与 ShellUpdateBanner Widget 测试 |
 | 240 | 89 | PLAN_89 阶段 3：全量 414 测试通过、真机 WIFI ADB 三链路实测与交接文档收官 |
@@ -100,7 +100,7 @@
 
 ### 3.1 调试桥（0 part）
 
-- `lib/services/bridge/server/agent_automation_server.dart`（223 行）：状态、生命周期、`readJsonBody/sendJson`、序列化、样例表。
+- `lib/services/bridge/server/agent_automation_server.dart`（229 行）：状态、生命周期、`readJsonBody/sendJson`、序列化、样例表（显式接收 `AppStores`）。
 - `lib/services/bridge/server/bridge_router.dart`：纯路径分发。
 - `lib/services/bridge/handler/system/`：`system_handler`、`log_handler`、`media_handler`、`verify_handler`。
 - `lib/services/bridge/handler/parse/`：`parse_handler`、`parse_batch_handler`、`history_handler`。
@@ -110,14 +110,14 @@
 
 ### 3.2 Selection（0 part）
 
-- 会话：[save_selection_session.dart](file:///c:/Users/Administrator/Desktop/github/LinXruan/YuYin/lib/services/selection/save_selection_session.dart)（372 行）：只读查询 + 32 个门面委托 + 事务通知。
+- 会话：[save_selection_session.dart](file:///c:/Users/Administrator/Desktop/github/LinXruan/YuYin/lib/services/selection/save_selection_session.dart)（383 行）：只读查询 + 门面委托 + 事务通知（显式接收 `TerminalMemoryStore`）。
 - 节点：`lib/services/selection/node/` 六个公开类（`TerminalNode`/`AuthorNode`/`WorkNode`/`VideoWorkNode`/`MediaWorkNode`/`ResourceNode`）。
 - 命令：`lib/services/selection/command/` 三个领域对象（`SelectionOperator`/`TerminalOperator`/`SaveOperator`）。
 - 新命令：写进领域对象，再在会话加一行委托；**不要**恢复 `part`。
 
 ### 3.3 Shell（0 part）
 
-- `pages/shell/page/app_shell.dart`：长期服务 + 启动流程（更新检查、登录页、Tab 切换）。
+- `pages/shell/page/app_shell.dart`：长期服务 + 启动流程（更新检查、登录页、Tab 切换；由 `main.dart` 传入 `AppStores` 并向下分发）。
 - `pages/shell/widget/shell_scaffold.dart` / `shell_update_banner.dart`：纯展示组件。
 
 ### 3.4 Sniffer（0 part，大重构完成）
@@ -131,11 +131,11 @@
 - `home/home_sniff_strategy.dart`、`home/profile_sniff_strategy.dart`、`home/sniffer_home_host.dart`。
 - `navigation/sniffer_navigation_policy.dart`：白名单、错误收集、URL 分发、验证码检测。
 - `lifecycle/sniffer_page_lifecycle.dart`：空白页重置、空闲延迟卸载、桌面 UA 恢复。
-- 门面 `douyin_sniffer.dart` **278 行**，硬上限 400，**0 part**。
+- 门面 `douyin_sniffer.dart` **358 行**（硬上限 400，**0 part**），显式接收 `LoginStateStore`。
 
 ### 3.5 原生（Kotlin）
 
-- `MainActivity.kt` 86 行：只组装通道与生命周期。
+- `MainActivity.kt` 84 行：只组装通道与生命周期。
 - `audio/AudioPreviewPlayer.kt`：prepared 状态机、AudioFocus、错误即释放。
 - `install/InstallerChannel.kt`：安装、未知来源权限、返回续装。
 - `channel/StorageChannel.kt`：SAF 选择、落盘、查询、旧版权限。
@@ -152,7 +152,7 @@
 ```bash
 cd c:/Users/Administrator/Desktop/github/LinXruan/YuYin
 flutter analyze            # 必须 0 issues
-flutter test               # 必须 421+ 全绿（含 structure_gate_test）
+flutter test               # 必须 435 全绿（含 structure_gate_test）
 flutter build apk --debug  # 校验 Kotlin 与打包
 ```
 
@@ -259,7 +259,9 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 
 | 主题 | 文件 |
 | --- | --- |
-| 迭代计划 | `PLAN/PLAN_71~80/PLAN_77~80.md`、`PLAN/PLAN_81~90/PLAN_81~90.md` |
+| 开发守则 | `GEMINI.md`（原 `AGENTS.md`） |
+| 迭代计划 | `PLAN/PLAN_71~80/PLAN_77~80.md`、`PLAN/PLAN_81~90/PLAN_81~90.md`、`PLAN/PLAN_91~100/PLAN_91~92.md` |
+| 状态容器 | `lib/utils/app_stores.dart` |
 | 嗅探门面 | `lib/services/sniffer/facade/douyin_sniffer.dart` |
 | 任务态 | `lib/services/sniffer/session/sniff_session.dart` |
 | 消息路由 | `lib/services/sniffer/message/sniffer_message_router.dart` |
@@ -277,8 +279,8 @@ D:/Install/anaconda3/envs/deepseek/python.exe tool/launch_emulator.py
 
 ## 8. 新对话开场建议
 
-1. 先读本文件 + `AGENTS.md` + `DEBUG.md`。
+1. 先读本文件 + `GEMINI.md` + `DEBUG.md`。
 2. 跑 `flutter analyze` 与 `flutter test` 确认基线（应为 `0 issues` / `435 tests all passed`）。
 3. 目前 `part`、兼容壳、Store 静态单例、测试归类、`PLAN_79` 体验与缩略图/JS/Cookie 细节均已清零收官；下一步建议按需从 `5.C` 剩余性能项推进（例如：`SessionWorkPreparer` 滑动窗口边解析边下载、Sniffer 启动去冗余 IPC、`StorageBridge` 目录缓存与线程池、选择树单作者增量刷新等）。
-4. 严格遵守 `AGENTS.md` §0：先写 `PLAN_93.md` 再编码；每完成一个阶段执行 `bump build → analyze → test → 设备三链路回归 → commit`。
+4. 严格遵守 `GEMINI.md` §0：先写 `PLAN_93.md` 再编码；每完成一个阶段执行 `开发改动 → flutter analyze (0 issues) → flutter test (100%全绿) → 设备验证 → commit`（版本与 `pubspec.yaml`、`lib/app_info.dart` 同步）。
 5. 任何阶段遇到阻塞（时序回归、无法确定的行为），先停下汇报或记录，严禁用回退兜底掩盖问题。
