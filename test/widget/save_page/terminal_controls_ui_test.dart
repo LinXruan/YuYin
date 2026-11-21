@@ -12,7 +12,7 @@ import 'package:yuyin/services/selection/save_selection_session.dart';
 import 'package:yuyin/widgets/save_page/middle_multi_work_sheet.dart';
 import 'package:yuyin/widgets/save_page/top_multi_home_sheet.dart';
 
-import 'image_preview_sheet_harness.dart';
+import '../../image_preview_sheet_harness.dart';
 
 SingleWorkResult _note(String work, {bool music = false}) {
   return SingleWorkResult(

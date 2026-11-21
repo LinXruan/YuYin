@@ -76,4 +76,15 @@ void main() {
     }
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
+
+  test('test 下不再使用 plan_XX 编号命名测试文件', () {
+    final violations = <String>[];
+    final pattern = RegExp(r'^plan_\d+');
+    for (final entity in Directory('test').listSync(recursive: true)) {
+      if (entity is! File || !entity.path.endsWith('.dart')) continue;
+      final name = entity.uri.pathSegments.last;
+      if (pattern.hasMatch(name)) violations.add(entity.path);
+    }
+    expect(violations, isEmpty, reason: violations.join('\n'));
+  });
 }
